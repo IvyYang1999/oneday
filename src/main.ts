@@ -1,27 +1,36 @@
 import { Plugin } from "obsidian"
 import { parseTimeline } from "./core/parser"
-import { formatHours } from "./core/duration"
-import { statsByType } from "./core/stats"
+import { renderTimelineInto } from "./render/timeline-view"
+import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 
 /**
  * Oneday — highlighter-style daily timeline block.
- * M1 first slice: parser is done; this registers a minimal read-only
- * code-block processor so the build is green. SVG renderer lands next.
+ * Markdown source is the single source of truth (mermaid-style dual view).
+ * M1: parse -> SVG render -> per-type stats, plus 荧光笔色号 settings.
  */
 export default class OnedayPlugin extends Plugin {
+  settings: OnedaySettings = DEFAULT_SETTINGS
+
   async onload(): Promise<void> {
+    await this.loadSettings()
+    this.addSettingTab(new OnedaySettingTab(this.app, this))
+
     this.registerMarkdownCodeBlockProcessor("timeline", (source, el) => {
       const doc = parseTimeline(source)
-      const container = el.createDiv({ cls: "oneday-timeline" })
-      container.createEl("p", {
-        text: `[oneday] ${doc.entries.length} entries, ${doc.annotations.length} annotations, ${doc.errors.length} errors`,
+      renderTimelineInto(el, doc, {
+        typeColors: this.settings.typeColors,
+        hourHeight: this.settings.hourHeight,
+        width: this.settings.width,
       })
-      const stats = statsByType(doc.entries)
-      if (stats.length > 0) {
-        container.createEl("p", {
-          text: stats.map((s) => `${s.type} ${formatHours(s.minutes)}`).join(" · "),
-        })
-      }
     })
+  }
+
+  async loadSettings(): Promise<void> {
+    const data = (await this.loadData()) as Partial<OnedaySettings> | null
+    this.settings = { ...DEFAULT_SETTINGS, ...data, typeColors: { ...DEFAULT_SETTINGS.typeColors, ...(data?.typeColors ?? {}) } }
+  }
+
+  async saveSettings(): Promise<void> {
+    await this.saveData(this.settings)
   }
 }

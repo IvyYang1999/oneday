@@ -1,0 +1,78 @@
+.oneday-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.oneday-svg-holder {
+  line-height: 0;
+}
+
+.oneday-svg .oneday-grid {
+  stroke: var(--background-modifier-border);
+  stroke-width: 0.5;
+}
+
+.oneday-svg .oneday-track {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.oneday-svg .oneday-hour {
+  font-size: 10px;
+  fill: var(--text-muted);
+  font-family: var(--font-monospace);
+}
+
+.oneday-svg .oneday-duration {
+  font-size: 11px;
+  fill: var(--text-normal);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-duration.oneday-thin {
+  font-size: 10px;
+  fill: var(--text-muted);
+}
+
+.oneday-svg .oneday-note {
+  font-size: 9px;
+  fill: var(--text-muted);
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-anno {
+  font-size: 10px;
+  fill: var(--text-accent);
+}
+
+.oneday-svg .oneday-anno-line {
+  stroke: var(--text-accent);
+  stroke-width: 1;
+}
+
+.oneday-block {
+  cursor: default;
+}
+
+.oneday-stats {
+  font-size: 12px;
+  color: var(--color-red);
+  font-family: var(--font-monospace);
+}
+
+.oneday-warning {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.oneday-errors {
+  font-size: 11px;
+  color: var(--text-error);
+  border-left: 2px solid var(--text-error);
+  padding-left: 6px;
+}

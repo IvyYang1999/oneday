@@ -6,15 +6,21 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e:smoke": "node e2e/render-smoke.mjs"
   },
-  "keywords": ["obsidian", "obsidian-plugin", "timeline"],
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "timeline"
+  ],
   "author": "yyt",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.19.17",
     "esbuild": "^0.25.11",
     "obsidian": "latest",
+    "playwright": "^1.62.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }
