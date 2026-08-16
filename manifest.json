@@ -1,0 +1,10 @@
+{
+  "id": "oneday",
+  "name": "Oneday",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Highlighter-style daily timeline block. Markdown is the single source of truth.",
+  "author": "yyt",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

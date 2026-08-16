@@ -1,0 +1,21 @@
+{
+  "name": "oneday",
+  "version": "0.1.0",
+  "description": "Obsidian plugin: highlighter-style daily timeline block, markdown as the single source of truth.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "test": "vitest run"
+  },
+  "keywords": ["obsidian", "obsidian-plugin", "timeline"],
+  "author": "yyt",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.19.17",
+    "esbuild": "^0.25.11",
+    "obsidian": "latest",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
