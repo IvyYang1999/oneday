@@ -37,7 +37,7 @@ function toMinutes(h: string, m: string): number | null {
 }
 
 /** Normalize [start, end): cross-midnight wrap and D10 range-based shifting. */
-function normalizeSpan(rawStart: number, rawEnd: number, rangeStart: number): [number, number] {
+export function normalizeSpan(rawStart: number, rawEnd: number, rangeStart: number): [number, number] {
   let start = rawStart
   let end = rawEnd
   if (start < rangeStart) {

@@ -76,3 +76,25 @@
   border-left: 2px solid var(--text-error);
   padding-left: 6px;
 }
+
+.oneday-dialog {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.oneday-dialog-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.oneday-dialog-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  min-height: 14px;
+}
+
+.oneday-dialog-status.oneday-dialog-error {
+  color: var(--text-error);
+}
