@@ -1,21 +1,34 @@
 /**
- * Plugin settings: type -> color mapping (荧光笔色号, D2) + layout knobs.
- * parseTypeColors is pure and unit-tested; the tab itself is Obsidian glue.
+ * Plugin settings: type -> color mapping (荧光笔色号, D2) + 对话模型配置
+ * （2026-08-16 拍板：设置页填 API key 直调模型）+ layout knobs.
  */
 import { App, PluginSettingTab, Setting } from "obsidian"
 import type OnedayPlugin from "./main"
+import { ApiProvider } from "./agent/api-client"
 import { DEFAULT_TYPE_COLORS, parseTypeColors, serializeTypeColors } from "./core/type-colors"
+
+export type DialogBackend = "api" | "claude-cli"
 
 export interface OnedaySettings {
   typeColors: Record<string, string>
   hourHeight: number
   width: number
+  dialogBackend: DialogBackend
+  provider: ApiProvider
+  apiKey: string
+  baseUrl: string
+  model: string
 }
 
 export const DEFAULT_SETTINGS: OnedaySettings = {
   typeColors: DEFAULT_TYPE_COLORS,
   hourHeight: 48,
   width: 200,
+  dialogBackend: "api",
+  provider: "openai-compatible",
+  apiKey: "",
+  baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+  model: "glm-4.5-air",
 }
 
 export class OnedaySettingTab extends PluginSettingTab {
@@ -54,6 +67,69 @@ export class OnedaySettingTab extends PluginSettingTab {
             this.plugin.settings.hourHeight = n
             await this.plugin.saveSettings()
           }
+        })
+      )
+
+    containerEl.createEl("h3", { text: "自然语言记录（对话框）" })
+
+    new Setting(containerEl)
+      .setName("后端")
+      .setDesc("api = 直调模型 API（推荐）；claude-cli = 调本机 Claude Code CLI")
+      .addDropdown((d) =>
+        d
+          .addOption("api", "模型 API 直调")
+          .addOption("claude-cli", "本机 claude CLI")
+          .setValue(this.plugin.settings.dialogBackend)
+          .onChange(async (v) => {
+            this.plugin.settings.dialogBackend = v as DialogBackend
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName("API 协议")
+      .setDesc("openai-compatible 覆盖 GLM / DeepSeek / OpenAI 等大多数服务")
+      .addDropdown((d) =>
+        d
+          .addOption("openai-compatible", "OpenAI 兼容")
+          .addOption("anthropic", "Anthropic")
+          .setValue(this.plugin.settings.provider)
+          .onChange(async (v) => {
+            this.plugin.settings.provider = v as ApiProvider
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName("API Key")
+      .setDesc("明文存在 Obsidian data.json，仅本机使用")
+      .addText((t) => {
+        t.inputEl.type = "password"
+        t.setPlaceholder("sk-…")
+          .setValue(this.plugin.settings.apiKey)
+          .onChange(async (v) => {
+            this.plugin.settings.apiKey = v.trim()
+            await this.plugin.saveSettings()
+          })
+      })
+
+    new Setting(containerEl)
+      .setName("Base URL")
+      .setDesc("如 GLM：https://open.bigmodel.cn/api/paas/v4；DeepSeek：https://api.deepseek.com/v1")
+      .addText((t) =>
+        t.setValue(this.plugin.settings.baseUrl).onChange(async (v) => {
+          this.plugin.settings.baseUrl = v.trim()
+          await this.plugin.saveSettings()
+        })
+      )
+
+    new Setting(containerEl)
+      .setName("模型")
+      .setDesc("如 glm-4.5-air / deepseek-chat / gpt-4o-mini / claude-haiku-4-5")
+      .addText((t) =>
+        t.setValue(this.plugin.settings.model).onChange(async (v) => {
+          this.plugin.settings.model = v.trim()
+          await this.plugin.saveSettings()
         })
       )
   }

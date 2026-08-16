@@ -27,7 +27,7 @@ export default class OnedayPlugin extends Plugin {
         width: this.settings.width,
       })
 
-      if (Platform.isDesktopApp) {
+      if (Platform.isDesktopApp || this.settings.dialogBackend === "api") {
         const container = el.querySelector(".oneday-container")
         if (container instanceof HTMLElement) {
           attachDialog(container, doc, {

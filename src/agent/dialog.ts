@@ -8,6 +8,8 @@ import { OnedaySettings } from "../settings"
 import { buildSystemPrompt } from "./prompt"
 import { interpretResponse, ValidatedEntry } from "./response"
 import { runEntryAgent } from "./runner"
+import { runEntryAgentApi } from "./direct-runner"
+import { obsidianTransport } from "./obsidian-transport"
 
 export interface DialogDeps {
   settings: OnedaySettings
@@ -32,11 +34,24 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     status.setText("生成中…")
     status.removeClass("oneday-dialog-error")
 
-    const run = await runEntryAgent(text, buildSystemPrompt({
+    const systemPrompt = buildSystemPrompt({
       typeColors: deps.settings.typeColors,
       now: new Date(),
       doc,
-    }))
+    })
+    const run = deps.settings.dialogBackend === "claude-cli"
+      ? await runEntryAgent(text, systemPrompt)
+      : await runEntryAgentApi(
+          text,
+          systemPrompt,
+          {
+            provider: deps.settings.provider,
+            apiKey: deps.settings.apiKey,
+            baseUrl: deps.settings.baseUrl,
+            model: deps.settings.model,
+          },
+          obsidianTransport
+        )
 
     if (!run.ok) {
       status.setText(run.reason)
@@ -58,7 +73,8 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     try {
       await deps.writeEntry(result.entry)
       input.value = ""
-      const cost = run.costUsd !== undefined ? `（$${run.costUsd.toFixed(4)}）` : ""
+      const rawCost = "costUsd" in run ? run.costUsd : undefined
+      const cost = typeof rawCost === "number" ? `（$${rawCost.toFixed(4)}）` : ""
       status.setText(`已记录 ${result.entry.sourceLine} ${cost}`)
     } catch (error) {
       status.setText(`写回失败：${error instanceof Error ? error.message : String(error)}`)
