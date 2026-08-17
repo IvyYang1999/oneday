@@ -5,7 +5,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian"
 import type OnedayPlugin from "./main"
 import { ApiProvider } from "./agent/api-client"
-import { DEFAULT_TYPE_COLORS, parseTypeColors, serializeTypeColors } from "./core/type-colors"
+import { DEFAULT_TYPE_COLORS } from "./core/type-colors"
 
 export type DialogBackend = "api" | "claude-cli"
 
@@ -41,22 +41,54 @@ export class OnedaySettingTab extends PluginSettingTab {
     containerEl.empty()
     containerEl.createEl("h2", { text: "Oneday 时间轴" })
 
-    new Setting(containerEl)
-      .setName("荧光笔色号（类型: 颜色，每行一条）")
-      .setDesc("时间轴语法里写类型名（如 math），颜色在这里配。未登记的类型显示为灰色。")
-      .addTextArea((ta) => {
-        ta.setPlaceholder("math: #7fd4c1")
-          .setValue(serializeTypeColors(this.plugin.settings.typeColors))
-          .onChange(async (value) => {
-            const parsed = parseTypeColors(value)
-            if (Object.keys(parsed).length > 0) {
-              this.plugin.settings.typeColors = parsed
+    containerEl.createEl("h3", { text: "荧光笔色号（全局）" })
+    const paletteDesc = containerEl.createEl("p", {
+      text: "类型名会写进时间轴语法（如 math），改名/删除后历史笔记里的同名色块显示为灰色。每个 block 默认显示全部荧光笔，可在块内右键色板临时隐藏。",
+      cls: "setting-item-description",
+    })
+    paletteDesc.style.marginTop = "0"
+
+    const paletteEl = containerEl.createDiv()
+    const renderPalette = (): void => {
+      paletteEl.empty()
+      for (const [type, color] of Object.entries(this.plugin.settings.typeColors)) {
+        new Setting(paletteEl)
+          .addColorPicker((cp) =>
+            cp.setValue(color).onChange(async (v) => {
+              this.plugin.settings.typeColors[type] = v
               await this.plugin.saveSettings()
-            }
-          })
-        ta.inputEl.rows = 8
-        ta.inputEl.cols = 30
-      })
+            })
+          )
+          .addText((t) =>
+            t.setValue(type).setPlaceholder("类型名").onChange(async (v) => {
+              const name = v.trim()
+              if (!/^[A-Za-z][\w-]*$/.test(name) || name === type || name in this.plugin.settings.typeColors) return
+              const entries = Object.entries(this.plugin.settings.typeColors).map(([k, c]) =>
+                k === type ? [name, c] : [k, c]
+              ) as Array<[string, string]>
+              this.plugin.settings.typeColors = Object.fromEntries(entries)
+              await this.plugin.saveSettings()
+            })
+          )
+          .addExtraButton((b) =>
+            b.setIcon("trash").setTooltip("删除").onClick(async () => {
+              delete this.plugin.settings.typeColors[type]
+              await this.plugin.saveSettings()
+              renderPalette()
+            })
+          )
+      }
+      new Setting(paletteEl).addButton((b) =>
+        b.setButtonText("添加荧光笔").onClick(async () => {
+          let n = 1
+          while (`type${n}` in this.plugin.settings.typeColors) n++
+          this.plugin.settings.typeColors[`type${n}`] = "#bdbdbd"
+          await this.plugin.saveSettings()
+          renderPalette()
+        })
+      )
+    }
+    renderPalette()
 
     new Setting(containerEl)
       .setName("每小时高度（px）")

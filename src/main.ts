@@ -6,11 +6,11 @@ import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
-import { deleteEntryLine, insertEntryLine, replaceEntryLine } from "./edit/source-rewriter"
+import { addHiddenType, deleteEntryLine, insertEntryLine, removeHiddenType, replaceEntryLine } from "./edit/source-rewriter"
 import { buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
-import { attachHoverInfo } from "./edit/hover-info"
+import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
 
 /**
  * Oneday — highlighter-style daily timeline block.
@@ -21,6 +21,8 @@ export default class OnedayPlugin extends Plugin {
   settings: OnedaySettings = DEFAULT_SETTINGS
   /** Currently selected highlighter (session-scoped). */
   private activeType = ""
+  /** 记录/计划 draw mode (session-scoped). */
+  private drawMode: "actual" | "plan" = "actual"
 
   async onload(): Promise<void> {
     await this.loadSettings()
@@ -33,15 +35,27 @@ export default class OnedayPlugin extends Plugin {
         hourHeight: this.settings.hourHeight,
         width: this.settings.width,
       })
-      if (this.activeType === "" || !(this.activeType in this.settings.typeColors)) {
-        this.activeType = Object.keys(this.settings.typeColors)[0] ?? "misc"
+      const visibleTypes = Object.keys(this.settings.typeColors).filter((t) => !doc.hiddenTypes.includes(t))
+      if (this.activeType === "" || !visibleTypes.includes(this.activeType)) {
+        this.activeType = visibleTypes[0] ?? "misc"
       }
 
       const toolbar = buildToolbar({
         typeColors: this.settings.typeColors,
+        hiddenTypes: doc.hiddenTypes,
         activeType: this.activeType,
+        mode: this.drawMode,
         onSelect: (type) => {
           this.activeType = type
+        },
+        onModeChange: (mode) => {
+          this.drawMode = mode
+        },
+        onHide: (type) => {
+          void this.applyBlockTransform(el, ctx, source, (s) => addHiddenType(s, type))
+        },
+        onShow: (type) => {
+          void this.applyBlockTransform(el, ctx, source, (s) => removeHiddenType(s, type))
         },
       })
       container.prepend(toolbar.el)
@@ -52,9 +66,13 @@ export default class OnedayPlugin extends Plugin {
       attachDrawInteraction(container, doc, {
         hourHeight: this.settings.hourHeight,
         getActiveType: () => this.activeType,
+        getMode: () => this.drawMode,
         typeColor: (type) => this.settings.typeColors[type] ?? FALLBACK_COLOR,
         onCreate: (entryLine, startMin) => {
           void this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entryLine, startMin))
+        },
+        onBlockClick: (line) => {
+          toggleBlockFocus(container, line)
         },
         onBlockMenu: (line, x, y) => {
           const entry = doc.entries.find((e) => e.line === line)

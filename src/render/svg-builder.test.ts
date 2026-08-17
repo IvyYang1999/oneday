@@ -18,19 +18,20 @@ describe("renderTimelineSvg", () => {
     expect(svg).toContain(`>3h</text>`)
   })
 
-  it("renders plan blocks translucent, underneath actual blocks", () => {
+  it("renders plan blocks with a faint fill + hatch, underneath actual blocks", () => {
     const svg = svgOf("plan 08:00-10:00 math\n09:00-10:00 math")
     const planIdx = svg.indexOf("oneday-plan")
     const actualIdx = svg.indexOf('fill-opacity="0.85"')
-    expect(svg).toContain('fill-opacity="0.22"')
+    expect(svg).toContain('fill-opacity="0.08"') // 底色近乎无（yyt 2026-08-17）
+    expect(svg).toContain("oneday-plan-hatch") // 斜线纹理区分
     expect(planIdx).toBeGreaterThan(-1)
     expect(planIdx).toBeLessThan(actualIdx) // plan drawn first = behind
   })
 
-  it("moves the duration label to the right for thin blocks (D6)", () => {
-    const svg = svgOf("17:00-17:30 math") // 30min -> 24px < 30
-    expect(svg).toContain("oneday-duration oneday-thin")
-    expect(svg).toContain(">0.5h</text>")
+  it("keeps the duration centered with adaptive font even for thin blocks (yyt 2026-08-17)", () => {
+    const svg = svgOf("17:00-17:30 math") // 30min -> 24px tall
+    expect(svg).not.toContain("oneday-duration oneday-thin")
+    expect(svg).toMatch(/<text pointer-events="none" class="oneday-duration" font-size="([\d.]+)"[^>]*>0.5h<\/text>/)
   })
 
   it("shows the note inside tall blocks", () => {
@@ -92,13 +93,16 @@ describe("parallel events (并列日程, yyt 2026-08-17)", () => {
 describe("note visibility (yyt 2026-08-17: 备注必须看得见)", () => {
   it("shows the note on the right side when it does not fit inside", () => {
     const svg = svgOf("17:00-17:30 meal 晚饭吃太多")
-    expect(svg).toContain("0.5h · 晚饭吃太多")
+    expect(svg).toContain("oneday-note oneday-side")
+    expect(svg).toContain(">晚饭吃太多</text>") // 时长恒居中，侧栏只放备注
   })
 
-  it("narrow columns push duration+note to the right side", () => {
-    // 3 overlapping -> columns ~49px wide < 56 -> side label
+  it("narrow columns keep duration inline (adaptive) and push note to the side", () => {
+    // 3 overlapping -> columns ~49px; 5-char duration still fits inline at full size
     const svg = svgOf("09:00-12:00 math\n09:30-11:00 micro\n09:45-10:45 english 背单词打卡")
-    expect(svg).toContain("1h · 背单词打卡")
+    expect(svg).toContain("oneday-note oneday-side")
+    expect(svg).toContain(">背单词打卡</text>")
+    expect(svg).toContain(">1h</text>") // duration stays inside the block
   })
 
   it("truncates long side notes", () => {
@@ -114,26 +118,26 @@ describe("label lane (M4)", () => {
   })
 
   it("spreads colliding side labels vertically with leader lines", () => {
-    // two thin blocks 15min apart -> natural label y only 12px apart < 13px row
+    // two thin blocks 15min apart, both with notes -> note labels 12px apart < 13px row
     const svg = svgOf("17:00-17:15 meal 晚饭\n17:15-17:30 english 单词")
     const leaders = svg.match(/oneday-side-leader/g) ?? []
     expect(leaders.length).toBeGreaterThanOrEqual(1)
-    const ys = [...svg.matchAll(/oneday-thin"[^>]*x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
+    const ys = [...svg.matchAll(/oneday-note oneday-side"[^>]*x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
     expect(ys).toHaveLength(2)
     expect(Math.abs(ys[1] - ys[0])).toBeGreaterThanOrEqual(13)
   })
 
   it("annotations and side labels do not overlap each other", () => {
-    // annotation at 17:07 sits on top of the 17:00-17:30 block's side label
+    // annotation at 17:07 sits on top of the 17:00-17:30 block's side note
     const svg = svgOf("17:00-17:30 meal 晚饭\n@17:07 头晕")
-    const ys = [...svg.matchAll(/class="oneday-(?:duration oneday-thin|anno)"[^>]*x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
+    const ys = [...svg.matchAll(/class="oneday-(?:note oneday-side|anno)"[^>]*x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
     expect(ys).toHaveLength(2)
     expect(Math.abs(ys[1] - ys[0])).toBeGreaterThanOrEqual(13)
   })
 
   it("extends svg height when pushed-down labels overflow the axis", () => {
-    // dense cluster right before 23:00 forces labels past the axis bottom
-    const svg = svgOf("22:00-22:15 a1\n22:15-22:30 a2\n22:30-22:45 a3\n22:45-23:00 a4\n@22:50 备注")
+    // dense noted cluster right before 23:00 forces labels past the axis bottom
+    const svg = svgOf("22:00-22:15 a1 甲\n22:15-22:30 a2 乙\n22:30-22:45 a3 丙\n22:45-23:00 a4 丁\n@22:50 备注")
     const height = Number(/<svg[^>]*height="([\d.]+)"/.exec(svg)?.[1])
     expect(height).toBeGreaterThan(784) // default axis bottom + pad = 784
   })
@@ -148,16 +152,16 @@ describe("M4b: plan hatch + label-block association (yyt 2026-08-17)", () => {
     expect(svg).toContain('fill="url(#oneday-hatch-0)"')
   })
 
-  it("every block side label draws a leader from its own column edge", () => {
-    // 2-column cluster with a thin block: leader starts at the column's right edge, not the track edge
-    const svg = svgOf("09:00-12:00 math\n09:30-10:00 micro\n09:15-09:30 english")
-    const leaders = [...svg.matchAll(/<line class="oneday-side-leader" data-line="(\d+)" x1="([\d.]+)"/g)]
-    expect(leaders.length).toBe(2) // both narrow/thin blocks
+  it("every noted block's side label draws a leader from its own column edge", () => {
+    // 2-column cluster with noted blocks: leaders start at column right edges
+    const svg = svgOf("09:00-12:00 math\n09:30-10:00 micro 听课\n09:15-09:30 english 单词")
+    const leaders = [...svg.matchAll(/<line class="oneday-side-leader[^"]*" data-line="(\d+)" x1="([\d.]+)"/g)]
+    expect(leaders.length).toBe(2)
     expect(Number(leaders[0][2])).toBeLessThan(194) // anchored at column edge, not track right edge
   })
 
-  it("side labels carry data-line for hover pairing", () => {
+  it("side labels carry data-line for hover/focus pairing", () => {
     const svg = svgOf("17:00-17:30 meal 晚饭")
-    expect(svg).toContain('class="oneday-duration oneday-thin" data-line="0"')
+    expect(svg).toContain('class="oneday-note oneday-side" data-line="0"')
   })
 })

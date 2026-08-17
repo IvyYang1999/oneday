@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { deleteEntryLine, insertEntryLine, replaceEntryLine } from "./source-rewriter"
+import { addHiddenType, deleteEntryLine, insertEntryLine, removeHiddenType, replaceEntryLine } from "./source-rewriter"
 import { parseTimeline } from "../core/parser"
 
 describe("insertEntryLine", () => {
@@ -55,5 +55,29 @@ describe("replaceEntryLine / deleteEntryLine", () => {
 
   it("throws on out-of-range line", () => {
     expect(() => deleteEntryLine(src, 99)).toThrow()
+  })
+})
+
+describe("addHiddenType / removeHiddenType", () => {
+  it("adds a hide header when none exists", () => {
+    const out = addHiddenType("09:00-10:00 math", "sleep")
+    expect(out).toBe("hide: sleep\n09:00-10:00 math")
+    expect(parseTimeline(out).hiddenTypes).toEqual(["sleep"])
+  })
+
+  it("appends to an existing hide header, idempotently", () => {
+    const src = "hide: sleep\n---\n09:00-10:00 math"
+    expect(addHiddenType(src, "misc")).toBe("hide: sleep misc\n---\n09:00-10:00 math")
+    expect(addHiddenType(src, "sleep")).toBe(src)
+  })
+
+  it("removes types and drops the header when empty", () => {
+    const src = "hide: sleep misc\n09:00-10:00 math"
+    expect(removeHiddenType(src, "misc")).toBe("hide: sleep\n09:00-10:00 math")
+    expect(removeHiddenType("hide: sleep\n09:00-10:00 math", "sleep")).toBe("09:00-10:00 math")
+  })
+
+  it("remove is a no-op without a hide header", () => {
+    expect(removeHiddenType("09:00-10:00 math", "sleep")).toBe("09:00-10:00 math")
   })
 })

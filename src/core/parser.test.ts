@@ -86,3 +86,21 @@ describe("parseTimeline", () => {
     expect(doc.entries).toHaveLength(3)
   })
 })
+
+describe("hide header (per-block highlighter hiding)", () => {
+  it("parses hide: types", () => {
+    const doc = parseTimeline("hide: sleep misc\n---\n09:00-10:00 math")
+    expect(doc.hiddenTypes).toEqual(["sleep", "misc"])
+    expect(doc.errors).toEqual([])
+  })
+
+  it("accepts commas and works without separator", () => {
+    const doc = parseTimeline("hide: sleep, misc\n09:00-10:00 math")
+    expect(doc.hiddenTypes).toEqual(["sleep", "misc"])
+  })
+
+  it("rejects hide without valid types", () => {
+    const doc = parseTimeline("hide: !!!\n---\n09:00-10:00 math")
+    expect(doc.errors).toHaveLength(1)
+  })
+})

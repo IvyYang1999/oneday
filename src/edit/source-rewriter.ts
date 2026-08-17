@@ -48,3 +48,31 @@ export function deleteEntryLine(source: string, line: number): string {
   lines.splice(line, 1)
   return lines.join("\n")
 }
+
+/** Add a type to the block's `hide:` header (per-day highlighter hiding). */
+export function addHiddenType(source: string, type: string): string {
+  const lines = source.split("\n")
+  const idx = lines.findIndex((l) => /^hide\s*:/.test(l.trim()))
+  if (idx >= 0) {
+    const existing = lines[idx].split(":")[1].split(/[\s,，]+/).filter(Boolean)
+    if (existing.includes(type)) return source
+    lines[idx] = `hide: ${[...existing, type].join(" ")}`
+    return lines.join("\n")
+  }
+  // No hide header yet: insert at the top (header order doesn't matter to the parser).
+  return `hide: ${type}\n${source}`
+}
+
+/** Remove a type from the block's `hide:` header (re-show a hidden highlighter). */
+export function removeHiddenType(source: string, type: string): string {
+  const lines = source.split("\n")
+  const idx = lines.findIndex((l) => /^hide\s*:/.test(l.trim()))
+  if (idx < 0) return source
+  const remaining = lines[idx].split(":")[1].split(/[\s,，]+/).filter((t) => t && t !== type)
+  if (remaining.length === 0) {
+    lines.splice(idx, 1) // drop the header entirely when nothing is hidden anymore
+  } else {
+    lines[idx] = `hide: ${remaining.join(" ")}`
+  }
+  return lines.join("\n")
+}

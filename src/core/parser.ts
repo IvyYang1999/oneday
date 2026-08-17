@@ -57,6 +57,7 @@ export function parseTimeline(source: string): TimelineDoc {
     entries: [],
     annotations: [],
     errors: [],
+    hiddenTypes: [],
   }
 
   const lines = source.split(/\r?\n/)
@@ -157,6 +158,15 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
       }
       doc.rangeStart = start * 60
       doc.rangeEnd = end * 60
+      return
+    }
+    case "hide": {
+      const types = value.split(/[\s,，]+/).filter((t) => /^[A-Za-z][\w-]*$/.test(t))
+      if (types.length === 0) {
+        doc.errors.push({ line, text: raw, reason: "hide 需要至少一个类型名" })
+        return
+      }
+      doc.hiddenTypes.push(...types)
       return
     }
     default:

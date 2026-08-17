@@ -19,3 +19,16 @@ export function minutesFromY(y: number, rangeStart: number, hourHeight: number):
 export function snapMinutes(min: number, snap = SNAP_MINUTES): number {
   return Math.round(min / snap) * snap
 }
+
+/**
+ * Adaptive inline font size for duration labels (yyt 2026-08-17:
+ * 时长永远居中，字号自适应). Returns 0 when the block is too small for
+ * any readable label (caller falls back to the side lane).
+ */
+export function inlineFontSize(w: number, h: number, text: string): number {
+  const byWidth = (w - 8) / (text.length * 0.62)
+  const byHeight = h * 0.55
+  const size = Math.min(11, byWidth, byHeight)
+  if (size < 6) return 0
+  return Math.floor(size * 2) / 2
+}

@@ -168,8 +168,13 @@
 /* M4 标注车道 */
 
 .oneday-svg .oneday-side-leader {
+  display: none;
   stroke: var(--text-faint);
   stroke-width: 0.6;
+}
+
+.oneday-svg .oneday-side-leader.is-displaced {
+  display: inline;
 }
 
 .oneday-svg .oneday-note.oneday-side {
@@ -222,7 +227,82 @@
   font-weight: 700;
 }
 
-.oneday-svg .oneday-side-leader.is-hover {
+.oneday-svg .oneday-side-leader.is-hover,
+.oneday-svg .oneday-side-leader.is-focus {
+  display: inline;
   stroke: var(--text-accent);
   stroke-width: 1.2;
+}
+
+.oneday-svg .oneday-block.is-focus {
+  stroke: var(--text-accent);
+  stroke-width: 2;
+}
+
+.oneday-svg .is-focus.oneday-note,
+.oneday-svg .is-focus.oneday-duration,
+.oneday-svg .is-focus.oneday-anno {
+  fill: var(--text-accent);
+  font-weight: 700;
+}
+
+/* M5 工具栏：模式切换 + 荧光笔管理 */
+
+.oneday-mode {
+  display: inline-flex;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-right: 4px;
+}
+
+.oneday-mode-btn {
+  font-size: 11px;
+  padding: 1px 10px;
+  border: none;
+  background: var(--background-secondary);
+  cursor: pointer;
+  box-shadow: none;
+  border-radius: 0;
+  color: var(--text-muted);
+}
+
+.oneday-mode-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.oneday-add-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.oneday-add-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 110px;
+}
+
+.oneday-add-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 10px;
+  border: none;
+  background: none;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: none;
+  text-align: left;
+}
+
+.oneday-add-item:hover {
+  background: var(--background-secondary);
 }

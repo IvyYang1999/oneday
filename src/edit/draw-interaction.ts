@@ -14,9 +14,13 @@ import { minutesFromY, snapMinutes, SNAP_MINUTES, yFromMinutes } from "../core/g
 export interface DrawDeps {
   hourHeight: number
   getActiveType: () => string
+  /** "actual" | "plan" — 计划模式下画出的色块带 plan 前缀 */
+  getMode: () => "actual" | "plan"
   typeColor: (type: string) => string
   onCreate: (entryLine: string, startMin: number) => void
   onBlockMenu: (line: number, clientX: number, clientY: number) => void
+  /** 点击（未拖动）色块 -> focus 切换 */
+  onBlockClick: (line: number) => void
 }
 
 const SVGNS = "http://www.w3.org/2000/svg"
@@ -38,6 +42,8 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   let dragging = false
   let dragStartMin = 0
+  let downBlockLine: number | null = null
+  let downY = 0
   let ghost: SVGRectElement | null = null
 
   const setStatus = (text: string): void => {
@@ -53,6 +59,9 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     if (e.button !== 0) return
     // 并列日程：允许从已有色块上起笔（yyt 2026-08-17）；右键菜单不受影响。
     dragging = true
+    const hit = (e.target as Element | null)?.closest("rect.oneday-block")
+    downBlockLine = hit ? Number((hit as HTMLElement).dataset.line) : null
+    downY = e.clientY
     const rect = svg.getBoundingClientRect()
     dragOriginTop = rect.top
     dragScale = svgWidth / rect.width
@@ -98,9 +107,15 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
     if (endMin - startMin < SNAP_MINUTES) {
       setStatus("")
+      // 未拖动的点击落在色块上 -> focus 切换（高亮对应备注/连线）
+      if (downBlockLine !== null && Math.abs(e.clientY - downY) < 4) {
+        deps.onBlockClick(downBlockLine)
+      }
+      downBlockLine = null
       return
     }
-    const line = formatEntryLine({ plan: false, startMin, endMin, type: deps.getActiveType() })
+    downBlockLine = null
+    const line = formatEntryLine({ plan: deps.getMode() === "plan", startMin, endMin, type: deps.getActiveType() })
     setStatus("")
     deps.onCreate(line, startMin)
   })

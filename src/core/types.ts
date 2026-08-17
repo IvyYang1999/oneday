@@ -13,6 +13,8 @@ export interface TimelineDoc {
   entries: Entry[]
   annotations: Annotation[]
   errors: ParseError[]
+  /** Per-block hidden highlighters (`hide:` header); global palette minus these is shown. */
+  hiddenTypes: string[]
 }
 
 export interface Entry {

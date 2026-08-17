@@ -7,6 +7,14 @@
 import { TimelineDoc } from "../core/types"
 import { durationMinutes, formatClock, formatHours } from "../core/duration"
 
+/** Toggle click-focus on a block: highlight it + its lane label + leader (yyt: 连线不用常驻). */
+export function toggleBlockFocus(container: HTMLElement, line: number): void {
+  const already = container.querySelector(`rect.oneday-block[data-line="${line}"]`)?.classList.contains("is-focus")
+  container.querySelectorAll(".is-focus").forEach((el) => el.classList.remove("is-focus"))
+  if (already) return
+  container.querySelectorAll(`[data-line="${line}"]`).forEach((el) => el.classList.add("is-focus"))
+}
+
 export function attachHoverInfo(container: HTMLElement, doc: TimelineDoc): void {
   const svg = container.querySelector<SVGSVGElement>("svg.oneday-svg")
   if (!svg) return

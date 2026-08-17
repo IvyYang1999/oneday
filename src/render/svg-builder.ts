@@ -8,7 +8,7 @@
  */
 import { Entry, TimelineDoc } from "../core/types"
 import { formatClock, formatHours, durationMinutes } from "../core/duration"
-import { AXIS_PAD_TOP, AXIS_PAD_BOTTOM, LABEL_W, TRACK_PAD } from "../core/geometry"
+import { AXIS_PAD_TOP, AXIS_PAD_BOTTOM, LABEL_W, TRACK_PAD, inlineFontSize } from "../core/geometry"
 
 export interface RenderOptions {
   /** type -> css color (D2). Unknown types fall back to FALLBACK_COLOR. */
@@ -22,7 +22,7 @@ export interface RenderOptions {
 export const FALLBACK_COLOR = "#bdbdbd"
 const PAD_TOP = AXIS_PAD_TOP
 const PAD_BOTTOM = AXIS_PAD_BOTTOM
-const PLAN_OPACITY = 0.22
+const PLAN_OPACITY = 0.08
 const BLOCK_OPACITY = 0.85
 /** Below this height (px) the duration label moves to the right of the block. */
 const MIN_INLINE_LABEL_H = 30
@@ -187,22 +187,23 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
         `<title>${escapeXml(formatClock(e.startMin))}–${escapeXml(formatClock(e.endMin))} ${escapeXml(e.type)}${e.note ? " · " + escapeXml(e.note) : ""}</title></rect>`
     )
     const label = formatHours(durationMinutes(e.startMin, e.endMin))
-    const fitsInside = p.w >= MIN_INLINE_LABEL_W && hh >= MIN_INLINE_LABEL_H
-    if (fitsInside) {
-      const showNoteInside = hh >= MIN_NOTE_H && e.note
+    const fs = inlineFontSize(p.w, hh, label)
+    if (fs > 0) {
+      // 时长恒居中，自适应字号（yyt 2026-08-17）
+      const showNoteInside = p.w >= MIN_INLINE_LABEL_W && hh >= MIN_NOTE_H && e.note
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" x="${p.x + p.w / 2}" y="${yy + hh / 2 + (showNoteInside ? -4 : 4)}" text-anchor="middle">${label}</text>`
+        `<text pointer-events="none" class="oneday-duration" font-size="${fs}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + (showNoteInside ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
       )
       if (showNoteInside) {
         parts.push(
           `<text pointer-events="none" class="oneday-note" x="${p.x + p.w / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(truncate(e.note ?? ""))}</text>`
         )
       } else if (e.note) {
-        // 备注放不进块内 -> 右侧标注车道（yyt 2026-08-17：备注必须看得见）
+        // 备注放不进块内 -> 右侧标注车道（备注必须看得见）
         sideItems.push({ naturalY: yy + hh / 2, text: truncate(e.note, 14), cls: "oneday-note oneday-side", dataLine: e.line, anchorX: p.x + p.w })
       }
     } else {
-      // D6: thin/narrow block, duration (+note) -> 标注车道
+      // 极端小块：时长(+备注)去标注车道
       const side = e.note ? `${label} · ${truncate(e.note, 14)}` : label
       sideItems.push({ naturalY: yy + hh / 2, text: side, cls: "oneday-duration oneday-thin", dataLine: e.line, anchorX: p.x + p.w })
     }
@@ -216,9 +217,10 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
   const placedSide = layoutSideItems(sideItems)
   for (const it of placedSide) {
     if (it.anchorX !== undefined) {
-      // 标注 ↔ 色块列的对应关系线（多列时关键）
+      // 标注 ↔ 色块列的对应关系线；CSS 控制非常驻（避让偏移/focus 时才可见）
+      const cls = it.displaced ? "oneday-side-leader is-displaced" : "oneday-side-leader"
       parts.push(
-        `<line class="oneday-side-leader" data-line="${it.dataLine ?? ""}" x1="${it.anchorX}" y1="${it.naturalY}" x2="${laneX - 2}" y2="${it.y}"/>`
+        `<line class="${cls}" data-line="${it.dataLine ?? ""}" x1="${it.anchorX}" y1="${it.naturalY}" x2="${laneX - 2}" y2="${it.y}"/>`
       )
     } else if (it.displaced) {
       parts.push(
