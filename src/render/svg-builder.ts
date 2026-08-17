@@ -200,9 +200,15 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
       `<rect class="oneday-block" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${p.x}" y="${yy}" width="${p.w}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${BLOCK_OPACITY}"></rect>`
     )
     const label = formatHours(durationMinutes(e.startMin, e.endMin))
+    // 备注尽量进块内（yyt 2026-08-17）：先试「时长 · 备注」同一行，再两行，最后才去侧栏
+    const combined = e.note ? `${label} · ${truncate(e.note, 8)}` : label
+    const fsCombined = e.note ? inlineFontSize(p.w, hh, combined) : 0
     const fs = inlineFontSize(p.w, hh, label)
-    if (fs > 0) {
-      // 时长恒居中，自适应字号（yyt 2026-08-17）
+    if (e.note && fsCombined > 0) {
+      parts.push(
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
+      )
+    } else if (fs > 0) {
       const showNoteInside = p.w >= MIN_INLINE_LABEL_W && hh >= MIN_NOTE_H && e.note
       parts.push(
         `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + (showNoteInside ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
@@ -212,7 +218,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
           `<text pointer-events="none" class="oneday-note" x="${p.x + p.w / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(truncate(e.note ?? ""))}</text>`
         )
       } else if (e.note) {
-        // 备注放不进块内 -> 右侧标注车道（备注必须看得见）
+        // 实在放不进 -> 右侧标注车道
         sideItems.push({ naturalY: yy + hh / 2, text: truncate(e.note, 14), cls: "oneday-note oneday-side", dataLine: e.line, anchorX: p.x + p.w })
       }
     } else {

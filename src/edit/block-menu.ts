@@ -2,10 +2,12 @@
  * Right-click menu on a block (M3): 改备注 / 改类型 / 删除 / 转规划(实际).
  * Obsidian glue (Menu + Modal); pure logic stays in source-rewriter/format.
  */
-import { App, Menu, Modal, Setting } from "obsidian"
+import { App, Menu } from "obsidian"
 import { Entry } from "../core/types"
 
 export interface BlockMenuActions {
+  /** 打开备注小浮窗（色块右侧临时编辑框） */
+  editNote: (line: number) => void
   setNote: (line: number, note: string) => void
   setType: (line: number, type: string) => void
   remove: (line: number) => void
@@ -39,7 +41,7 @@ export function showBlockMenu(
   menu.addItem((item) =>
     item.setTitle(entry.note ? "修改备注" : "添加备注")
       .setIcon("notebook-pen")
-      .onClick(() => new NoteModal(app, entry.note ?? "", (note) => actions.setNote(entry.line, note)).open())
+      .onClick(() => actions.editNote(entry.line))
   )
 
   menu.addSeparator()
@@ -56,33 +58,4 @@ export function showBlockMenu(
   )
 
   menu.showAtPosition({ x, y })
-}
-
-class NoteModal extends Modal {
-  constructor(app: App, private initial: string, private onSave: (note: string) => void) {
-    super(app)
-  }
-
-  onOpen(): void {
-    const { contentEl } = this
-    contentEl.createEl("h3", { text: "这段时间干了什么？" })
-    let value = this.initial
-    new Setting(contentEl).addText((t) => {
-      t.setValue(this.initial).onChange((v) => (value = v))
-      t.inputEl.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (e.key === "Enter") {
-          e.preventDefault()
-          this.onSave(value.trim())
-          this.close()
-        }
-      })
-      window.setTimeout(() => t.inputEl.focus(), 0)
-    })
-    new Setting(contentEl).addButton((b) =>
-      b.setButtonText("保存").setCta().onClick(() => {
-        this.onSave(value.trim())
-        this.close()
-      })
-    )
-  }
 }

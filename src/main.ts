@@ -16,6 +16,7 @@ import { applyItemToSlot, attachGridInteract } from "./edit/grid-interact"
 import { compactGrid, GRID_ROW_H, gridRows, GridItem, serializeLayoutHeader } from "./core/grid-layout"
 import { inferDate, insertTimelineBlock } from "./insert"
 import { attachWidthHandle } from "./edit/width-handle"
+import { openNotePopover } from "./edit/note-popover"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
 /**
@@ -38,6 +39,8 @@ export default class OnedayPlugin extends Plugin {
   private drawMode: "actual" | "plan" = "actual"
   /** 色块编辑态（跨渲染保持；Esc/点别处退出） */
   private editing: { path: string; line: number } | null = null
+  /** 色板在设置里变更过（旧渲染的块提示刷新） */
+  private paletteDirty = false
 
   async onload(): Promise<void> {
     await this.loadSettings()
@@ -165,6 +168,18 @@ export default class OnedayPlugin extends Plugin {
           void this.applyBlockTransform(el, ctx, source, (s) => removeHiddenType(s, type))
         },
       })
+      // 色板在设置里变更后：提示刷新（yyt 2026-08-17，可忽略）
+      if (this.paletteDirty) {
+        const badge = document.createElement("button")
+        badge.className = "oneday-palette-refresh"
+        badge.textContent = "↻ 荧光笔有更新，点击刷新"
+        badge.addEventListener("click", () => {
+          this.paletteDirty = false
+          this.rerenderMarkdownViews()
+        })
+        toolbar.el.appendChild(badge)
+      }
+
       // 填槽：工具栏/状态行/对话框各就各位（插槽位置由 layout 决定）
       const toolbarSlot = container.querySelector(".oneday-slot-toolbar")
       if (toolbarSlot) toolbarSlot.appendChild(toolbar.el)
@@ -244,6 +259,18 @@ export default class OnedayPlugin extends Plugin {
           const entry = doc.entries.find((e) => e.line === line)
           if (!entry) return
           showBlockMenu(this.app, entry, paletteTypes, x, y, {
+            editNote: (ln) => {
+              const rect = container.querySelector(`rect.oneday-block[data-line="${ln}"]`)
+              const e0 = doc.entries.find((it) => it.line === ln)
+              if (!rect || !e0) return
+              openNotePopover(container, rect.getBoundingClientRect(), e0.note ?? "", (note) => {
+                void this.applyBlockTransform(el, ctx, source, (s) => {
+                  const e = this.parse(s).entries.find((it) => it.line === ln)
+                  if (!e) return s
+                  return replaceEntryLine(s, ln, formatEntryLine({ ...e, note: note || undefined }))
+                })
+              })
+            },
             editSpan: (ln) => {
               this.editing = { path: ctx.sourcePath, line: ln }
               const svgEl = container.querySelector("svg.oneday-svg")
@@ -302,6 +329,20 @@ export default class OnedayPlugin extends Plugin {
           setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
         )
       })
+
+      // 右下角：设置快捷入口（yyt 2026-08-17）
+      const gear = document.createElement("button")
+      gear.className = "oneday-open-settings"
+      gear.textContent = "⚙"
+      gear.title = "打开 Oneday 设置"
+      gear.addEventListener("click", (e) => {
+        e.stopPropagation()
+        // @ts-expect-error setting 是内部 API
+        this.app.setting?.open?.()
+        // @ts-expect-error 内部 API
+        this.app.setting?.openTabById?.("oneday")
+      })
+      container.appendChild(gear)
 
       // 显式「＋组件」入口：block 右下角（与荧光笔的＋无关，yyt 2026-08-17）
       const addComp = document.createElement("button")
@@ -479,6 +520,20 @@ export default class OnedayPlugin extends Plugin {
   }
 
   async saveSettings(): Promise<void> {
+    this.paletteDirty = true
     await this.saveData(this.settings)
+  }
+
+  /** 尽量触发所有 markdown 视图重渲染（阅读模式可靠；Live Preview 下次自然重渲染生效） */
+  private rerenderMarkdownViews(): void {
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (leaf.view instanceof MarkdownView) {
+        try {
+          leaf.view.previewMode.rerender(true)
+        } catch {
+          /* LP 下无 previewMode 重渲入口 */
+        }
+      }
+    })
   }
 }

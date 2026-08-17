@@ -253,6 +253,21 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       return
     }
     if (!dragging) {
+      // 编辑态光标：目标块边缘 ns-resize / 中部 grab；冻结块 default
+      const editing = editingRect()
+      if (editing) {
+        const target0 = (e.target as Element | null)?.closest("rect.oneday-block")
+        if (target0 === editing) {
+          const rect0 = svg.getBoundingClientRect()
+          const ly = (e.clientY - rect0.top) * (svgWidth / rect0.width)
+          const top = Number(editing.getAttribute("y"))
+          const bottom = top + Number(editing.getAttribute("height"))
+          svg.style.cursor = Math.abs(ly - top) <= 5 || Math.abs(ly - bottom) <= 5 ? "ns-resize" : "grab"
+        } else {
+          svg.style.cursor = "default"
+        }
+        return
+      }
       // hover 光标反馈：轴端热区 -> ns-resize；色块 -> context-menu；其余 crosshair
       const target = e.target as Element | null
       let cursor = "crosshair"
