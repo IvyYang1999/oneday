@@ -436,7 +436,7 @@
   margin: 0 2px;
   cursor: col-resize;
   border-radius: 4px;
-  background: var(--background-modifier-border); /* 常驻可见 */
+  background: transparent; /* 平时隐形，hover 才显示（yyt 2026-08-17） */
 }
 
 .oneday-body.side-left {
@@ -480,9 +480,14 @@
   width: 100%;
   font-size: 14px;
   font-family: var(--font-text);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  padding: 6px 8px;
+  line-height: var(--line-height-normal);
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  resize: none;
+  overflow: hidden; /* 高度由 JS 按内容撑开，编辑时不跳版 */
 }
 
 .oneday-modal-error {

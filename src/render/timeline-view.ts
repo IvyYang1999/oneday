@@ -29,7 +29,12 @@ function attachInlineTextEditor(pane: HTMLElement, text: string, deps: TextPaneD
     pane.empty()
     const ta = pane.createEl("textarea", { cls: "oneday-text-inline" })
     ta.value = text
-    ta.rows = Math.max(4, text.split("\n").length + 2)
+    const fit = (): void => {
+      ta.style.height = "0px"
+      ta.style.height = `${ta.scrollHeight}px`
+    }
+    ta.addEventListener("input", fit)
+    window.setTimeout(fit, 0)
     const commit = (): void => deps.onSave(ta.value)
     ta.addEventListener("blur", commit)
     ta.addEventListener("keydown", (e: KeyboardEvent) => {
