@@ -97,9 +97,11 @@ export function renderTimelineInto(
   // 在 callout（> [!x|right]）内时浮动由 callout 主导（Live Preview 唯一可行路径），
   // 我们只提供内容宽度，callout shrink-to-fit。
   const inCallout = el.closest(".callout") !== null
+  // Live Preview（CM6）里 float 无法环绕文字，只会把块推右留空洞——禁用
+  const inLivePreview = el.closest(".cm-editor") !== null
   el.style.width = hasText ? "100%" : `${baseWidth + SIDE_LANE_W}px`
   el.classList.add("oneday-host")
-  el.classList.toggle("oneday-host-float", Boolean(doc.floatRight) && !inCallout)
+  el.classList.toggle("oneday-host-float", Boolean(doc.floatRight) && !inCallout && !inLivePreview)
 
   const statsSlot = container.querySelector(".oneday-slot-stats") ?? container
   const stats = statsByType(doc.entries)

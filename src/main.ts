@@ -110,16 +110,18 @@ export default class OnedayPlugin extends Plugin {
             setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
           )
         })
-        // 组件拖拽换位（跨列），写回 layout 头
-        attachLayoutDrag(body, (cols) => {
-          void this.applyBlockTransform(el, ctx, source, (s) =>
-            setHeaderValue(s, "layout", serializeLayout(cols))
-          )
-        })
       } else {
         attachResizeHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, Boolean(doc.floatRight), (totalWidth) => {
           void this.applyBlockTransform(el, ctx, source, (s) =>
             setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
+          )
+        })
+      }
+      // 组件拖拽换位（跨列），写回 layout 头——所有块都可用
+      if (body instanceof HTMLElement) {
+        attachLayoutDrag(body, (cols) => {
+          void this.applyBlockTransform(el, ctx, source, (s) =>
+            setHeaderValue(s, "layout", serializeLayout(cols))
           )
         })
       }
