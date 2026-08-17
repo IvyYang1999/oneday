@@ -178,3 +178,12 @@ describe("off header (组件隐藏)", () => {
     expect(doc.errors).toEqual([])
   })
 })
+
+describe("multiple text sections (多文本框)", () => {
+  it("parses each === segment into texts[]", () => {
+    const doc = parseTimeline("09:00-10:00 math\n===\n上午\n===\n下午")
+    expect(doc.texts).toEqual(["上午", "下午"])
+    expect(doc.text).toBe("上午")
+    expect(doc.entries).toHaveLength(1)
+  })
+})

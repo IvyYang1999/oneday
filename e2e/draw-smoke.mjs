@@ -50,6 +50,8 @@ window.__hidden = []
 window.__shown = []
 window.__trackmenu = []
 window.__extend = []
+window.__editing = null
+window.__span = []
 
 attachHoverInfo(container, doc)
 attachDrawInteraction(container, doc, {
@@ -60,6 +62,9 @@ attachDrawInteraction(container, doc, {
   onBlockClick: (line) => window.__focus.push(line),
   onTrackMenu: (x, y) => window.__trackmenu.push({ x, y }),
   onExtendRange: (startMin, endMin) => window.__extend.push({ startMin, endMin }),
+  getEditingLine: () => window.__editing,
+  setEditingLine: (l) => { window.__editing = l },
+  onUpdateSpan: (line, startMin, endMin) => window.__span.push({ line, startMin, endMin }),
   onCreate: (line, startMin) => window.__created.push({ line, startMin }),
   onBlockMenu: (line, x, y) => window.__menu.push({ line, x, y }),
 })
@@ -129,9 +134,22 @@ if (hoverCount < 1) { console.error("no hover pairing"); process.exit(1) }
   await page.mouse.up()
 }
 
-// 6. click (no drag) on the sleep block -> focus toggle callback
+// 5e. block edit mode: set editing line, resize bottom edge 08:00 -> 09:00, then move block to 10:00-11:00
+await page.evaluate(() => { window.__editing = 0 })
+await page.mouse.move(trackCX, yFor(480) - 2) // 底沿
+await page.mouse.down()
+await page.mouse.move(trackCX, yFor(540), { steps: 4 })
+await page.mouse.up()
+await page.mouse.move(trackCX, yFor(450)) // 中部
+await page.mouse.down()
+await page.mouse.move(trackCX, yFor(630), { steps: 4 }) // +3h -> 10:00-11:00
+await page.mouse.up()
+await page.mouse.move(trackCX, yFor(1200)) // 空白处 -> 退出编辑
+await page.mouse.down()
+await page.mouse.up()
+
 await page.locator('.oneday-mode-btn[data-mode="actual"]').click()
-await page.mouse.click(trackCX, yFor(450))
+await page.mouse.click(trackCX, yFor(630)) // sleep 块已被移到 10:00-11:00
 // 7. toolbar: right-click a swatch hides it; "+" menu shows hidden ones back
 await page.locator('.oneday-swatch[data-type="math"]').click({ button: "right" })
 await page.waitForSelector(".oneday-ctx-menu")
@@ -152,6 +170,14 @@ const expectCreated = [
 ]
 if (JSON.stringify(created) !== JSON.stringify(expectCreated)) { console.error("created mismatch"); process.exit(1) }
 if (menu.length !== 1 || menu[0].line !== 0) { console.error("menu mismatch"); process.exit(1) }
+const spans = await page.evaluate(() => window.__span)
+const expectedSpans = [
+  { line: 0, startMin: 420, endMin: 540 },   // 底沿 08:00->09:00
+  { line: 0, startMin: 600, endMin: 660 },   // 移动 +3h -> 10:00-11:00
+]
+if (JSON.stringify(spans) !== JSON.stringify(expectedSpans)) { console.error("span mismatch", JSON.stringify(spans)); process.exit(1) }
+const editingAfter = await page.evaluate(() => window.__editing)
+if (editingAfter !== null) { console.error("edit mode not exited", editingAfter); process.exit(1) }
 const extend = await page.evaluate(() => window.__extend)
 if (extend.length !== 1 || extend[0].startMin !== 420 || extend[0].endMin !== 1560) {
   console.error("extend mismatch", JSON.stringify(extend)); process.exit(1)

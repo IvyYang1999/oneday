@@ -66,15 +66,22 @@ export function parseTimeline(source: string, opts: ParseOptions = {}): Timeline
     errors: [],
     hiddenTypes: [],
     hiddenSlots: [],
+    texts: [],
   }
 
   const lines = source.split(/\r?\n/)
-  // `===` splits the block: entry syntax above, free markdown text below (块内图文混排).
-  const textSep = lines.findIndex((l) => l.trim() === "===")
-  if (textSep >= 0) {
-    const text = lines.splice(textSep + 1).join("\n").trim()
-    lines.splice(textSep) // drop the === line itself
-    doc.text = text // 空字符串也保留：渲染为空占位，点击即可原地编辑
+  // `===` splits the block: entry syntax above, free markdown text below (块内图文混排)。
+  // 多个 ===  -> 多个文本框（text, text2, …，yyt 2026-08-17）
+  const allLines = [...lines]
+  const sepIdxs = allLines.map((l, i) => (l.trim() === "===" ? i : -1)).filter((i) => i >= 0)
+  if (sepIdxs.length > 0) {
+    const first = sepIdxs[0]
+    const bounds = [...sepIdxs, allLines.length]
+    for (let i = 0; i < bounds.length - 1; i++) {
+      doc.texts.push(allLines.slice(bounds[i] + 1, bounds[i + 1]).join("\n").trim())
+    }
+    lines.splice(first) // 条目区只保留 === 之前
+    doc.text = doc.texts[0]
   }
   let inHeader = true
   let sawSeparator = false

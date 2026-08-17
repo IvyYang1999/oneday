@@ -767,3 +767,15 @@
   fill: var(--text-muted);
   font-weight: 500;
 }
+
+/* 色块编辑态：目标高亮，其余冻结 */
+
+.oneday-svg.is-editing-block .oneday-block.is-frozen {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-block.is-edit-target {
+  stroke: var(--text-accent);
+  stroke-width: 2;
+}

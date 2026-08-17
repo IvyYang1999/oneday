@@ -2,8 +2,8 @@
 export interface TextPaneDeps {
   /** Render doc.text markdown into the pane (Obsidian MarkdownRenderer). */
   renderMarkdown: (host: HTMLElement, text: string) => void
-  /** Persist edited text (setTextSection write-back). */
-  onSave: (text: string) => void
+  /** Persist edited text（第 index 个文本区） */
+  onSave: (index: number, text: string) => void
 }
 
 /** DOM mount: svg string + stats row + error list, into a code-block container. */
@@ -12,10 +12,15 @@ import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
 import { renderTimelineSvg, RenderOptions, SIDE_LANE_W } from "./svg-builder"
 import { hashTypeColor } from "../core/type-colors"
-import { GRID_COLS, GRID_ROW_H, gridRows, resolveGrid } from "../core/grid-layout"
+import { GRID_COLS, GRID_ROW_H, gridRows, isTextSlot, resolveGrid } from "../core/grid-layout"
+
+interface InlineEditorDeps {
+  renderMarkdown: (host: HTMLElement, text: string) => void
+  onSave: (text: string) => void
+}
 
 /** 文字区原地编辑：点击渲染区 -> textarea；失焦/⌘Enter 保存，Esc 取消（yyt：不要弹窗）。 */
-function attachInlineTextEditor(pane: HTMLElement, text: string, deps: TextPaneDeps): void {
+function attachInlineTextEditor(pane: HTMLElement, text: string, deps: InlineEditorDeps): void {
   const show = (): void => {
     pane.closest(".oneday-slot")?.classList.remove("is-editing")
     pane.empty()
@@ -70,7 +75,8 @@ export function renderTimelineInto(
   const container = el.createDiv({ cls: "oneday-container" })
 
   const baseWidth = doc.width ?? opts.width ?? 200
-  const hasText = textPane !== undefined && doc.text !== undefined
+  const texts = doc.texts ?? []
+  const hasText = textPane !== undefined && texts.length > 0
   const body = container.createDiv({ cls: "oneday-body is-settling" })
 
   // 网格布局（yyt 2026-08-17：组件手柄拖拽移动+缩放、自动吸附+重力压实）：
@@ -79,7 +85,7 @@ export function renderTimelineInto(
   const timelineSvg = renderTimelineSvg(doc, { ...opts, width: baseWidth })
   const svgHeight = Number(/<svg[^>]*height="([\d.]+)"/.exec(timelineSvg)?.[1] ?? 800)
   const timelineRows = Math.ceil(svgHeight / GRID_ROW_H)
-  const items = resolveGrid(doc.layout ?? null, hasText, doc.side, timelineRows, doc.hiddenSlots)
+  const items = resolveGrid(doc.layout ?? null, texts.length, doc.side, timelineRows, doc.hiddenSlots)
   body.style.height = `${gridRows(items) * GRID_ROW_H}px`
   for (const it of items) {
     const slot = body.createDiv({ cls: `oneday-slot oneday-slot-${it.id}` })
@@ -95,9 +101,13 @@ export function renderTimelineInto(
     if (it.id === "timeline") {
       const svgHolder = slot.createDiv({ cls: "oneday-svg-holder" })
       svgHolder.innerHTML = timelineSvg
-    } else if (it.id === "text" && textPane) {
+    } else if (isTextSlot(it.id) && textPane) {
+      const idx = it.id === "text" ? 0 : Number(it.id.slice(4)) - 1
       const pane = slot.createDiv({ cls: "oneday-text-pane" })
-      attachInlineTextEditor(pane, doc.text ?? "", textPane)
+      attachInlineTextEditor(pane, texts[idx] ?? "", {
+        renderMarkdown: (host, text) => textPane.renderMarkdown(host, text),
+        onSave: (text) => textPane.onSave(idx, text),
+      })
     }
   }
   // 宽度/浮动必须设在宿主 el 上：Obsidian 的代码块宿主默认通栏，

@@ -1,5 +1,5 @@
 import { MarkdownPostProcessorContext, MarkdownRenderer, MarkdownView, Menu, Platform, Plugin, TFile } from "obsidian"
-import { normalizeSpan, parseTimeline } from "./core/parser"
+import { parseTimeline } from "./core/parser"
 import { formatEntryLine, weekdayZh } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
 import { hashTypeColor } from "./core/type-colors"
@@ -7,7 +7,7 @@ import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
-import { addHiddenType, addOffSlot, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeOffSlot, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
+import { addHiddenType, addOffSlot, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeOffSlot, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
 import { buildModeToggle, buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
@@ -36,6 +36,8 @@ export default class OnedayPlugin extends Plugin {
   private activeType = ""
   /** 记录/计划 draw mode (session-scoped). */
   private drawMode: "actual" | "plan" = "actual"
+  /** 色块编辑态（跨渲染保持；Esc/点别处退出） */
+  private editing: { path: string; line: number } | null = null
 
   async onload(): Promise<void> {
     await this.loadSettings()
@@ -66,8 +68,8 @@ export default class OnedayPlugin extends Plugin {
       const doc = this.parse(source)
       // 渲染色号：全局优先，退休板兜底（删除/改名的类型在旧块里保色）
       const paletteForRender = { ...this.settings.retiredTypeColors, ...this.settings.typeColors }
-      const saveText = (text: string): void => {
-        void this.applyBlockTransform(el, ctx, source, (s) => setTextSection(s, text))
+      const saveText = (index: number, text: string): void => {
+        void this.applyBlockTransform(el, ctx, source, (s) => setTextSection(s, text, index))
       }
       const container = renderTimelineInto(
         el,
@@ -95,28 +97,35 @@ export default class OnedayPlugin extends Plugin {
 
       const showAddMenu = (x: number, y: number): void => {
         const menu = new Menu()
-        if (doc.text === undefined) {
-          menu.addItem((item) =>
-            item.setTitle("添加文字区").setIcon("file-text").onClick(() => {
-              void this.applyBlockTransform(el, ctx, source, (s) => {
-                let out = `${s.replace(/\n+$/, "")}\n===\n`
-                // 落在右键点击的格子附近（yyt 2026-08-17）
-                if (body instanceof HTMLElement) {
-                  const bodyRect = body.getBoundingClientRect()
-                  if (bodyRect.width > 100) {
-                    const cellW = bodyRect.width / 12
-                    const gx = Math.min(12 - 6, Math.max(0, Math.floor((x - bodyRect.left) / cellW)))
-                    const gy = Math.max(0, Math.floor((y - bodyRect.top) / GRID_ROW_H))
-                    const items = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot")).map((sl) => ({
-                      id: sl.dataset.slot as GridItem["id"],
-                      x: Number(sl.dataset.x), y: Number(sl.dataset.y), w: Number(sl.dataset.w), h: Number(sl.dataset.h),
-                    }))
-                    items.push({ id: "text", x: gx, y: gy, w: 6, h: 4 })
-                    out = setHeaderValue(out, "layout", serializeLayoutHeader(compactGrid(items, "text")))
-                  }
+        // 添加文本框（常驻，可多个；落在点击的格子附近）
+        menu.addItem((item) =>
+          item.setTitle("添加文本框").setIcon("file-text").onClick(() => {
+            void this.applyBlockTransform(el, ctx, source, (s) => {
+              const newId = doc.texts.length === 0 ? "text" : `text${doc.texts.length + 1}`
+              let out = setTextSection(s, "", doc.texts.length) // 追加空文本区
+              if (body instanceof HTMLElement) {
+                const bodyRect = body.getBoundingClientRect()
+                if (bodyRect.width > 100) {
+                  const cellW = bodyRect.width / 12
+                  const gx = Math.min(12 - 6, Math.max(0, Math.floor((x - bodyRect.left) / cellW)))
+                  const gy = Math.max(0, Math.floor((y - bodyRect.top) / GRID_ROW_H))
+                  const items = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot")).map((sl) => ({
+                    id: sl.dataset.slot as GridItem["id"],
+                    x: Number(sl.dataset.x), y: Number(sl.dataset.y), w: Number(sl.dataset.w), h: Number(sl.dataset.h),
+                  }))
+                  items.push({ id: newId, x: gx, y: gy, w: 6, h: 4 })
+                  out = setHeaderValue(out, "layout", serializeLayoutHeader(compactGrid(items, newId)))
                 }
-                return out
-              })
+              }
+              return out
+            })
+          })
+        )
+        // 隐藏组件恢复（off: 头）
+        for (const slotId of doc.hiddenSlots) {
+          menu.addItem((item) =>
+            item.setTitle(`恢复「${slotId}」组件`).setIcon("eye").onClick(() => {
+              void this.applyBlockTransform(el, ctx, source, (s) => removeOffSlot(s, slotId))
             })
           )
         }
@@ -130,7 +139,7 @@ export default class OnedayPlugin extends Plugin {
               this.settings.templateLayout = serializeLayoutHeader(items)
             }
             this.settings.templateWidth = doc.width
-            this.settings.templateHasText = doc.text !== undefined
+            this.settings.templateHasText = doc.texts.length > 0
             void this.saveSettings()
           })
         )
@@ -219,10 +228,32 @@ export default class OnedayPlugin extends Plugin {
             setHeaderValue(s, "range", `${Math.round(startMin / 60)}-${Math.round(endMin / 60)}`)
           )
         },
+        getEditingLine: () => (this.editing?.path === ctx.sourcePath ? this.editing.line : null),
+        setEditingLine: (line) => {
+          this.editing = line === null ? null : { path: ctx.sourcePath, line }
+        },
+        onUpdateSpan: (line, startMin, endMin) => {
+          void this.applyBlockTransform(el, ctx, source, (s) => {
+            const d = this.parse(s)
+            const e = d.entries.find((it) => it.line === line)
+            if (!e) return s
+            return replaceEntryLine(s, line, formatEntryLine({ ...e, startMin, endMin }))
+          })
+        },
         onBlockMenu: (line, x, y) => {
           const entry = doc.entries.find((e) => e.line === line)
           if (!entry) return
           showBlockMenu(this.app, entry, paletteTypes, x, y, {
+            editSpan: (ln) => {
+              this.editing = { path: ctx.sourcePath, line: ln }
+              const svgEl = container.querySelector("svg.oneday-svg")
+              svgEl?.classList.add("is-editing-block")
+              svgEl?.querySelectorAll("rect.oneday-block").forEach((r) => {
+                const isTarget = Number((r as HTMLElement).dataset.line) === ln
+                r.classList.toggle("is-edit-target", isTarget)
+                r.classList.toggle("is-frozen", !isTarget)
+              })
+            },
             setNote: (ln, note) =>
               void this.applyBlockTransform(el, ctx, source, (s) => {
                 const e = this.parse(s).entries.find((it) => it.line === ln)
@@ -236,16 +267,6 @@ export default class OnedayPlugin extends Plugin {
                 return replaceEntryLine(s, ln, formatEntryLine({ ...e, type }))
               }),
             remove: (ln) => void this.applyBlockTransform(el, ctx, source, (s) => deleteEntryLine(s, ln)),
-            edit: (ln, patch) =>
-              void this.applyBlockTransform(el, ctx, source, (s) => {
-                const d = this.parse(s)
-                const e = d.entries.find((it) => it.line === ln)
-                if (!e) return s
-                const [sh, sm] = patch.start.split(":").map(Number)
-                const [eh, em] = patch.end.split(":").map(Number)
-                const [startMin, endMin] = normalizeSpan(sh * 60 + sm, eh * 60 + em, d.rangeStart)
-                return replaceEntryLine(s, ln, formatEntryLine({ ...e, startMin, endMin, type: patch.type, note: patch.note || undefined }))
-              }),
             togglePlan: (ln) =>
               void this.applyBlockTransform(el, ctx, source, (s) => {
                 const e = this.parse(s).entries.find((it) => it.line === ln)
@@ -302,6 +323,26 @@ export default class OnedayPlugin extends Plugin {
         // 点在组件空白上 -> 提供「隐藏此组件」（off: 头，＋菜单可加回）
         const slotEl = t?.closest(".oneday-slot") as HTMLElement | null
         const slotId = slotEl?.dataset.slot
+        if (slotId && (slotId === "text" || /^text\d+$/.test(slotId)) && t?.closest(".oneday-text-pane") === null) {
+          // 文本框空白处右键 -> 删除此文本框（可 Ctrl+Z 恢复）
+          const idx = slotId === "text" ? 0 : Number(slotId.slice(4)) - 1
+          const menu = new Menu()
+          menu.addItem((mi) =>
+            mi.setTitle("删除此文本框").setIcon("trash").onClick(() => {
+              void this.applyBlockTransform(el, ctx, source, (s) => {
+                let out = removeTextSection(s, idx)
+                // layout 头里同步摘掉该槽位
+                if (doc.layout) {
+                  const remaining = doc.layout.filter((g) => g.id !== slotId)
+                  out = setHeaderValue(out, "layout", serializeLayoutHeader(remaining))
+                }
+                return out
+              })
+            })
+          )
+          menu.showAtPosition({ x: e.clientX, y: e.clientY })
+          return
+        }
         if (slotId && ["toolbar", "stats", "dialog"].includes(slotId)) {
           const menu = new Menu()
           menu.addItem((item) =>

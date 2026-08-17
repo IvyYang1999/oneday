@@ -45,21 +45,21 @@ describe("resolveOverlaps (push down)", () => {
 
 describe("resolveGrid", () => {
   it("default with text: two halves, rail stacked", () => {
-    const grid = resolveGrid(null, true, undefined, 40)
+    const grid = resolveGrid(null, 1, undefined, 40)
     expect(grid.find((i) => i.id === "text")).toMatchObject({ x: 0, w: 6 })
     expect(grid.find((i) => i.id === "toolbar")).toMatchObject({ x: 6, y: 0 })
     expect(grid.find((i) => i.id === "timeline")).toMatchObject({ x: 6, y: 3 })
   })
 
   it("appends missing slots below existing content", () => {
-    const grid = resolveGrid(parseLayoutHeader("timeline@0,0,12,20"), false, undefined, 40)
+    const grid = resolveGrid(parseLayoutHeader("timeline@0,0,12,20"), 0, undefined, 40)
     const toolbar = grid.find((i) => i.id === "toolbar")!
     expect(toolbar.y).toBeGreaterThanOrEqual(20)
     expect(grid.flatMap((i) => i.id).sort()).toEqual(["dialog", "stats", "timeline", "toolbar"])
   })
 
   it("drops text when the block has no text section", () => {
-    const grid = resolveGrid(parseLayoutHeader("text@0,0,6,10 toolbar@6,0,6,3"), false, undefined, 40)
+    const grid = resolveGrid(parseLayoutHeader("text@0,0,6,10 toolbar@6,0,6,3"), 0, undefined, 40)
     expect(grid.find((i) => i.id === "text")).toBeUndefined()
   })
 })
@@ -68,7 +68,7 @@ describe("grid helpers", () => {
   it("overlaps / clampItem / gridRows", () => {
     expect(overlaps({ id: "text", x: 0, y: 0, w: 2, h: 2 }, { id: "stats", x: 1, y: 1, w: 2, h: 2 })).toBe(true)
     expect(clampItem({ id: "text", x: -1, y: -1, w: 99, h: 0 })).toMatchObject({ x: 0, y: 0, w: 12, h: 1 })
-    expect(gridRows(defaultGrid(true, undefined, 40))).toBeGreaterThan(40)
+    expect(gridRows(defaultGrid(1, undefined, 40))).toBeGreaterThan(40)
   })
 })
 
@@ -102,7 +102,7 @@ describe("compactGrid (重力压实)", () => {
 
 describe("resolveGrid with hiddenSlots", () => {
   it("drops hidden slots and does not re-append them", () => {
-    const grid = resolveGrid(null, false, undefined, 40, ["stats", "dialog"])
+    const grid = resolveGrid(null, 0, undefined, 40, ["stats", "dialog"])
     const ids = grid.map((i) => i.id)
     expect(ids).toContain("toolbar")
     expect(ids).toContain("timeline")

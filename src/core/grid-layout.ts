@@ -8,8 +8,14 @@
 export const GRID_COLS = 12
 export const GRID_ROW_H = 20
 
-export type SlotId = "text" | "toolbar" | "timeline" | "stats" | "dialog"
-export const SLOT_IDS: readonly SlotId[] = ["text", "toolbar", "timeline", "stats", "dialog"]
+export type SlotId = string // 核心: toolbar|timeline|stats|dialog；文本框: text, text2, text3…
+export const CORE_SLOT_IDS = ["toolbar", "timeline", "stats", "dialog"] as const
+export function isTextSlot(id: SlotId): boolean {
+  return id === "text" || /^text\d+$/.test(id)
+}
+export function isValidSlotId(id: string): id is SlotId {
+  return (CORE_SLOT_IDS as readonly string[]).includes(id) || isTextSlot(id)
+}
 
 export interface GridItem {
   id: SlotId
@@ -19,13 +25,13 @@ export interface GridItem {
   h: number
 }
 
-const TOKEN_RE = /^([a-z]+)@(\d+),(\d+),(\d+),(\d+)$/
+const TOKEN_RE = /^([a-z][a-z0-9]*)@(\d+),(\d+),(\d+),(\d+)$/
 
 export function parseLayoutHeader(value: string): GridItem[] | null {
   const items: GridItem[] = []
   for (const token of value.trim().split(/\s+/)) {
     const m = TOKEN_RE.exec(token)
-    if (!m || !(SLOT_IDS as readonly string[]).includes(m[1])) continue
+    if (!m || !isValidSlotId(m[1])) continue
     items.push(clampItem({ id: m[1] as SlotId, x: +m[2], y: +m[3], w: +m[4], h: +m[5] }))
   }
   if (items.length === 0) return null
@@ -85,14 +91,14 @@ export function resolveOverlaps(items: GridItem[], priorityId?: SlotId): GridIte
 }
 
 /** Default arrangement (px heights converted to rows by caller-supplied estimates). */
-export function defaultGrid(hasText: boolean, side: "left" | "right" | undefined, timelineRows: number): GridItem[] {
+export function defaultGrid(textCount: number, side: "left" | "right" | undefined, timelineRows: number): GridItem[] {
   const rail: GridItem[] = [
     { id: "toolbar", x: 0, y: 0, w: 0, h: 3 },
     { id: "timeline", x: 0, y: 0, w: 0, h: Math.max(4, timelineRows) },
     { id: "stats", x: 0, y: 0, w: 0, h: 1 },
     { id: "dialog", x: 0, y: 0, w: 0, h: 4 },
   ]
-  if (!hasText) {
+  if (textCount === 0) {
     let y = 0
     return rail.map((it) => {
       const r = { ...it, x: 0, y, w: GRID_COLS }
@@ -102,7 +108,13 @@ export function defaultGrid(hasText: boolean, side: "left" | "right" | undefined
   }
   const railCol = side === "left" ? 0 : 6
   const textCol = side === "left" ? 6 : 0
-  const items: GridItem[] = [{ id: "text", x: textCol, y: 0, w: 6, h: 4 }] // 默认小巧，随输入自动撑高
+  // 每个文本框一个槽位，左列竖排；默认小巧（4 行），随输入自动撑高
+  const items: GridItem[] = []
+  let textY = 0
+  for (let i = 0; i < textCount; i++) {
+    items.push({ id: i === 0 ? "text" : `text${i + 1}`, x: textCol, y: textY, w: 6, h: 4 })
+    textY += 4
+  }
   let y = 0
   for (const it of rail) {
     items.push({ ...it, x: railCol, y, w: 6 })
@@ -114,19 +126,21 @@ export function defaultGrid(hasText: boolean, side: "left" | "right" | undefined
 /** Effective grid: header layout completed with any missing slots (appended below). */
 export function resolveGrid(
   parsed: GridItem[] | null,
-  hasText: boolean,
+  textCount: number,
   side: "left" | "right" | undefined,
   timelineRows: number,
   hiddenSlots: SlotId[] = []
 ): GridItem[] {
-  const base = parsed ?? defaultGrid(hasText, side, timelineRows)
-  let items = base.filter((it) => (hasText || it.id !== "text") && !hiddenSlots.includes(it.id))
+  const wantTextIds = Array.from({ length: textCount }, (_, i) => (i === 0 ? "text" : `text${i + 1}`))
+  const base = parsed ?? defaultGrid(textCount, side, timelineRows)
+  // 隐藏槽位剔除；文本槽位数量与文本区数量对齐
+  let items = base.filter((it) => !hiddenSlots.includes(it.id) && (!isTextSlot(it.id) || wantTextIds.includes(it.id)))
   const present = new Set(items.map((it) => it.id))
-  const required = SLOT_IDS.filter((id) => (hasText || id !== "text") && !hiddenSlots.includes(id))
+  const required: SlotId[] = [...wantTextIds, ...CORE_SLOT_IDS].filter((id) => !hiddenSlots.includes(id))
   let maxY = items.reduce((m, it) => Math.max(m, it.y + it.h), 0)
   for (const id of required) {
     if (present.has(id)) continue
-    const d = defaultGrid(hasText, side, timelineRows).find((it) => it.id === id)!
+    const d = defaultGrid(textCount, side, timelineRows).find((it) => it.id === id)!
     items.push({ ...d, y: maxY })
     maxY += d.h
     present.add(id)

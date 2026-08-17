@@ -25,10 +25,15 @@ export interface DrawDeps {
   onTrackMenu: (clientX: number, clientY: number) => void
   /** 轴向延展：拖上/下边缘线延长当天范围（整小时吸附） */
   onExtendRange: (startMin: number, endMin: number) => void
+  /** 色块编辑态：当前正在编辑的源码行号（跨渲染保持），null=未编辑 */
+  getEditingLine: () => number | null
+  setEditingLine: (line: number | null) => void
+  /** 编辑态提交新的起止（移动/边缘拖拽） */
+  onUpdateSpan: (line: number, startMin: number, endMin: number) => void
 }
 
 /** 轴端热区（px，svg 坐标） */
-const AXIS_EDGE_PX = 10
+const AXIS_EDGE_PX = 4 // 热区收窄（yyt：±10px 抢画块手势）
 
 const SVGNS = "http://www.w3.org/2000/svg"
 
@@ -96,6 +101,8 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   let dragging = false
   let extending: "top" | "bottom" | null = null
+  // 色块编辑态：边缘拖拽改起止 / 中部拖动移动整块
+  let editDrag: { mode: "top" | "bottom" | "move"; startMin: number; endMin: number; grabOffsetMin: number } | null = null
   let extendPreview: SVGGElement | null = null
   let dragStartMin = 0
   let downBlockLine: number | null = null
@@ -113,6 +120,39 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   svg.addEventListener("pointerdown", (e: PointerEvent) => {
     if (e.button !== 0) return
+    // 编辑态：目标块的边缘/中部手势优先
+    const editing = editingRect()
+    if (editing) {
+      const target = (e.target as Element | null)?.closest("rect.oneday-block")
+      if (target === editing) {
+        const rect0 = svg.getBoundingClientRect()
+        dragOriginTop = rect0.top
+        dragScale = svgWidth / rect0.width
+        const localY0 = toLocalY(e.clientY)
+        const line = Number(editing.dataset.line)
+        const entry = doc.entries.find((it) => it.line === line)
+        if (entry) {
+          const top = Number(editing.getAttribute("y"))
+          const bottom = top + Number(editing.getAttribute("height"))
+          const nearTop = Math.abs(localY0 - top) <= 5
+          const nearBottom = Math.abs(localY0 - bottom) <= 5
+          const mode = nearTop ? "top" : nearBottom ? "bottom" : "move"
+          editDrag = {
+            mode,
+            startMin: entry.startMin,
+            endMin: entry.endMin,
+            grabOffsetMin: snapMinutes(minutesFromY(localY0, doc.rangeStart, deps.hourHeight)) - entry.startMin,
+          }
+          svg.setPointerCapture(e.pointerId)
+          return
+        }
+      } else {
+        // 点在别处 -> 退出编辑态（本次点击不触发其它操作）
+        exitEdit()
+        return
+      }
+    }
+
     // 并列日程：允许从已有色块上起笔（yyt 2026-08-17）；右键菜单不受影响。
     const hit = (e.target as Element | null)?.closest("rect.oneday-block")
     downBlockLine = hit ? Number((hit as HTMLElement).dataset.line) : null
@@ -124,8 +164,11 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       const localY0 = (e.clientY - rect0.top) * (svgWidth / rect0.width)
       const yTop = yFromMinutes(doc.rangeStart, doc.rangeStart, deps.hourHeight)
       const yBottom = yFromMinutes(doc.rangeEnd, doc.rangeStart, deps.hourHeight)
-      if (Math.abs(localY0 - yTop) <= AXIS_EDGE_PX || Math.abs(localY0 - yBottom) <= AXIS_EDGE_PX) {
-        extending = Math.abs(localY0 - yTop) <= AXIS_EDGE_PX ? "top" : "bottom"
+      // 单侧热区：顶线只认线上方、底线只认线下方（顶线下方起拖=画块）
+      const nearTop = localY0 >= yTop - 6 && localY0 <= yTop + 1
+      const nearBottom = localY0 >= yBottom - 1 && localY0 <= yBottom + 6
+      if (nearTop || nearBottom) {
+        extending = nearTop ? "top" : "bottom"
         dragOriginTop = rect0.top
         dragScale = svgWidth / rect0.width
         svg.setPointerCapture(e.pointerId)
@@ -166,6 +209,30 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   }
 
   svg.addEventListener("pointermove", (e: PointerEvent) => {
+    if (editDrag) {
+      const rect = editingRect()
+      if (!rect) {
+        editDrag = null
+        return
+      }
+      const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+      const { mode, grabOffsetMin } = editDrag
+      let ns = editDrag.startMin
+      let ne = editDrag.endMin
+      if (mode === "top") ns = Math.min(cur, editDrag.endMin - SNAP_MINUTES)
+      else if (mode === "bottom") ne = Math.max(cur, editDrag.startMin + SNAP_MINUTES)
+      else {
+        const dur = editDrag.endMin - editDrag.startMin
+        ns = Math.min(30 * 60 - dur, Math.max(0, cur - grabOffsetMin))
+        ne = ns + dur
+      }
+      const y1 = yFromMinutes(ns, doc.rangeStart, deps.hourHeight)
+      const y2 = yFromMinutes(ne, doc.rangeStart, deps.hourHeight)
+      rect.setAttribute("y", String(y1))
+      rect.setAttribute("height", String(Math.max(2, y2 - y1)))
+      setStatus(`${formatClock(ns % (24 * 60))} – ${formatClock(ne % (24 * 60))} · ${formatHours(durationMinutes(ns, ne))}`)
+      return
+    }
     if (extending) {
       const raw = minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)
       const hourSnap = Math.round(raw / 60) * 60
@@ -196,7 +263,9 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
         const localY = (e.clientY - rect.top) * (svgWidth / rect.width)
         const yTop = yFromMinutes(doc.rangeStart, doc.rangeStart, deps.hourHeight)
         const yBottom = yFromMinutes(doc.rangeEnd, doc.rangeStart, deps.hourHeight)
-        if (Math.abs(localY - yTop) <= AXIS_EDGE_PX || Math.abs(localY - yBottom) <= AXIS_EDGE_PX) {
+        const hovTop = localY >= yTop - 6 && localY <= yTop + 1
+        const hovBottom = localY >= yBottom - 1 && localY <= yBottom + 6
+        if (hovTop || hovBottom) {
           cursor = "ns-resize"
         }
       }
@@ -208,6 +277,30 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   })
 
   svg.addEventListener("pointerup", (e: PointerEvent) => {
+    if (editDrag) {
+      const rect = editingRect()
+      const drag = editDrag
+      editDrag = null
+      svg.releasePointerCapture(e.pointerId)
+      setStatus("")
+      if (rect) {
+        const line = Number(rect.dataset.line)
+        const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+        let ns = drag.startMin
+        let ne = drag.endMin
+        if (drag.mode === "top") ns = Math.min(cur, drag.endMin - SNAP_MINUTES)
+        else if (drag.mode === "bottom") ne = Math.max(cur, drag.startMin + SNAP_MINUTES)
+        else {
+          const dur = drag.endMin - drag.startMin
+          ns = Math.min(30 * 60 - dur, Math.max(0, cur - drag.grabOffsetMin))
+          ne = ns + dur
+        }
+        if (ns !== drag.startMin || ne !== drag.endMin) {
+          deps.onUpdateSpan(line, ns, ne)
+        }
+      }
+      return
+    }
     if (extending) {
       const raw = minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)
       const hourSnap = Math.round(raw / 60) * 60
@@ -258,6 +351,38 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     ghost = null
     deps.onCreate(line, startMin)
   })
+
+  const editingRect = (): SVGRectElement | null => {
+    const line = deps.getEditingLine()
+    if (line === null) return null
+    return svg.querySelector<SVGRectElement>(`rect.oneday-block[data-line="${line}"]`)
+  }
+
+  const syncEditVisual = (): void => {
+    const rect = editingRect()
+    svg.classList.toggle("is-editing-block", rect !== null)
+    svg.querySelectorAll("rect.oneday-block").forEach((r) => {
+      r.classList.toggle("is-edit-target", rect !== null && r === rect)
+      r.classList.toggle("is-frozen", rect !== null && r !== rect)
+    })
+  }
+
+  const exitEdit = (): void => {
+    deps.setEditingLine(null)
+    editDrag = null
+    syncEditVisual()
+  }
+
+  const onEditKey = (e: KeyboardEvent): void => {
+    if (e.key === "Escape" && deps.getEditingLine() !== null) {
+      e.preventDefault()
+      exitEdit()
+    }
+  }
+  document.addEventListener("keydown", onEditKey)
+
+  // 进入编辑态的视觉同步（挂载时若已在编辑态则恢复）
+  syncEditVisual()
 
   svg.addEventListener("contextmenu", (e: MouseEvent) => {
     const target = e.target as Element | null

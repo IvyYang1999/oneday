@@ -19,7 +19,9 @@ export interface TimelineDoc {
   width?: number
   /** Float the block right so text wraps on the left (`float: right` header). */
   floatRight?: boolean
-  /** Free markdown text section (everything after a `===` line) — 块内图文混排的文。 */
+  /** Free markdown text sections (=== 分隔，可多个) — 块内图文混排的文。 */
+  texts: string[]
+  /** 兼容读取：第一个文本区 */
   text?: string
   /** 时间轴栏在左还是右（`side: left`，默认右）。 */
   side?: "left" | "right"

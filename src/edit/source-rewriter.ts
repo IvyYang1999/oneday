@@ -125,17 +125,33 @@ export function replaceBlockInContent(
   return lines.join("\n")
 }
 
-/** Set/replace the free-text section (`===` below the entries). Empty text removes the section. */
-export function setTextSection(source: string, text: string): string {
+/** Set/replace the Nth free-text section (`===` 分隔，可多个). Empty text keeps a placeholder. */
+export function setTextSection(source: string, text: string, index = 0): string {
   const lines = source.split("\n")
-  const sep = lines.findIndex((l) => l.trim() === "===")
-  const head = sep >= 0 ? lines.slice(0, sep) : lines
-  // trim trailing blanks in the entry zone
-  while (head.length > 0 && head[head.length - 1].trim() === "") head.pop()
+  const sepIdxs = lines.map((l, i) => (l.trim() === "===" ? i : -1)).filter((i) => i >= 0)
   const trimmed = text.trim()
-  // 空文本也保留 ===（渲染为「点击书写…」占位，yyt：空保存不该把文字区弄没）
-  if (trimmed === "") return [...head, "==="].join("\n")
-  return [...head, "===", ...trimmed.split("\n")].join("\n")
+  if (sepIdxs.length === 0 || index >= sepIdxs.length) {
+    // 目标不存在 -> 追加新区（index 0 等价于创建）
+    const head = [...lines]
+    while (head.length > 0 && head[head.length - 1].trim() === "") head.pop()
+    return [...head, "===", ...(trimmed === "" ? [] : trimmed.split("\n"))].join("\n")
+  }
+  const start = sepIdxs[index]
+  const end = index + 1 < sepIdxs.length ? sepIdxs[index + 1] : lines.length
+  const replacement = trimmed === "" ? ["==="] : ["===", ...trimmed.split("\n")]
+  lines.splice(start, end - start, ...replacement)
+  return lines.join("\n")
+}
+
+/** Remove the Nth text section entirely（删除文本框）。 */
+export function removeTextSection(source: string, index: number): string {
+  const lines = source.split("\n")
+  const sepIdxs = lines.map((l, i) => (l.trim() === "===" ? i : -1)).filter((i) => i >= 0)
+  if (index >= sepIdxs.length) return source
+  const start = sepIdxs[index]
+  const end = index + 1 < sepIdxs.length ? sepIdxs[index + 1] : lines.length
+  lines.splice(start, end - start)
+  return lines.join("\n")
 }
 
 /** Add a component to the block's `off:` header (hide a slot). */

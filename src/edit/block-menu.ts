@@ -4,15 +4,14 @@
  */
 import { App, Menu, Modal, Setting } from "obsidian"
 import { Entry } from "../core/types"
-import { formatClockPlain } from "../core/format"
 
 export interface BlockMenuActions {
   setNote: (line: number, note: string) => void
   setType: (line: number, type: string) => void
   remove: (line: number) => void
   togglePlan: (line: number) => void
-  /** 编辑色块（类型/起止/备注一并改） */
-  edit: (line: number, patch: { type: string; start: string; end: string; note: string }) => void
+  /** 进入交互式编辑态（边缘拖拽改起止、中部拖动移动） */
+  editSpan: (line: number) => void
 }
 
 export function showBlockMenu(
@@ -32,11 +31,9 @@ export function showBlockMenu(
   )
 
   menu.addItem((item) =>
-    item.setTitle("编辑色块…")
-      .setIcon("pencil-line")
-      .onClick(() =>
-        new EditBlockModal(app, entry, types, (patch) => actions.edit(entry.line, patch)).open()
-      )
+    item.setTitle("编辑起止 / 移动（交互式）")
+      .setIcon("move")
+      .onClick(() => actions.editSpan(entry.line))
   )
 
   menu.addItem((item) =>
@@ -84,53 +81,6 @@ class NoteModal extends Modal {
     new Setting(contentEl).addButton((b) =>
       b.setButtonText("保存").setCta().onClick(() => {
         this.onSave(value.trim())
-        this.close()
-      })
-    )
-  }
-}
-
-/** 编辑色块弹窗：类型/起止/备注（替代不稳定的边沿拖拽, yyt 2026-08-17） */
-class EditBlockModal extends Modal {
-  constructor(
-    app: App,
-    private entry: Entry,
-    private types: string[],
-    private onSave: (patch: { type: string; start: string; end: string; note: string }) => void
-  ) {
-    super(app)
-  }
-
-  onOpen(): void {
-    const { contentEl } = this
-    contentEl.createEl("h3", { text: "编辑色块" })
-    let type = this.entry.type
-    let start = formatClockPlain(this.entry.startMin)
-    let end = formatClockPlain(this.entry.endMin)
-    let note = this.entry.note ?? ""
-    const err = contentEl.createDiv({ cls: "oneday-modal-error" })
-
-    new Setting(contentEl).setName("类型").addDropdown((d) => {
-      for (const t of this.types) d.addOption(t, t)
-      if (!this.types.includes(type)) d.addOption(type, `${type}（未登记）`)
-      d.setValue(type).onChange((v) => (type = v))
-    })
-    new Setting(contentEl).setName("开始").addText((t) =>
-      t.setValue(start).setPlaceholder("HH:MM").onChange((v) => (start = v.trim()))
-    )
-    new Setting(contentEl).setName("结束").addText((t) =>
-      t.setValue(end).setPlaceholder("HH:MM").onChange((v) => (end = v.trim()))
-    )
-    new Setting(contentEl).setName("备注").addText((t) =>
-      t.setValue(note).onChange((v) => (note = v))
-    )
-    new Setting(contentEl).addButton((b) =>
-      b.setButtonText("保存").setCta().onClick(() => {
-        if (!/^\d{1,2}:\d{2}$/.test(start) || !/^\d{1,2}:\d{2}$/.test(end)) {
-          err.setText("时间格式应为 HH:MM")
-          return
-        }
-        this.onSave({ type, start, end, note: note.trim() })
         this.close()
       })
     )

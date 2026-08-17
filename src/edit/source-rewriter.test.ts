@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./source-rewriter"
+import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./source-rewriter"
 import { parseTimeline } from "../core/parser"
 
 describe("insertEntryLine", () => {
@@ -173,5 +173,23 @@ describe("insertEntryLine with text section (=== 边界)", () => {
     const src = "09:00-10:00 math\n===\n文字"
     const out = insertEntryLine(src, "21:00-21:30 fitness", 21 * 60)
     expect(out).toBe("09:00-10:00 math\n21:00-21:30 fitness\n===\n文字")
+  })
+})
+
+describe("setTextSection / removeTextSection (多文本框)", () => {
+  const src = "09:00-10:00 math\n===\n上午\n===\n下午"
+
+  it("replaces the Nth section", () => {
+    expect(setTextSection(src, "上午改", 0)).toBe("09:00-10:00 math\n===\n上午改\n===\n下午")
+    expect(setTextSection(src, "下午改", 1)).toBe("09:00-10:00 math\n===\n上午\n===\n下午改")
+  })
+
+  it("appends a new section when index >= count", () => {
+    expect(setTextSection(src, "", 2)).toBe("09:00-10:00 math\n===\n上午\n===\n下午\n===")
+  })
+
+  it("removeTextSection removes only that segment", () => {
+    expect(removeTextSection(src, 0)).toBe("09:00-10:00 math\n===\n下午")
+    expect(parseTimeline(removeTextSection(src, 0)).texts).toEqual(["下午"])
   })
 })
