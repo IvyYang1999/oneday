@@ -118,7 +118,7 @@ describe("label lane (M4)", () => {
     const svg = svgOf("17:00-17:15 meal 晚饭\n17:15-17:30 english 单词")
     const leaders = svg.match(/oneday-side-leader/g) ?? []
     expect(leaders.length).toBeGreaterThanOrEqual(1)
-    const ys = [...svg.matchAll(/oneday-thin" x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
+    const ys = [...svg.matchAll(/oneday-thin"[^>]*x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
     expect(ys).toHaveLength(2)
     expect(Math.abs(ys[1] - ys[0])).toBeGreaterThanOrEqual(13)
   })
@@ -126,7 +126,7 @@ describe("label lane (M4)", () => {
   it("annotations and side labels do not overlap each other", () => {
     // annotation at 17:07 sits on top of the 17:00-17:30 block's side label
     const svg = svgOf("17:00-17:30 meal 晚饭\n@17:07 头晕")
-    const ys = [...svg.matchAll(/class="oneday-(?:duration oneday-thin|anno)" x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
+    const ys = [...svg.matchAll(/class="oneday-(?:duration oneday-thin|anno)"[^>]*x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
     expect(ys).toHaveLength(2)
     expect(Math.abs(ys[1] - ys[0])).toBeGreaterThanOrEqual(13)
   })
@@ -136,5 +136,28 @@ describe("label lane (M4)", () => {
     const svg = svgOf("22:00-22:15 a1\n22:15-22:30 a2\n22:30-22:45 a3\n22:45-23:00 a4\n@22:50 备注")
     const height = Number(/<svg[^>]*height="([\d.]+)"/.exec(svg)?.[1])
     expect(height).toBeGreaterThan(784) // default axis bottom + pad = 784
+  })
+})
+
+describe("M4b: plan hatch + label-block association (yyt 2026-08-17)", () => {
+  it("plan blocks get a diagonal hatch overlay (斜线纹理)", () => {
+    const svg = svgOf("plan 09:00-12:00 math")
+    expect(svg).toContain("<pattern")
+    expect(svg).toContain("oneday-hatch-0")
+    expect(svg).toContain("oneday-plan-hatch")
+    expect(svg).toContain('fill="url(#oneday-hatch-0)"')
+  })
+
+  it("every block side label draws a leader from its own column edge", () => {
+    // 2-column cluster with a thin block: leader starts at the column's right edge, not the track edge
+    const svg = svgOf("09:00-12:00 math\n09:30-10:00 micro\n09:15-09:30 english")
+    const leaders = [...svg.matchAll(/<line class="oneday-side-leader" data-line="(\d+)" x1="([\d.]+)"/g)]
+    expect(leaders.length).toBe(2) // both narrow/thin blocks
+    expect(Number(leaders[0][2])).toBeLessThan(194) // anchored at column edge, not track right edge
+  })
+
+  it("side labels carry data-line for hover pairing", () => {
+    const svg = svgOf("17:00-17:30 meal 晚饭")
+    expect(svg).toContain('class="oneday-duration oneday-thin" data-line="0"')
   })
 })

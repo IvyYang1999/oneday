@@ -175,3 +175,54 @@
 .oneday-svg .oneday-note.oneday-side {
   fill: var(--text-muted);
 }
+
+/* M4b hover 信息浮窗 + 联动高亮 */
+
+.oneday-container {
+  position: relative;
+}
+
+.oneday-tooltip {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  max-width: 240px;
+}
+
+.oneday-tooltip-time {
+  font-family: var(--font-monospace);
+  font-weight: 600;
+}
+
+.oneday-tooltip-type {
+  color: var(--text-accent);
+  font-size: 11px;
+}
+
+.oneday-tooltip-note {
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.oneday-svg .oneday-block.is-hover {
+  stroke: var(--text-accent);
+  stroke-width: 1.5;
+}
+
+.oneday-svg .is-hover.oneday-duration,
+.oneday-svg .is-hover.oneday-note,
+.oneday-svg .is-hover.oneday-anno {
+  fill: var(--text-accent);
+  font-weight: 700;
+}
+
+.oneday-svg .oneday-side-leader.is-hover {
+  stroke: var(--text-accent);
+  stroke-width: 1.2;
+}

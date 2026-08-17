@@ -20,6 +20,7 @@ import { parseTimeline } from "${path.join(here, "../src/core/parser")}"
 import { renderTimelineSvg } from "${path.join(here, "../src/render/svg-builder")}"
 import { buildToolbar } from "${path.join(here, "../src/edit/toolbar")}"
 import { attachDrawInteraction } from "${path.join(here, "../src/edit/draw-interaction")}"
+import { attachHoverInfo } from "${path.join(here, "../src/edit/hover-info")}"
 
 const COLORS = { math: "#7fd4c1", sleep: "#d9d9d9", fitness: "#f6c667" }
 const source = "07:00-08:00 sleep\\n"
@@ -36,6 +37,7 @@ window.__active = "math"
 window.__created = []
 window.__menu = []
 
+attachHoverInfo(container, doc)
 attachDrawInteraction(container, doc, {
   hourHeight: 48,
   getActiveType: () => window.__active,
@@ -80,6 +82,16 @@ await drag(840, 750)
 await drag(450, 510)
 // 4. right-click the sleep block fires menu with line 0
 await page.mouse.click(trackCX, yFor(450), { button: "right" })
+
+// 5. hover the sleep block -> tooltip with details appears
+await page.mouse.move(trackCX, yFor(455))
+await page.waitForSelector(".oneday-tooltip", { state: "visible" })
+const tooltipText = await page.locator(".oneday-tooltip").innerText()
+if (!tooltipText.includes("07:00") || !tooltipText.includes("1h") || !tooltipText.includes("sleep")) {
+  console.error("tooltip mismatch:", tooltipText); process.exit(1)
+}
+const hoverCount = await page.evaluate(() => document.querySelectorAll(".is-hover").length)
+if (hoverCount < 1) { console.error("no hover pairing"); process.exit(1) }
 
 const created = await page.evaluate(() => window.__created)
 const menu = await page.evaluate(() => window.__menu)

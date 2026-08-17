@@ -10,6 +10,7 @@ import { deleteEntryLine, insertEntryLine, replaceEntryLine } from "./edit/sourc
 import { buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
+import { attachHoverInfo } from "./edit/hover-info"
 
 /**
  * Oneday — highlighter-style daily timeline block.
@@ -46,6 +47,7 @@ export default class OnedayPlugin extends Plugin {
       container.prepend(toolbar.el)
       const svgHolder = container.querySelector(".oneday-svg-holder")
       if (svgHolder) svgHolder.after(toolbar.statusEl)
+      attachHoverInfo(container, doc)
 
       attachDrawInteraction(container, doc, {
         hourHeight: this.settings.hourHeight,

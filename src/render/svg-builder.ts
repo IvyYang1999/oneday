@@ -47,6 +47,10 @@ export interface SideItem {
   naturalY: number
   text: string
   cls: string
+  /** source line of the block this label belongs to (hover pairing) */
+  dataLine?: number
+  /** block right-edge x; when set, a leader line is always drawn (多列时标注↔色块对应关系) */
+  anchorX?: number
 }
 
 export interface PlacedSideItem extends SideItem {
@@ -147,14 +151,27 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
     `<rect class="oneday-track" x="${trackX}" y="${y(doc.rangeStart)}" width="${trackW}" height="${y(doc.rangeEnd) - y(doc.rangeStart)}"/>`
   )
 
-  // Plan layer first (full-width translucent background, D3 覆盖语义).
+  // Plan layer first (full-width translucent background + diagonal hatch, D3 覆盖语义)
+  const planColors = [...new Set(doc.entries.filter((e) => e.plan).map((e) => opts.typeColors[e.type] ?? FALLBACK_COLOR))]
+  if (planColors.length > 0) {
+    const defs = planColors
+      .map(
+        (c, i) =>
+          `<pattern id="oneday-hatch-${i}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
+          `<line x1="0" y1="0" x2="0" y2="6" stroke="${escapeXml(c)}" stroke-width="1.6" stroke-opacity="0.55"/></pattern>`
+      )
+      .join("")
+    parts.push(`<defs>${defs}</defs>`)
+  }
   for (const e of doc.entries.filter((e) => e.plan)) {
     const color = opts.typeColors[e.type] ?? FALLBACK_COLOR
+    const hatchId = `oneday-hatch-${planColors.indexOf(color)}`
     const yy = y(e.startMin)
     const hh = Math.max(2, y(e.endMin) - yy)
+    const title = `<title>${escapeXml(formatClock(e.startMin))}–${escapeXml(formatClock(e.endMin))} ${escapeXml(e.type)}${e.note ? " · " + escapeXml(e.note) : ""}</title>`
     parts.push(
-      `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}">` +
-        `<title>${escapeXml(formatClock(e.startMin))}–${escapeXml(formatClock(e.endMin))} ${escapeXml(e.type)}${e.note ? " · " + escapeXml(e.note) : ""}</title></rect>`
+      `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}">${title}</rect>` +
+        `<rect pointer-events="none" class="oneday-plan-hatch" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="url(#${hatchId})"/>`
     )
   }
 
@@ -182,12 +199,12 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
         )
       } else if (e.note) {
         // 备注放不进块内 -> 右侧标注车道（yyt 2026-08-17：备注必须看得见）
-        sideItems.push({ naturalY: yy + hh / 2, text: truncate(e.note, 14), cls: "oneday-note oneday-side" })
+        sideItems.push({ naturalY: yy + hh / 2, text: truncate(e.note, 14), cls: "oneday-note oneday-side", dataLine: e.line, anchorX: p.x + p.w })
       }
     } else {
       // D6: thin/narrow block, duration (+note) -> 标注车道
       const side = e.note ? `${label} · ${truncate(e.note, 14)}` : label
-      sideItems.push({ naturalY: yy + hh / 2, text: side, cls: "oneday-duration oneday-thin" })
+      sideItems.push({ naturalY: yy + hh / 2, text: side, cls: "oneday-duration oneday-thin", dataLine: e.line, anchorX: p.x + p.w })
     }
   }
 
@@ -198,12 +215,18 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
 
   const placedSide = layoutSideItems(sideItems)
   for (const it of placedSide) {
-    if (it.displaced) {
+    if (it.anchorX !== undefined) {
+      // 标注 ↔ 色块列的对应关系线（多列时关键）
+      parts.push(
+        `<line class="oneday-side-leader" data-line="${it.dataLine ?? ""}" x1="${it.anchorX}" y1="${it.naturalY}" x2="${laneX - 2}" y2="${it.y}"/>`
+      )
+    } else if (it.displaced) {
       parts.push(
         `<line class="oneday-side-leader" x1="${trackX + trackW}" y1="${it.naturalY}" x2="${laneX - 2}" y2="${it.y}"/>`
       )
     }
-    parts.push(`<text pointer-events="none" class="${it.cls}" x="${laneX}" y="${it.y + 3}">${escapeXml(it.text)}</text>`)
+    const dataAttr = it.dataLine !== undefined ? ` data-line="${it.dataLine}"` : ""
+    parts.push(`<text pointer-events="none" class="${it.cls}"${dataAttr} x="${laneX}" y="${it.y + 3}">${escapeXml(it.text)}</text>`)
   }
 
   const lastSideBottom = placedSide.length > 0 ? placedSide[placedSide.length - 1].y + SIDE_LINE_H / 2 : 0
