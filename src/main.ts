@@ -11,7 +11,6 @@ import { buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
-import { attachResizeHandle } from "./edit/resize-handle"
 import { attachGridInteract } from "./edit/grid-interact"
 import { serializeLayoutHeader } from "./core/grid-layout"
 import { insertTimelineBlock } from "./insert"
@@ -79,6 +78,23 @@ export default class OnedayPlugin extends Plugin {
         this.activeType = visibleTypes[0] ?? "misc"
       }
 
+      const showAddMenu = (x: number, y: number): void => {
+        const menu = new Menu()
+        if (doc.text === undefined) {
+          menu.addItem((item) =>
+            item.setTitle("添加文字区").setIcon("file-text").onClick(() => {
+              void this.applyBlockTransform(el, ctx, source, (s) => `${s.replace(/\n+$/, "")}\n===\n`)
+            })
+          )
+        }
+        menu.addItem((item) =>
+          item.setTitle("重置组件布局").setIcon("layout-grid").onClick(() => {
+            void this.applyBlockTransform(el, ctx, source, (s) => removeHeaderValue(s, "layout"))
+          })
+        )
+        menu.showAtPosition({ x, y })
+      }
+
       const toolbar = buildToolbar({
         typeColors: this.settings.typeColors,
         hiddenTypes: doc.hiddenTypes,
@@ -93,6 +109,10 @@ export default class OnedayPlugin extends Plugin {
         onHide: (type) => {
           void this.applyBlockTransform(el, ctx, source, (s) => addHiddenType(s, type))
         },
+        onAddComponent: () => {
+          const r = container.getBoundingClientRect()
+          showAddMenu(r.left + 8, r.top + 30)
+        },
         onShow: (type) => {
           void this.applyBlockTransform(el, ctx, source, (s) => removeHiddenType(s, type))
         },
@@ -105,14 +125,6 @@ export default class OnedayPlugin extends Plugin {
       const col = container.querySelector(".oneday-timeline-col")
       attachHoverInfo(container, doc)
       const body = container.querySelector(".oneday-body")
-      if (doc.text === undefined) {
-        // 纯时间轴块：外缘手柄调整体宽度
-        attachResizeHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, Boolean(doc.floatRight), (totalWidth) => {
-          void this.applyBlockTransform(el, ctx, source, (s) =>
-            setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
-          )
-        })
-      }
       // 网格组件交互：拖拽移动 + 八向缩放，写回 layout 头——所有块可用
       if (body instanceof HTMLElement) {
         attachGridInteract(body, (items) => {
@@ -134,14 +146,7 @@ export default class OnedayPlugin extends Plugin {
           toggleBlockFocus(container, line)
         },
         onTrackMenu: (x, y) => {
-          if (doc.text !== undefined) return
-          const menu = new Menu()
-          menu.addItem((item) =>
-            item.setTitle("添加文字区").setIcon("file-text").onClick(() => {
-              void this.applyBlockTransform(el, ctx, source, (s) => `${s.replace(/\n+$/, "")}\n===\n`)
-            })
-          )
-          menu.showAtPosition({ x, y })
+          showAddMenu(x, y)
         },
         onBlockMenu: (line, x, y) => {
           const entry = doc.entries.find((e) => e.line === line)
@@ -178,6 +183,13 @@ export default class OnedayPlugin extends Plugin {
               }),
           })
         },
+      })
+
+      container.addEventListener("contextmenu", (e: MouseEvent) => {
+        const t = e.target as Element | null
+        if (t?.closest("button, input, textarea, a, rect, .oneday-text-host, .oneday-add-menu")) return
+        e.preventDefault()
+        showAddMenu(e.clientX, e.clientY)
       })
 
       if (Platform.isDesktopApp || this.settings.dialogBackend === "api") {
