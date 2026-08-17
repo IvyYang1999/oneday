@@ -4,7 +4,7 @@ import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
 import { renderTimelineSvg, RenderOptions, FALLBACK_COLOR } from "./svg-builder"
 
-export function renderTimelineInto(el: HTMLElement, doc: TimelineDoc, opts: RenderOptions): void {
+export function renderTimelineInto(el: HTMLElement, doc: TimelineDoc, opts: RenderOptions): HTMLElement {
   const container = el.createDiv({ cls: "oneday-container" })
 
   const svgHolder = container.createDiv({ cls: "oneday-svg-holder" })
@@ -32,4 +32,6 @@ export function renderTimelineInto(el: HTMLElement, doc: TimelineDoc, opts: Rend
       box.createDiv({ text: `第 ${err.line + 1} 行：${err.reason}${err.text ? `（${err.text.trim()}）` : ""}` })
     }
   }
+
+  return container
 }

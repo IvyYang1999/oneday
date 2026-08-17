@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { insertEntryLine } from "./source-rewriter"
+import { deleteEntryLine, insertEntryLine, replaceEntryLine } from "./source-rewriter"
 import { parseTimeline } from "../core/parser"
 
 describe("insertEntryLine", () => {
@@ -36,5 +36,24 @@ describe("insertEntryLine", () => {
     const doc = parseTimeline(out)
     expect(doc.errors).toEqual([])
     expect(doc.entries).toHaveLength(3)
+  })
+})
+
+describe("replaceEntryLine / deleteEntryLine", () => {
+  const src = "date: 2026-08-18\n---\n09:00-10:00 math\n13:00-14:00 micro"
+
+  it("replaces a line in place", () => {
+    const out = replaceEntryLine(src, 2, "09:00-10:30 math 行列式")
+    expect(out.split("\n")[2]).toBe("09:00-10:30 math 行列式")
+    expect(parseTimeline(out).errors).toEqual([])
+  })
+
+  it("deletes a line", () => {
+    const out = deleteEntryLine(src, 3)
+    expect(out).toBe("date: 2026-08-18\n---\n09:00-10:00 math")
+  })
+
+  it("throws on out-of-range line", () => {
+    expect(() => deleteEntryLine(src, 99)).toThrow()
   })
 })

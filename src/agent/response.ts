@@ -1,6 +1,7 @@
 /** Extract & validate the agent's structured entry (D7 插件统一校验). */
 import { normalizeSpan } from "../core/parser"
 import { TimelineDoc } from "../core/types"
+import { formatEntryLine } from "../core/format"
 
 export interface AgentEntry {
   start: string
@@ -77,11 +78,7 @@ export function validateEntry(raw: unknown, doc: TimelineDoc): ResponseResult {
     }
   }
   const note = typeof obj.note === "string" && obj.note.trim() ? obj.note.trim() : undefined
-  const fmt = (m: number) => {
-    const v = m >= 24 * 60 ? m - 24 * 60 : m // 源码里写普通 24 小时制（D10：早于 range 起点即凌晨）
-    return `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}`
-  }
-  const sourceLine = `${plan ? "plan " : ""}${fmt(startMin)}-${fmt(endMin)} ${type}${note ? " " + note : ""}`
+  const sourceLine = formatEntryLine({ plan, startMin, endMin, type, note })
   return { ok: true, entry: { startMin, endMin, type, note, plan, sourceLine } }
 }
 

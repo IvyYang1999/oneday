@@ -7,6 +7,7 @@
  */
 import { TimelineDoc } from "../core/types"
 import { formatClock, formatHours, durationMinutes } from "../core/duration"
+import { AXIS_PAD_TOP, AXIS_PAD_BOTTOM, LABEL_W, TRACK_PAD } from "../core/geometry"
 
 export interface RenderOptions {
   /** type -> css color (D2). Unknown types fall back to FALLBACK_COLOR. */
@@ -18,10 +19,8 @@ export interface RenderOptions {
 }
 
 export const FALLBACK_COLOR = "#bdbdbd"
-const LABEL_W = 36
-const PAD_TOP = 8
-const PAD_BOTTOM = 8
-const TRACK_PAD = 6
+const PAD_TOP = AXIS_PAD_TOP
+const PAD_BOTTOM = AXIS_PAD_BOTTOM
 const PLAN_OPACITY = 0.22
 const BLOCK_OPACITY = 0.85
 /** Below this height (px) the duration label moves to the right of the block. */
@@ -66,23 +65,23 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
     const cls = e.plan ? "oneday-block oneday-plan" : "oneday-block"
     const opacity = e.plan ? PLAN_OPACITY : BLOCK_OPACITY
     parts.push(
-      `<rect class="${cls}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${opacity}">` +
+      `<rect class="${cls}" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${opacity}">` +
         `<title>${escapeXml(formatClock(e.startMin))}–${escapeXml(formatClock(e.endMin))} ${escapeXml(e.type)}${e.note ? " · " + escapeXml(e.note) : ""}</title></rect>`
     )
     if (!e.plan) {
       const label = formatHours(durationMinutes(e.startMin, e.endMin))
       if (hh >= MIN_INLINE_LABEL_H) {
         parts.push(
-          `<text class="oneday-duration" x="${trackX + trackW / 2}" y="${yy + hh / 2 + (hh >= MIN_NOTE_H && e.note ? -4 : 4)}" text-anchor="middle">${label}</text>`
+          `<text pointer-events="none" class="oneday-duration" x="${trackX + trackW / 2}" y="${yy + hh / 2 + (hh >= MIN_NOTE_H && e.note ? -4 : 4)}" text-anchor="middle">${label}</text>`
         )
         if (hh >= MIN_NOTE_H && e.note) {
           parts.push(
-            `<text class="oneday-note" x="${trackX + trackW / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(e.note)}</text>`
+            `<text pointer-events="none" class="oneday-note" x="${trackX + trackW / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(e.note)}</text>`
           )
         }
       } else {
         // D6: thin block, label to the right
-        parts.push(`<text class="oneday-duration oneday-thin" x="${trackX + trackW + 2}" y="${yy + hh / 2 + 3}">${label}</text>`)
+        parts.push(`<text pointer-events="none" class="oneday-duration oneday-thin" x="${trackX + trackW + 2}" y="${yy + hh / 2 + 3}">${label}</text>`)
       }
     }
   }

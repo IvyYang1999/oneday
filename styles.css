@@ -98,3 +98,68 @@
 .oneday-dialog-status.oneday-dialog-error {
   color: var(--text-error);
 }
+
+/* M3 画板编辑 */
+
+.oneday-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.oneday-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.oneday-swatch.is-active {
+  border-color: var(--text-accent);
+  box-shadow: 0 0 0 1px var(--text-accent);
+}
+
+.oneday-swatch-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.oneday-draw-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  height: 14px;
+  overflow: hidden;
+  white-space: nowrap;
+  margin: 2px 0;
+  font-family: var(--font-monospace);
+}
+
+.oneday-svg {
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.oneday-svg .oneday-block {
+  cursor: context-menu;
+}
+
+.oneday-svg .oneday-plan {
+  cursor: crosshair;
+}
+
+.oneday-ghost {
+  fill-opacity: 0.5;
+  stroke: var(--text-accent);
+  stroke-dasharray: 3 2;
+  pointer-events: none;
+}

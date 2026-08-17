@@ -1,19 +1,25 @@
-import { Platform, Plugin, TFile } from "obsidian"
+import { MarkdownPostProcessorContext, Platform, Plugin, TFile } from "obsidian"
 import { parseTimeline } from "./core/parser"
+import { formatEntryLine } from "./core/format"
+import { FALLBACK_COLOR } from "./render/svg-builder"
 import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
-import { insertEntryLine } from "./edit/source-rewriter"
+import { deleteEntryLine, insertEntryLine, replaceEntryLine } from "./edit/source-rewriter"
+import { buildToolbar } from "./edit/toolbar"
+import { attachDrawInteraction } from "./edit/draw-interaction"
+import { showBlockMenu } from "./edit/block-menu"
 
 /**
  * Oneday — highlighter-style daily timeline block.
  * Markdown source is the single source of truth (mermaid-style dual view).
- * M1: parse -> SVG render -> per-type stats + 荧光笔色号 settings.
- * M2: inline dialog -> claude CLI returns JSON -> plugin writes back (D7).
+ * M1 渲染 / M2 对话框 / M3 画板编辑（选荧光笔→拖色块→写回；右键菜单）。
  */
 export default class OnedayPlugin extends Plugin {
   settings: OnedaySettings = DEFAULT_SETTINGS
+  /** Currently selected highlighter (session-scoped). */
+  private activeType = ""
 
   async onload(): Promise<void> {
     await this.loadSettings()
@@ -21,37 +27,83 @@ export default class OnedayPlugin extends Plugin {
 
     this.registerMarkdownCodeBlockProcessor("timeline", (source, el, ctx) => {
       const doc = parseTimeline(source)
-      renderTimelineInto(el, doc, {
+      const container = renderTimelineInto(el, doc, {
         typeColors: this.settings.typeColors,
         hourHeight: this.settings.hourHeight,
         width: this.settings.width,
       })
+      if (this.activeType === "" || !(this.activeType in this.settings.typeColors)) {
+        this.activeType = Object.keys(this.settings.typeColors)[0] ?? "misc"
+      }
+
+      const toolbar = buildToolbar({
+        typeColors: this.settings.typeColors,
+        activeType: this.activeType,
+        onSelect: (type) => {
+          this.activeType = type
+        },
+      })
+      container.prepend(toolbar.el)
+      const svgHolder = container.querySelector(".oneday-svg-holder")
+      if (svgHolder) svgHolder.after(toolbar.statusEl)
+
+      attachDrawInteraction(container, doc, {
+        hourHeight: this.settings.hourHeight,
+        getActiveType: () => this.activeType,
+        typeColor: (type) => this.settings.typeColors[type] ?? FALLBACK_COLOR,
+        onCreate: (entryLine, startMin) => {
+          void this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entryLine, startMin))
+        },
+        onBlockMenu: (line, x, y) => {
+          const entry = doc.entries.find((e) => e.line === line)
+          if (!entry) return
+          showBlockMenu(this.app, entry, Object.keys(this.settings.typeColors), x, y, {
+            setNote: (ln, note) =>
+              void this.applyBlockTransform(el, ctx, source, (s) => {
+                const e = parseTimeline(s).entries.find((it) => it.line === ln)
+                if (!e) return s
+                return replaceEntryLine(s, ln, formatEntryLine({ ...e, note: note || undefined }))
+              }),
+            setType: (ln, type) =>
+              void this.applyBlockTransform(el, ctx, source, (s) => {
+                const e = parseTimeline(s).entries.find((it) => it.line === ln)
+                if (!e) return s
+                return replaceEntryLine(s, ln, formatEntryLine({ ...e, type }))
+              }),
+            remove: (ln) => void this.applyBlockTransform(el, ctx, source, (s) => deleteEntryLine(s, ln)),
+            togglePlan: (ln) =>
+              void this.applyBlockTransform(el, ctx, source, (s) => {
+                const e = parseTimeline(s).entries.find((it) => it.line === ln)
+                if (!e) return s
+                return replaceEntryLine(s, ln, formatEntryLine({ ...e, plan: !e.plan }))
+              }),
+          })
+        },
+      })
 
       if (Platform.isDesktopApp || this.settings.dialogBackend === "api") {
-        const container = el.querySelector(".oneday-container")
-        if (container instanceof HTMLElement) {
-          attachDialog(container, doc, {
-            settings: this.settings,
-            writeEntry: (entry) => this.writeEntryToNote(ctx.sourcePath, el, ctx.getSectionInfo(el), source, entry),
-          })
-        }
+        attachDialog(container, doc, {
+          settings: this.settings,
+          writeEntry: (entry: ValidatedEntry) =>
+            this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entry.sourceLine, entry.startMin)),
+        })
       }
     })
   }
 
-  /** Sole write path into markdown (D7): insert the entry line, keep time order. */
-  private async writeEntryToNote(
-    sourcePath: string,
+  /** Sole write path into markdown (D7/D3 共用): transform block source, splice back. */
+  private async applyBlockTransform(
     el: HTMLElement,
-    section: { lineStart: number; lineEnd: number } | null,
+    ctx: MarkdownPostProcessorContext,
     source: string,
-    entry: ValidatedEntry
+    transform: (source: string) => string
   ): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(sourcePath)
+    const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath)
     if (!(file instanceof TFile)) throw new Error("找不到当前笔记文件")
+    const section = ctx.getSectionInfo(el)
     if (!section) throw new Error("无法定位时间轴代码块（试试切换到阅读模式再试）")
 
-    const newSource = insertEntryLine(source, entry.sourceLine, entry.startMin)
+    const newSource = transform(source)
     await this.app.vault.process(file, (content) => {
       const lines = content.split("\n")
       // section spans the fenced block including the ``` lines.

@@ -32,3 +32,19 @@ export function insertEntryLine(source: string, sourceLine: string, newStartMin:
   }
   return [...body, ...trailing].join("\n")
 }
+
+/** Replace the 0-based line inside the block source. */
+export function replaceEntryLine(source: string, line: number, newLine: string): string {
+  const lines = source.split("\n")
+  if (line < 0 || line >= lines.length) throw new Error(`行号越界：${line}`)
+  lines[line] = newLine
+  return lines.join("\n")
+}
+
+/** Delete the 0-based line from the block source. */
+export function deleteEntryLine(source: string, line: number): string {
+  const lines = source.split("\n")
+  if (line < 0 || line >= lines.length) throw new Error(`行号越界：${line}`)
+  lines.splice(line, 1)
+  return lines.join("\n")
+}
