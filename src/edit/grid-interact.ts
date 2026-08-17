@@ -7,7 +7,7 @@
  * - drop: overlaps push down, layout persists via the `layout:` header
  * Pure DOM.
  */
-import { GRID_COLS, GRID_ROW_H, GridItem, SlotId, clampItem, resolveOverlaps, gridRows } from "../core/grid-layout"
+import { GRID_COLS, GRID_ROW_H, GridItem, SlotId, clampItem, compactGrid, gridRows, resolveOverlaps } from "../core/grid-layout"
 
 export function applyItemToSlot(slot: HTMLElement, it: GridItem): void {
   slot.style.left = `${(it.x / GRID_COLS) * 100}%`
@@ -41,7 +41,7 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
   const slots = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot"))
 
   const finish = (priorityId?: SlotId): void => {
-    const items = resolveOverlaps(slots.map(itemFromSlot), priorityId)
+    const items = compactGrid(resolveOverlaps(slots.map(itemFromSlot), priorityId), priorityId)
     for (const slot of slots) setItemOnSlot(slot, items.find((it) => it.id === slot.dataset.slot)!)
     body.style.height = `${gridRows(items) * GRID_ROW_H}px`
     onCommit(items)
@@ -87,8 +87,8 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
         item.x = next.x
         item.y = next.y
         setItemOnSlot(slot, next)
-        // iOS 式实时重排：被拖组件优先，其余组件立刻让位（带 CSS 过渡）
-        const items = resolveOverlaps(slots.map(itemFromSlot), slot.dataset.slot as SlotId)
+        // iOS 式实时重排：被拖组件优先，其余组件立刻让位+重力压实（带 CSS 过渡）
+        const items = compactGrid(resolveOverlaps(slots.map(itemFromSlot), slot.dataset.slot as SlotId), slot.dataset.slot as SlotId)
         for (const other of slots) {
           if (other === slot) continue
           setItemOnSlot(other, items.find((it) => it.id === other.dataset.slot)!)
@@ -140,8 +140,8 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
           const resized = clampItem({ ...it, x, y, w, h: hh })
           if (resized.x === it.x && resized.y === it.y && resized.w === it.w && resized.h === it.h) return
           setItemOnSlot(slot, resized)
-          // 缩放同样实时下挤
-          const items = resolveOverlaps(slots.map(itemFromSlot), slot.dataset.slot as SlotId)
+          // 缩放同样实时压实
+          const items = compactGrid(resolveOverlaps(slots.map(itemFromSlot), slot.dataset.slot as SlotId), slot.dataset.slot as SlotId)
           for (const other of slots) {
             if (other === slot) continue
             setItemOnSlot(other, items.find((o) => o.id === other.dataset.slot)!)

@@ -64,9 +64,12 @@ export function renderTimelineInto(
   const hasText = textPane !== undefined && doc.text !== undefined
   const body = container.createDiv({ cls: "oneday-body" })
 
-  // 网格布局（yyt 2026-08-17：组件手柄拖拽移动+缩放、自动吸附）：
+  // 网格布局（yyt 2026-08-17：组件手柄拖拽移动+缩放、自动吸附+重力压实）：
   // 12 列 x 20px 行，组件几何存 dataset，交互由 main 接 attachGridInteract
-  const timelineRows = Math.ceil(((doc.rangeEnd - doc.rangeStart) / 60) * ((opts.hourHeight ?? 48) / GRID_ROW_H)) + 2
+  // 时间轴默认行数取 SVG 实际高度（含标注车道撑高），避免底部截断
+  const timelineSvg = renderTimelineSvg(doc, { ...opts, width: baseWidth })
+  const svgHeight = Number(/<svg[^>]*height="([\d.]+)"/.exec(timelineSvg)?.[1] ?? 800)
+  const timelineRows = Math.ceil(svgHeight / GRID_ROW_H)
   const items = resolveGrid(doc.layout ?? null, hasText, doc.side, timelineRows)
   body.style.height = `${gridRows(items) * GRID_ROW_H}px`
   for (const it of items) {
@@ -82,7 +85,7 @@ export function renderTimelineInto(
     slot.style.height = `${it.h * GRID_ROW_H}px`
     if (it.id === "timeline") {
       const svgHolder = slot.createDiv({ cls: "oneday-svg-holder" })
-      svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
+      svgHolder.innerHTML = timelineSvg
     } else if (it.id === "text" && textPane) {
       const pane = slot.createDiv({ cls: "oneday-text-pane" })
       attachInlineTextEditor(pane, doc.text ?? "", textPane)

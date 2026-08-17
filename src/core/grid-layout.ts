@@ -131,7 +131,56 @@ export function resolveGrid(
     present.add(id)
   }
   items = items.map(clampItem)
-  return resolveOverlaps(items)
+  return compactGrid(resolveOverlaps(items))
+}
+
+/**
+ * Gravity compaction (iOS 主屏/gridstack): items fall up, then slide left,
+ * then fall up again — no stray gaps. anchorId（被拖组件）保持在原位，
+ * 其他组件绕着它压实。
+ */
+export function compactGrid(items: GridItem[], anchorId?: SlotId): GridItem[] {
+  const anchor = anchorId ? items.find((i) => i.id === anchorId) : undefined
+  const placed: GridItem[] = anchor ? [{ ...anchor }] : []
+  const rest = items.filter((i) => i.id !== anchorId)
+
+  const overlapWithPlaced = (it: GridItem): GridItem[] => placed.filter((p) => overlaps(it, p))
+
+  // pass 1: 向上落
+  for (const raw of [...rest].sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const it = { ...raw, y: 0 }
+    for (;;) {
+      const blockers = overlapWithPlaced(it)
+      if (blockers.length === 0) break
+      it.y = Math.min(...blockers.map((b) => b.y + b.h))
+    }
+    placed.push(it)
+  }
+  // pass 2: 向左滑
+  for (const it of [...placed].sort((a, b) => a.x - b.x || a.y - b.y)) {
+    if (anchor && it.id === anchor.id) continue
+    const others = placed.filter((p) => p !== it)
+    it.x = 0
+    for (;;) {
+      const blockers = others.filter((p) => overlaps(it, p))
+      if (blockers.length === 0) break
+      const nx = Math.min(...blockers.map((b) => b.x + b.w))
+      if (nx > GRID_COLS - it.w) break // 右边界，滑不动就停
+      it.x = nx
+    }
+  }
+  // pass 3: 再向上落一次（左滑可能腾出上方空间）
+  const finalPlaced: GridItem[] = anchor ? [placed.find((p) => p.id === anchor.id)!] : []
+  for (const raw of placed.filter((p) => !anchor || p.id !== anchor.id).sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const it = { ...raw, y: 0 }
+    for (;;) {
+      const blockers = finalPlaced.filter((p) => overlaps(it, p))
+      if (blockers.length === 0) break
+      it.y = Math.min(...blockers.map((b) => b.y + b.h))
+    }
+    finalPlaced.push(it)
+  }
+  return finalPlaced
 }
 
 /** Total grid height in rows. */

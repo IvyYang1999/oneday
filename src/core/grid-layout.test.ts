@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  clampItem, defaultGrid, gridRows, overlaps, parseLayoutHeader, resolveGrid, resolveOverlaps, serializeLayoutHeader,
+  clampItem, compactGrid, defaultGrid, gridRows, overlaps, parseLayoutHeader, resolveGrid, resolveOverlaps, serializeLayoutHeader,
 } from "./grid-layout"
 
 describe("parse/serialize layout header", () => {
@@ -69,5 +69,33 @@ describe("grid helpers", () => {
     expect(overlaps({ id: "text", x: 0, y: 0, w: 2, h: 2 }, { id: "stats", x: 1, y: 1, w: 2, h: 2 })).toBe(true)
     expect(clampItem({ id: "text", x: -1, y: -1, w: 99, h: 0 })).toMatchObject({ x: 0, y: 0, w: 12, h: 1 })
     expect(gridRows(defaultGrid(true, undefined, 40))).toBeGreaterThan(40)
+  })
+})
+
+describe("compactGrid (重力压实)", () => {
+  it("falls items up to remove top gaps", () => {
+    const out = compactGrid([
+      { id: "toolbar", x: 0, y: 5, w: 12, h: 2 },
+      { id: "timeline", x: 0, y: 7, w: 12, h: 10 },
+    ])
+    expect(out.find((i) => i.id === "toolbar")!.y).toBe(0)
+    expect(out.find((i) => i.id === "timeline")!.y).toBe(2)
+  })
+
+  it("anchor stays put, others compact around it", () => {
+    const out = compactGrid(
+      [
+        { id: "toolbar", x: 0, y: 5, w: 12, h: 2 },
+        { id: "timeline", x: 0, y: 0, w: 12, h: 10 },
+      ],
+      "toolbar"
+    )
+    expect(out.find((i) => i.id === "toolbar")!.y).toBe(5)
+    expect(out.find((i) => i.id === "timeline")!.y).toBe(7) // 被顶到 anchor 下面
+  })
+
+  it("slides left after falling up", () => {
+    const out = compactGrid([{ id: "stats", x: 6, y: 0, w: 6, h: 1 }])
+    expect(out[0].x).toBe(0)
   })
 })
