@@ -13,6 +13,9 @@ export interface OnedaySettings {
   typeColors: Record<string, string>
   hourHeight: number
   width: number
+  /** 默认时间轴起止小时（块内 range: 头可覆盖） */
+  rangeStartHour: number
+  rangeEndHour: number
   dialogBackend: DialogBackend
   provider: ApiProvider
   apiKey: string
@@ -24,6 +27,8 @@ export const DEFAULT_SETTINGS: OnedaySettings = {
   typeColors: DEFAULT_TYPE_COLORS,
   hourHeight: 48,
   width: 200,
+  rangeStartHour: 7,
+  rangeEndHour: 23,
   dialogBackend: "api",
   provider: "openai-compatible",
   apiKey: "",
@@ -43,7 +48,7 @@ export class OnedaySettingTab extends PluginSettingTab {
 
     containerEl.createEl("h3", { text: "荧光笔色号（全局）" })
     const paletteDesc = containerEl.createEl("p", {
-      text: "类型名会写进时间轴语法（如 math），改名/删除后历史笔记里的同名色块显示为灰色。每个 block 默认显示全部荧光笔，可在块内右键色板临时隐藏。",
+      text: "类型名（中英文均可，不含空格）会写进时间轴语法，改名/删除后历史笔记里的同名色块显示为灰色。每个 block 默认显示全部荧光笔，可在块内右键色板临时隐藏。",
       cls: "setting-item-description",
     })
     paletteDesc.style.marginTop = "0"
@@ -67,7 +72,7 @@ export class OnedaySettingTab extends PluginSettingTab {
             const commit = async (): Promise<void> => {
               const name = t.inputEl.value.trim()
               if (name === type) return
-              if (!/^[A-Za-z][\w-]*$/.test(name) || name in this.plugin.settings.typeColors) {
+              if (!/^\S+$/.test(name) || name in this.plugin.settings.typeColors) {
                 t.inputEl.value = type // 非法/重名：回退显示
                 return
               }
@@ -105,6 +110,28 @@ export class OnedaySettingTab extends PluginSettingTab {
       )
     }
     renderPalette()
+
+    new Setting(containerEl)
+      .setName("默认时间范围（起–止，小时）")
+      .setDesc("如 7–23；想全天就 0–24。单个块可用 range: 头覆盖。")
+      .addText((t) =>
+        t.setValue(String(this.plugin.settings.rangeStartHour)).onChange(async (v) => {
+          const n = Number(v)
+          if (Number.isInteger(n) && n >= 0 && n <= 23 && n < this.plugin.settings.rangeEndHour) {
+            this.plugin.settings.rangeStartHour = n
+            await this.plugin.saveSettings()
+          }
+        })
+      )
+      .addText((t) =>
+        t.setValue(String(this.plugin.settings.rangeEndHour)).onChange(async (v) => {
+          const n = Number(v)
+          if (Number.isInteger(n) && n >= 1 && n <= 24 && n > this.plugin.settings.rangeStartHour) {
+            this.plugin.settings.rangeEndHour = n
+            await this.plugin.saveSettings()
+          }
+        })
+      )
 
     new Setting(containerEl)
       .setName("每小时高度（px）")

@@ -21,7 +21,7 @@ import {
   TimelineDoc,
 } from "./types"
 
-const ENTRY_RE = /^(plan\s+)?(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})\s+([A-Za-z][\w-]*)(?:\s+(.*))?$/
+const ENTRY_RE = /^(plan\s+)?(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})\s+([^\s]+)(?:\s+(.*))?$/
 const ANNOTATION_RE = /^@(\d{1,2}):(\d{2})\s+(.*)$/
 const HEADER_RE = /^([A-Za-z][\w-]*)\s*:\s*(.*)$/
 const RANGE_RE = /^(\d{1,2})(?:-(\d{1,2}))?$/
@@ -51,10 +51,16 @@ export function normalizeSpan(rawStart: number, rawEnd: number, rangeStart: numb
   return [start, end]
 }
 
-export function parseTimeline(source: string): TimelineDoc {
+export interface ParseOptions {
+  /** 设置页的默认时间范围（range: 头优先） */
+  rangeStart?: number
+  rangeEnd?: number
+}
+
+export function parseTimeline(source: string, opts: ParseOptions = {}): TimelineDoc {
   const doc: TimelineDoc = {
-    rangeStart: DEFAULT_RANGE_START,
-    rangeEnd: DEFAULT_RANGE_END,
+    rangeStart: opts.rangeStart ?? DEFAULT_RANGE_START,
+    rangeEnd: opts.rangeEnd ?? DEFAULT_RANGE_END,
     entries: [],
     annotations: [],
     errors: [],
@@ -200,7 +206,7 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
       return
     }
     case "hide": {
-      const types = value.split(/[\s,，]+/).filter((t) => /^[A-Za-z][\w-]*$/.test(t))
+      const types = value.split(/[\s,，]+/).filter((t) => /^\S+$/.test(t))
       if (types.length === 0) {
         doc.errors.push({ line, text: raw, reason: "hide 需要至少一个类型名" })
         return

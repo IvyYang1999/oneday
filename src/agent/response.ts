@@ -63,8 +63,8 @@ export function validateEntry(raw: unknown, doc: TimelineDoc): ResponseResult {
     return { ok: false, reason: "start/end 时间格式应为 HH:MM" }
   }
   const type = typeof obj.type === "string" ? obj.type.trim() : ""
-  if (!/^[A-Za-z][\w-]*$/.test(type)) {
-    return { ok: false, reason: "type 必须是标识符" }
+  if (!/^\S+$/.test(type)) {
+    return { ok: false, reason: "type 不能含空白字符" }
   }
   const [startMin, endMin] = normalizeSpan(rawStart, rawEnd, doc.rangeStart)
   if (endMin - startMin < 5) {

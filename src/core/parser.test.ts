@@ -99,8 +99,8 @@ describe("hide header (per-block highlighter hiding)", () => {
     expect(doc.hiddenTypes).toEqual(["sleep", "misc"])
   })
 
-  it("rejects hide without valid types", () => {
-    const doc = parseTimeline("hide: !!!\n---\n09:00-10:00 math")
+  it("rejects hide with empty value", () => {
+    const doc = parseTimeline("hide: \n---\n09:00-10:00 math")
     expect(doc.errors).toHaveLength(1)
   })
 })
@@ -135,5 +135,38 @@ describe("text section (=== 块内图文混排)", () => {
 
   it("no text section by default", () => {
     expect(parseTimeline("09:00-10:00 math").text).toBeUndefined()
+  })
+})
+
+describe("unicode type names (中文类型名, yyt 2026-08-17)", () => {
+  it("parses Chinese types with notes", () => {
+    const doc = parseTimeline("09:00-10:00 数学 行列式\n10:00-11:00 英语")
+    expect(doc.errors).toEqual([])
+    expect(doc.entries[0]).toMatchObject({ type: "数学", note: "行列式" })
+    expect(doc.entries[1]).toMatchObject({ type: "英语", note: undefined })
+  })
+
+  it("hide: accepts Chinese types", () => {
+    const doc = parseTimeline("hide: 数学 英语\n---\n09:00-10:00 math")
+    expect(doc.hiddenTypes).toEqual(["数学", "英语"])
+  })
+})
+
+describe("ParseOptions default range (设置页默认时间范围)", () => {
+  it("uses provided defaults", () => {
+    const doc = parseTimeline("09:00-10:00 math", { rangeStart: 0, rangeEnd: 24 * 60 })
+    expect(doc.rangeStart).toBe(0)
+    expect(doc.rangeEnd).toBe(24 * 60)
+  })
+
+  it("range: header still wins over provided defaults", () => {
+    const doc = parseTimeline("range: 8-22\n---\n09:00-10:00 math", { rangeStart: 0, rangeEnd: 24 * 60 })
+    expect(doc.rangeStart).toBe(8 * 60)
+    expect(doc.rangeEnd).toBe(22 * 60)
+  })
+
+  it("cross-midnight shift follows the configured range start (0-24 不位移)", () => {
+    const doc = parseTimeline("00:30-01:30 sleep", { rangeStart: 0, rangeEnd: 24 * 60 })
+    expect(doc.entries[0].startMin).toBe(30) // rangeStart=0 → 不再 +24h
   })
 })

@@ -24,6 +24,13 @@ import { SIDE_LANE_W } from "./render/svg-builder"
  */
 export default class OnedayPlugin extends Plugin {
   settings: OnedaySettings = DEFAULT_SETTINGS
+
+  private parse(source: string) {
+    return parseTimeline(source, {
+      rangeStart: this.settings.rangeStartHour * 60,
+      rangeEnd: this.settings.rangeEndHour * 60,
+    })
+  }
   /** Currently selected highlighter (session-scoped). */
   private activeType = ""
   /** 记录/计划 draw mode (session-scoped). */
@@ -55,7 +62,7 @@ export default class OnedayPlugin extends Plugin {
     )
 
     this.registerMarkdownCodeBlockProcessor("timeline", (source, el, ctx) => {
-      const doc = parseTimeline(source)
+      const doc = this.parse(source)
       const saveText = (text: string): void => {
         void this.applyBlockTransform(el, ctx, source, (s) => setTextSection(s, text))
       }
@@ -155,20 +162,20 @@ export default class OnedayPlugin extends Plugin {
           showBlockMenu(this.app, entry, Object.keys(this.settings.typeColors), x, y, {
             setNote: (ln, note) =>
               void this.applyBlockTransform(el, ctx, source, (s) => {
-                const e = parseTimeline(s).entries.find((it) => it.line === ln)
+                const e = this.parse(s).entries.find((it) => it.line === ln)
                 if (!e) return s
                 return replaceEntryLine(s, ln, formatEntryLine({ ...e, note: note || undefined }))
               }),
             setType: (ln, type) =>
               void this.applyBlockTransform(el, ctx, source, (s) => {
-                const e = parseTimeline(s).entries.find((it) => it.line === ln)
+                const e = this.parse(s).entries.find((it) => it.line === ln)
                 if (!e) return s
                 return replaceEntryLine(s, ln, formatEntryLine({ ...e, type }))
               }),
             remove: (ln) => void this.applyBlockTransform(el, ctx, source, (s) => deleteEntryLine(s, ln)),
             edit: (ln, patch) =>
               void this.applyBlockTransform(el, ctx, source, (s) => {
-                const d = parseTimeline(s)
+                const d = this.parse(s)
                 const e = d.entries.find((it) => it.line === ln)
                 if (!e) return s
                 const [sh, sm] = patch.start.split(":").map(Number)
@@ -178,7 +185,7 @@ export default class OnedayPlugin extends Plugin {
               }),
             togglePlan: (ln) =>
               void this.applyBlockTransform(el, ctx, source, (s) => {
-                const e = parseTimeline(s).entries.find((it) => it.line === ln)
+                const e = this.parse(s).entries.find((it) => it.line === ln)
                 if (!e) return s
                 return replaceEntryLine(s, ln, formatEntryLine({ ...e, plan: !e.plan }))
               }),
