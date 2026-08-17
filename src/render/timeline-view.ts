@@ -10,8 +10,11 @@ export function renderTimelineInto(el: HTMLElement, doc: TimelineDoc, opts: Rend
   const baseWidth = doc.width ?? opts.width ?? 200
   const svgHolder = container.createDiv({ cls: "oneday-svg-holder" })
   svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
-  container.style.width = `${baseWidth + SIDE_LANE_W}px`
-  if (doc.floatRight) container.addClass("oneday-float-right")
+  // 宽度/浮动必须设在宿主 el 上：Obsidian 的代码块宿主默认通栏，
+  // 子元素浮动不会让出左侧空间（yyt 2026-08-17 反馈）
+  el.style.width = `${baseWidth + SIDE_LANE_W}px`
+  el.classList.add("oneday-host")
+  el.classList.toggle("oneday-host-float", Boolean(doc.floatRight))
 
   const stats = statsByType(doc.entries)
   if (stats.length > 0) {
