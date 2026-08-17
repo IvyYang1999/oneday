@@ -11,8 +11,8 @@ import { buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
-import { attachGridInteract } from "./edit/grid-interact"
-import { serializeLayoutHeader } from "./core/grid-layout"
+import { applyItemToSlot, attachGridInteract } from "./edit/grid-interact"
+import { compactGrid, GRID_ROW_H, gridRows, GridItem, serializeLayoutHeader } from "./core/grid-layout"
 import { insertTimelineBlock } from "./insert"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
@@ -109,10 +109,6 @@ export default class OnedayPlugin extends Plugin {
         onHide: (type) => {
           void this.applyBlockTransform(el, ctx, source, (s) => addHiddenType(s, type))
         },
-        onAddComponent: () => {
-          const r = container.getBoundingClientRect()
-          showAddMenu(r.left + 8, r.top + 30)
-        },
         onShow: (type) => {
           void this.applyBlockTransform(el, ctx, source, (s) => removeHiddenType(s, type))
         },
@@ -125,6 +121,9 @@ export default class OnedayPlugin extends Plugin {
       const col = container.querySelector(".oneday-timeline-col")
       attachHoverInfo(container, doc)
       const body = container.querySelector(".oneday-body")
+      // 自动量高：内容比格子高的槽位撑开格子（修新建块截断），只改显示不自动写源码
+      this.fitSlotHeights(container)
+
       // 网格组件交互：拖拽移动 + 八向缩放，写回 layout 头——所有块可用
       if (body instanceof HTMLElement) {
         attachGridInteract(body, (items) => {
@@ -185,6 +184,18 @@ export default class OnedayPlugin extends Plugin {
         },
       })
 
+      // 显式「＋组件」入口：block 右下角（与荧光笔的＋无关，yyt 2026-08-17）
+      const addComp = document.createElement("button")
+      addComp.className = "oneday-add-component"
+      addComp.textContent = "＋"
+      addComp.title = "添加组件（文字区…）"
+      addComp.addEventListener("click", (e) => {
+        e.stopPropagation()
+        const r = addComp.getBoundingClientRect()
+        showAddMenu(r.left, r.top)
+      })
+      container.appendChild(addComp)
+
       container.addEventListener("contextmenu", (e: MouseEvent) => {
         const t = e.target as Element | null
         if (t?.closest("button, input, textarea, a, rect, .oneday-text-host, .oneday-add-menu")) return
@@ -201,6 +212,40 @@ export default class OnedayPlugin extends Plugin {
         })
       }
     })
+  }
+
+  /** Grow slots whose content exceeds their grid height, then re-compact (display-only). */
+  private fitSlotHeights(container: HTMLElement): void {
+    const run = (): void => {
+      const body = container.querySelector(".oneday-body")
+      if (!(body instanceof HTMLElement)) return
+      const slots = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot"))
+      let grew = false
+      for (const slot of slots) {
+        const need = Math.ceil(slot.scrollHeight / GRID_ROW_H)
+        const cur = Number(slot.dataset.h)
+        if (need > cur) {
+          slot.dataset.h = String(need)
+          grew = true
+        }
+      }
+      if (!grew) return
+      const items = compactGrid(slots.map((s) => ({
+        id: s.dataset.slot as GridItem["id"],
+        x: Number(s.dataset.x), y: Number(s.dataset.y), w: Number(s.dataset.w), h: Number(s.dataset.h),
+      })))
+      for (const slot of slots) {
+        const it = items.find((i) => i.id === slot.dataset.slot)!
+        slot.dataset.x = String(it.x)
+        slot.dataset.y = String(it.y)
+        slot.dataset.w = String(it.w)
+        slot.dataset.h = String(it.h)
+        applyItemToSlot(slot, it)
+      }
+      body.style.height = `${gridRows(items) * GRID_ROW_H}px`
+    }
+    run()
+    window.setTimeout(run, 300) // markdown 异步渲染完再量一次
   }
 
   /** Sole write path into markdown (D7/D3 共用): transform block source, splice back. */

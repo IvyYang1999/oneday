@@ -586,3 +586,27 @@
   outline: 2px dashed var(--text-accent);
   outline-offset: 1px;
 }
+
+/* 块级「＋组件」入口（右下角，hover 淡入） */
+
+.oneday-add-component {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 14;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  opacity: 0.35;
+  padding: 0;
+  line-height: 20px;
+}
+
+.oneday-container:hover .oneday-add-component {
+  opacity: 1;
+}

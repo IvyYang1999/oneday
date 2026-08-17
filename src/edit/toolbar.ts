@@ -15,8 +15,6 @@ export interface ToolbarDeps {
   mode: DrawMode
   onSelect: (type: string) => void
   onModeChange: (mode: DrawMode) => void
-  /** 显式「+」：添加新组件（文字区…） */
-  onAddComponent: () => void
   /** Menu item: hide this swatch for this block. */
   onHide: (type: string) => void
   /** "+" menu picks a hidden type to show again. */
@@ -129,13 +127,6 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     wrap.append(addBtn, menu)
     el.appendChild(wrap)
   }
-
-  const plus = document.createElement("button")
-  plus.className = "oneday-swatch oneday-plus"
-  plus.textContent = "＋"
-  plus.title = "添加组件（文字区…）"
-  plus.addEventListener("click", () => deps.onAddComponent())
-  el.appendChild(plus)
 
   const statusEl = document.createElement("div")
   statusEl.className = "oneday-draw-status"

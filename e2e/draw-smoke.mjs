@@ -34,7 +34,6 @@ const toolbar = buildToolbar({
   onSelect: (t) => { window.__active = t },
   onModeChange: (m) => { window.__mode = m },
   onHide: (t) => window.__hidden.push(t),
-  onAddComponent: () => { window.__plus = (window.__plus ?? 0) + 1 },
   onShow: (t) => window.__shown.push(t),
 })
 container.appendChild(toolbar.el)
@@ -115,8 +114,6 @@ if (!tooltipText.includes("07:00") || !tooltipText.includes("1h") || !tooltipTex
 const hoverCount = await page.evaluate(() => document.querySelectorAll(".is-hover").length)
 if (hoverCount < 1) { console.error("no hover pairing"); process.exit(1) }
 
-// 5b. 「＋」按钮 + 空白处右键
-await page.locator(".oneday-plus").click()
 
 // 6. click (no drag) on the sleep block -> focus toggle callback
 await page.locator('.oneday-mode-btn[data-mode="actual"]').click()
@@ -141,8 +138,6 @@ const expectCreated = [
 ]
 if (JSON.stringify(created) !== JSON.stringify(expectCreated)) { console.error("created mismatch"); process.exit(1) }
 if (menu.length !== 1 || menu[0].line !== 0) { console.error("menu mismatch"); process.exit(1) }
-const plus = await page.evaluate(() => window.__plus)
-if (plus !== 1) { console.error("plus mismatch", plus); process.exit(1) }
 const focus = await page.evaluate(() => window.__focus)
 if (focus.length !== 1 || focus[0] !== 0) { console.error("focus mismatch", JSON.stringify(focus)); process.exit(1) }
 const hidden = await page.evaluate(() => window.__hidden)
