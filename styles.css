@@ -164,3 +164,14 @@
   stroke-dasharray: 3 2;
   pointer-events: none;
 }
+
+/* M4 标注车道 */
+
+.oneday-svg .oneday-side-leader {
+  stroke: var(--text-faint);
+  stroke-width: 0.6;
+}
+
+.oneday-svg .oneday-note.oneday-side {
+  fill: var(--text-muted);
+}

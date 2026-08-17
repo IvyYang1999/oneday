@@ -39,9 +39,9 @@ describe("renderTimelineSvg", () => {
     expect(svg).toContain("李林线代")
   })
 
-  it("renders annotations with leader line (D5)", () => {
+  it("renders annotations in the right label lane (D5 + M4)", () => {
     const svg = svgOf("@21:40 头晕")
-    expect(svg).toContain("oneday-anno-line")
+    expect(svg).toContain("oneday-anno")
     expect(svg).toContain(">头晕</text>")
   })
 
@@ -104,5 +104,37 @@ describe("note visibility (yyt 2026-08-17: 备注必须看得见)", () => {
   it("truncates long side notes", () => {
     const svg = svgOf("17:00-17:30 meal 这是一段特别特别特别长的备注文字内容")
     expect(svg).toContain("…")
+  })
+})
+
+describe("label lane (M4)", () => {
+  it("widens the svg by the side lane so labels are not clipped", () => {
+    const svg = svgOf("17:00-17:30 meal 晚饭")
+    expect(svg).toContain('width="312"') // 200 + SIDE_LANE_W(112)
+  })
+
+  it("spreads colliding side labels vertically with leader lines", () => {
+    // two thin blocks 15min apart -> natural label y only 12px apart < 13px row
+    const svg = svgOf("17:00-17:15 meal 晚饭\n17:15-17:30 english 单词")
+    const leaders = svg.match(/oneday-side-leader/g) ?? []
+    expect(leaders.length).toBeGreaterThanOrEqual(1)
+    const ys = [...svg.matchAll(/oneday-thin" x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
+    expect(ys).toHaveLength(2)
+    expect(Math.abs(ys[1] - ys[0])).toBeGreaterThanOrEqual(13)
+  })
+
+  it("annotations and side labels do not overlap each other", () => {
+    // annotation at 17:07 sits on top of the 17:00-17:30 block's side label
+    const svg = svgOf("17:00-17:30 meal 晚饭\n@17:07 头晕")
+    const ys = [...svg.matchAll(/class="oneday-(?:duration oneday-thin|anno)" x="198" y="([\d.]+)"/g)].map((m) => Number(m[1]))
+    expect(ys).toHaveLength(2)
+    expect(Math.abs(ys[1] - ys[0])).toBeGreaterThanOrEqual(13)
+  })
+
+  it("extends svg height when pushed-down labels overflow the axis", () => {
+    // dense cluster right before 23:00 forces labels past the axis bottom
+    const svg = svgOf("22:00-22:15 a1\n22:15-22:30 a2\n22:30-22:45 a3\n22:45-23:00 a4\n@22:50 备注")
+    const height = Number(/<svg[^>]*height="([\d.]+)"/.exec(svg)?.[1])
+    expect(height).toBeGreaterThan(784) // default axis bottom + pad = 784
   })
 })

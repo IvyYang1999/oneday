@@ -3,7 +3,8 @@
  * Layout mirrors the paper page: hour labels on the left, vertical track,
  * plan layer as translucent background, actual blocks on top (D3),
  * duration centered in the block (moved right when too thin, D6),
- * @annotations as right-side text with a leader line (D5).
+ * and a dedicated right "label lane" where thin-block labels, narrow-column
+ * notes and @annotations share one collision-avoiding layout (M4).
  */
 import { Entry, TimelineDoc } from "../core/types"
 import { formatClock, formatHours, durationMinutes } from "../core/duration"
@@ -29,11 +30,45 @@ const MIN_INLINE_LABEL_H = 30
 const MIN_INLINE_LABEL_W = 56
 /** Tall enough to also show the note inside the block. */
 const MIN_NOTE_H = 54
+/** Right lane reserved for side labels & annotations (M4: no more clipping). */
+export const SIDE_LANE_W = 112
+/** Vertical row height used by the side-label collision avoidance. */
+const SIDE_LINE_H = 13
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 }
 
+
+
+/** One item in the right label lane (thin-block label, side note, annotation). */
+export interface SideItem {
+  /** natural (ideal) center y */
+  naturalY: number
+  text: string
+  cls: string
+}
+
+export interface PlacedSideItem extends SideItem {
+  y: number
+  displaced: boolean
+}
+
+/**
+ * Collision-avoiding vertical layout for the label lane (M4):
+ * sorted by natural y, each item pushed down just enough to clear the
+ * previous one. Displaced items get a leader line from their anchor.
+ */
+export function layoutSideItems(items: SideItem[], lineH = SIDE_LINE_H): PlacedSideItem[] {
+  const sorted = [...items].sort((a, b) => a.naturalY - b.naturalY)
+  let prevBottom = -Infinity
+  return sorted.map((it) => {
+    const half = lineH / 2
+    const y = Math.max(it.naturalY, prevBottom + half + 1)
+    prevBottom = y + half
+    return { ...it, y, displaced: y > it.naturalY + 0.5 }
+  })
+}
 
 /** Column layout for actual entries (calendar-style parallel events). */
 interface Placed {
@@ -87,14 +122,17 @@ function truncate(text: string, max = 12): string {
 
 export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string {
   const hourHeight = opts.hourHeight ?? 48
-  const width = opts.width ?? 200
+  const baseWidth = opts.width ?? 200
   const trackX = LABEL_W
-  const trackW = width - LABEL_W - TRACK_PAD
+  const trackW = baseWidth - LABEL_W - TRACK_PAD
+  // M4: dedicated right lane for side labels & annotations (no clipping).
+  const width = baseWidth + SIDE_LANE_W
+  const laneX = trackX + trackW + 4
   const y = (min: number): number => PAD_TOP + ((min - doc.rangeStart) / 60) * hourHeight
-  const height = PAD_TOP + ((doc.rangeEnd - doc.rangeStart) / 60) * hourHeight + PAD_BOTTOM
+  const axisBottom = PAD_TOP + ((doc.rangeEnd - doc.rangeStart) / 60) * hourHeight
 
   const parts: string[] = []
-  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" class="oneday-svg" style="overflow:visible" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`)
+  const sideItems: SideItem[] = []
 
   // Hour gridlines + labels (including >24h hours, D10 自然延伸).
   const firstHour = Math.floor(doc.rangeStart / 60)
@@ -143,23 +181,34 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
           `<text pointer-events="none" class="oneday-note" x="${p.x + p.w / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(truncate(e.note ?? ""))}</text>`
         )
       } else if (e.note) {
-        // 备注放不进块内 -> 显示在轨道右侧（yyt 2026-08-17：备注必须看得见）
-        parts.push(`<text pointer-events="none" class="oneday-note oneday-side" x="${trackX + trackW + 2}" y="${yy + hh / 2 + 3}">${escapeXml(truncate(e.note))}</text>`)
+        // 备注放不进块内 -> 右侧标注车道（yyt 2026-08-17：备注必须看得见）
+        sideItems.push({ naturalY: yy + hh / 2, text: truncate(e.note, 14), cls: "oneday-note oneday-side" })
       }
     } else {
-      // D6: thin/narrow block, duration (+note) to the right of the track
-      const side = e.note ? `${label} · ${truncate(e.note)}` : label
-      parts.push(`<text pointer-events="none" class="oneday-duration oneday-thin" x="${trackX + trackW + 2}" y="${yy + hh / 2 + 3}">${escapeXml(side)}</text>`)
+      // D6: thin/narrow block, duration (+note) -> 标注车道
+      const side = e.note ? `${label} · ${truncate(e.note, 14)}` : label
+      sideItems.push({ naturalY: yy + hh / 2, text: side, cls: "oneday-duration oneday-thin" })
     }
   }
 
-  // @annotations: leader line + right-side text (D5)
+  // @annotations share the same label lane (D5 + M4 collision avoidance)
   for (const a of doc.annotations) {
-    const yy = y(a.timeMin)
-    parts.push(`<line class="oneday-anno-line" x1="${trackX}" y1="${yy}" x2="${trackX - 8}" y2="${yy}"/>`)
-    parts.push(`<text class="oneday-anno" x="${trackX + trackW + 2}" y="${yy + 3}">${escapeXml(a.text)}</text>`)
+    sideItems.push({ naturalY: y(a.timeMin), text: truncate(a.text, 14), cls: "oneday-anno" })
   }
 
-  parts.push("</svg>")
-  return parts.join("")
+  const placedSide = layoutSideItems(sideItems)
+  for (const it of placedSide) {
+    if (it.displaced) {
+      parts.push(
+        `<line class="oneday-side-leader" x1="${trackX + trackW}" y1="${it.naturalY}" x2="${laneX - 2}" y2="${it.y}"/>`
+      )
+    }
+    parts.push(`<text pointer-events="none" class="${it.cls}" x="${laneX}" y="${it.y + 3}">${escapeXml(it.text)}</text>`)
+  }
+
+  const lastSideBottom = placedSide.length > 0 ? placedSide[placedSide.length - 1].y + SIDE_LINE_H / 2 : 0
+  const height = Math.max(axisBottom, lastSideBottom) + PAD_BOTTOM
+
+  const out = [`<svg xmlns="http://www.w3.org/2000/svg" class="oneday-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`, ...parts, "</svg>"]
+  return out.join("")
 }
