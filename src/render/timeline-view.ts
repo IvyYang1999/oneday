@@ -11,6 +11,7 @@ import { TimelineDoc } from "../core/types"
 import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
 import { renderTimelineSvg, RenderOptions, FALLBACK_COLOR, SIDE_LANE_W } from "./svg-builder"
+import { resolveLayout, SlotId } from "../core/layout"
 
 /** 文字区原地编辑：点击渲染区 -> textarea；失焦/⌘Enter 保存，Esc 取消（yyt：不要弹窗）。 */
 function attachInlineTextEditor(pane: HTMLElement, text: string, deps: TextPaneDeps): void {
@@ -61,21 +62,36 @@ export function renderTimelineInto(
 
   const baseWidth = doc.width ?? opts.width ?? 200
   const hasText = textPane !== undefined && doc.text !== undefined
-  const body = container.createDiv({ cls: "oneday-body" + (doc.side === "left" ? " side-left" : "") })
-  if (hasText && textPane) {
-    const pane = body.createDiv({ cls: "oneday-text-pane" })
-    attachInlineTextEditor(pane, doc.text ?? "", textPane)
-    // 分隔条占位（拖拽行为由 main 接 attachDivider）
-    body.createDiv({ cls: "oneday-divider" })
+  const body = container.createDiv({ cls: "oneday-body" })
+
+  // 插槽化布局（yyt 2026-08-17：组件自由拖拽换位）：列 x 插槽，顺序由 layout 头决定
+  const layout = resolveLayout(doc.layout ?? null, hasText, doc.side)
+  for (const colIds of layout) {
+    const hasTimeline = colIds.includes("timeline")
+    const col = body.createDiv({ cls: "oneday-col" + (hasTimeline ? " oneday-timeline-col" : "") })
+    if (hasTimeline) {
+      // 宽度创建即钉死：否则列宽退化为内容驱动（修「双击编辑左侧变窄」）
+      col.style.width = `${baseWidth + SIDE_LANE_W}px`
+      col.style.flexShrink = "0"
+    }
+    for (const id of colIds) {
+      const slot = col.createDiv({ cls: `oneday-slot oneday-slot-${id}` })
+      slot.dataset.slot = id satisfies SlotId
+      if (id === "timeline") {
+        const svgHolder = slot.createDiv({ cls: "oneday-svg-holder" })
+        svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
+      } else if (id === "text" && textPane) {
+        const pane = slot.createDiv({ cls: "oneday-text-pane" })
+        attachInlineTextEditor(pane, doc.text ?? "", textPane)
+      }
+    }
   }
-  // 时间轴栏：工具栏/状态/统计/对话框都进这一列（yyt：和文字区分开）。
-  // 宽度创建即钉死：否则列宽退化为内容驱动，工具栏一排色板把列撑宽、
-  // 文字区在编辑时被挤压（yyt 2026-08-17「双击编辑左侧变窄」）
-  const col = body.createDiv({ cls: "oneday-timeline-col" })
-  col.style.width = `${baseWidth + SIDE_LANE_W}px`
-  col.style.flexShrink = "0"
-  const svgHolder = col.createDiv({ cls: "oneday-svg-holder" })
-  svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
+  // 双列时加分隔条（拖拽行为由 main 接 attachDivider）
+  if (layout.length > 1) {
+    const cols = Array.from(body.children)
+    const divider = createDiv({ cls: "oneday-divider" })
+    body.insertBefore(divider, cols[1])
+  }
   // 宽度/浮动必须设在宿主 el 上：Obsidian 的代码块宿主默认通栏，
   // 子元素浮动不会让出左侧空间（yyt 2026-08-17 反馈）。
   // 在 callout（> [!x|right]）内时浮动由 callout 主导（Live Preview 唯一可行路径），
@@ -85,9 +101,10 @@ export function renderTimelineInto(
   el.classList.add("oneday-host")
   el.classList.toggle("oneday-host-float", Boolean(doc.floatRight) && !inCallout)
 
+  const statsSlot = container.querySelector(".oneday-slot-stats") ?? container
   const stats = statsByType(doc.entries)
   if (stats.length > 0) {
-    col.createDiv({
+    statsSlot.createDiv({
       cls: "oneday-stats",
       text: stats.map((s) => `${s.type} ${formatHours(s.minutes)}`).join(" · "),
     })
@@ -95,14 +112,14 @@ export function renderTimelineInto(
 
   const unknown = [...new Set(doc.entries.map((e) => e.type).filter((t) => !(t in opts.typeColors)))]
   if (unknown.length > 0) {
-    col.createDiv({
+    statsSlot.createDiv({
       cls: "oneday-warning",
       text: `未登记类型（显示为 ${FALLBACK_COLOR} 灰色）：${unknown.join(", ")}`,
     })
   }
 
   if (doc.errors.length > 0) {
-    const box = col.createDiv({ cls: "oneday-errors" })
+    const box = statsSlot.createDiv({ cls: "oneday-errors" })
     for (const err of doc.errors) {
       box.createDiv({ text: `第 ${err.line + 1} 行：${err.reason}${err.text ? `（${err.text.trim()}）` : ""}` })
     }

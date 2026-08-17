@@ -23,6 +23,8 @@ export interface TimelineDoc {
   text?: string
   /** 时间轴栏在左还是右（`side: left`，默认右）。 */
   side?: "left" | "right"
+  /** 组件布局（`layout:` 头，列用 | 分隔）；缺省按 side/text 推导。 */
+  layout?: import("./layout").SlotId[][]
 }
 
 export interface Entry {

@@ -13,6 +13,8 @@ import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
 import { attachResizeHandle } from "./edit/resize-handle"
 import { attachDivider } from "./edit/divider"
+import { attachLayoutDrag } from "./edit/layout-drag"
+import { serializeLayout } from "./core/layout"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
 /**
@@ -93,13 +95,12 @@ export default class OnedayPlugin extends Plugin {
           )
         },
       })
-      // 工具栏/状态行进时间轴列（yyt：荧光笔、AI 输入框属于时间轴区域）
+      // 填槽：工具栏/状态行/对话框各就各位（插槽位置由 layout 决定）
+      const toolbarSlot = container.querySelector(".oneday-slot-toolbar")
+      if (toolbarSlot) toolbarSlot.appendChild(toolbar.el)
+      const timelineSlot = container.querySelector(".oneday-slot-timeline")
+      if (timelineSlot) timelineSlot.appendChild(toolbar.statusEl)
       const col = container.querySelector(".oneday-timeline-col")
-      if (col instanceof HTMLElement) {
-        col.prepend(toolbar.el)
-        const svgHolder = col.querySelector(".oneday-svg-holder")
-        if (svgHolder) svgHolder.after(toolbar.statusEl)
-      }
       attachHoverInfo(container, doc)
       const body = container.querySelector(".oneday-body")
       if (doc.text !== undefined && body instanceof HTMLElement) {
@@ -107,6 +108,12 @@ export default class OnedayPlugin extends Plugin {
         attachDivider(body, (doc.width ?? this.settings.width) + SIDE_LANE_W, (totalWidth) => {
           void this.applyBlockTransform(el, ctx, source, (s) =>
             setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
+          )
+        })
+        // 组件拖拽换位（跨列），写回 layout 头
+        attachLayoutDrag(body, (cols) => {
+          void this.applyBlockTransform(el, ctx, source, (s) =>
+            setHeaderValue(s, "layout", serializeLayout(cols))
           )
         })
       } else {
@@ -166,7 +173,8 @@ export default class OnedayPlugin extends Plugin {
       })
 
       if (Platform.isDesktopApp || this.settings.dialogBackend === "api") {
-        attachDialog((col instanceof HTMLElement ? col : container), doc, {
+        const dialogSlot = container.querySelector(".oneday-slot-dialog")
+        attachDialog((dialogSlot instanceof HTMLElement ? dialogSlot : col instanceof HTMLElement ? col : container), doc, {
           settings: this.settings,
           writeEntry: (entry: ValidatedEntry) =>
             this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entry.sourceLine, entry.startMin)),
