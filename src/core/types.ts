@@ -21,6 +21,8 @@ export interface TimelineDoc {
   floatRight?: boolean
   /** Free markdown text section (everything after a `===` line) — 块内图文混排的文。 */
   text?: string
+  /** 时间轴栏在左还是右（`side: left`，默认右）。 */
+  side?: "left" | "right"
 }
 
 export interface Entry {

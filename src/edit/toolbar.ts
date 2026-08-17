@@ -19,6 +19,9 @@ export interface ToolbarDeps {
   /** 文字区（块内图文混排） */
   hasText: boolean
   onEditText: () => void
+  /** 时间轴栏在左/右（有文字区时可换侧） */
+  side: "left" | "right"
+  onToggleSide: () => void
   onSelect: (type: string) => void
   onModeChange: (mode: DrawMode) => void
   /** Menu item: hide this swatch for this block. */
@@ -54,6 +57,33 @@ function showSwatchMenu(root: HTMLElement, x: number, y: number, type: string, d
 export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   const el = document.createElement("div")
   el.className = "oneday-toolbar" + (deps.mode === "plan" ? " is-plan" : "")
+
+  // 换侧 grip：点击或往对侧拖都交换左右（飞书式）
+  const grip = document.createElement("button")
+  grip.className = "oneday-grip"
+  grip.textContent = "⋮⋮"
+  grip.title = "点击或拖到对侧：交换文字区/时间轴位置"
+  let gripDownX: number | null = null
+  let gripFired = false
+  grip.addEventListener("pointerdown", (e) => {
+    gripDownX = e.clientX
+    gripFired = false
+    grip.setPointerCapture(e.pointerId)
+  })
+  grip.addEventListener("pointermove", (e) => {
+    if (gripDownX === null || gripFired) return
+    if (Math.abs(e.clientX - gripDownX) > 100) {
+      gripFired = true
+      deps.onToggleSide()
+    }
+  })
+  grip.addEventListener("pointerup", (e) => {
+    if (gripDownX !== null && !gripFired && Math.abs(e.clientY) >= 0) {
+      if (Math.abs(e.clientX - gripDownX) < 5) deps.onToggleSide()
+    }
+    gripDownX = null
+  })
+  el.appendChild(grip)
 
   // 计划/记录 mode toggle
   const modeWrap = document.createElement("span")

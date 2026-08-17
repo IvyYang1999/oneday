@@ -66,7 +66,7 @@ export function parseTimeline(source: string): TimelineDoc {
   if (textSep >= 0) {
     const text = lines.splice(textSep + 1).join("\n").trim()
     lines.splice(textSep) // drop the === line itself
-    if (text !== "") doc.text = text
+    doc.text = text // 空字符串也保留：渲染为空占位，点击即可原地编辑
   }
   let inHeader = true
   let sawSeparator = false
@@ -181,6 +181,14 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
         doc.floatRight = true
       } else {
         doc.errors.push({ line, text: raw, reason: "float 只支持 right" })
+      }
+      return
+    }
+    case "side": {
+      if (value === "left" || value === "right") {
+        doc.side = value
+      } else {
+        doc.errors.push({ line, text: raw, reason: "side 只支持 left/right" })
       }
       return
     }

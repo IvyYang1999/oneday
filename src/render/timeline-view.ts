@@ -2,8 +2,8 @@
 export interface TextPaneDeps {
   /** Render doc.text markdown into the pane (Obsidian MarkdownRenderer). */
   renderMarkdown: (host: HTMLElement, text: string) => void
-  /** Open the text editor modal. */
-  onEdit: () => void
+  /** Persist edited text (setTextSection write-back). */
+  onSave: (text: string) => void
 }
 
 /** DOM mount: svg string + stats row + error list, into a code-block container. */
@@ -11,6 +11,40 @@ import { TimelineDoc } from "../core/types"
 import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
 import { renderTimelineSvg, RenderOptions, FALLBACK_COLOR, SIDE_LANE_W } from "./svg-builder"
+
+/** 文字区原地编辑：点击渲染区 -> textarea；失焦/⌘Enter 保存，Esc 取消（yyt：不要弹窗）。 */
+function attachInlineTextEditor(pane: HTMLElement, text: string, deps: TextPaneDeps): void {
+  const show = (): void => {
+    pane.empty()
+    if (text.trim() === "") {
+      const ph = pane.createDiv({ cls: "oneday-text-placeholder", text: "点击书写…" })
+      ph.addEventListener("click", edit)
+    } else {
+      const host = pane.createDiv({ cls: "oneday-text-host" })
+      deps.renderMarkdown(host, text)
+      host.addEventListener("click", edit)
+    }
+  }
+  const edit = (): void => {
+    pane.empty()
+    const ta = pane.createEl("textarea", { cls: "oneday-text-inline" })
+    ta.value = text
+    ta.rows = Math.max(4, text.split("\n").length + 2)
+    const commit = (): void => deps.onSave(ta.value)
+    ta.addEventListener("blur", commit)
+    ta.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        ta.blur()
+      } else if (e.key === "Escape") {
+        ta.removeEventListener("blur", commit)
+        show()
+      }
+    })
+    ta.focus()
+  }
+  show()
+}
 
 export function renderTimelineInto(
   el: HTMLElement,
@@ -22,14 +56,10 @@ export function renderTimelineInto(
 
   const baseWidth = doc.width ?? opts.width ?? 200
   const hasText = textPane !== undefined && doc.text !== undefined
-  const body = container.createDiv({ cls: "oneday-body" })
+  const body = container.createDiv({ cls: "oneday-body" + (doc.side === "left" ? " side-left" : "") })
   if (hasText && textPane) {
     const pane = body.createDiv({ cls: "oneday-text-pane" })
-    const editBtn = pane.createEl("button", { cls: "oneday-text-edit", text: "✎" })
-    editBtn.title = "编辑文字区"
-    editBtn.addEventListener("click", () => textPane.onEdit())
-    const host = pane.createDiv({ cls: "oneday-text-host" })
-    textPane.renderMarkdown(host, doc.text ?? "")
+    attachInlineTextEditor(pane, doc.text ?? "", textPane)
     // 分隔条占位（拖拽行为由 main 接 attachDivider）
     body.createDiv({ cls: "oneday-divider" })
   }

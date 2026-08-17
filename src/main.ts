@@ -1,5 +1,5 @@
 import { MarkdownPostProcessorContext, MarkdownRenderer, Platform, Plugin, TFile } from "obsidian"
-import { parseTimeline } from "./core/parser"
+import { normalizeSpan, parseTimeline } from "./core/parser"
 import { formatEntryLine } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
 import { renderTimelineInto } from "./render/timeline-view"
@@ -13,7 +13,6 @@ import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
 import { attachResizeHandle } from "./edit/resize-handle"
 import { attachDivider } from "./edit/divider"
-import { TextSectionModal } from "./edit/text-modal"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
 /**
@@ -34,10 +33,8 @@ export default class OnedayPlugin extends Plugin {
 
     this.registerMarkdownCodeBlockProcessor("timeline", (source, el, ctx) => {
       const doc = parseTimeline(source)
-      const openTextEditor = (): void => {
-        new TextSectionModal(this.app, doc.text ?? "", (text) => {
-          void this.applyBlockTransform(el, ctx, source, (s) => setTextSection(s, text))
-        }).open()
+      const saveText = (text: string): void => {
+        void this.applyBlockTransform(el, ctx, source, (s) => setTextSection(s, text))
       }
       const container = renderTimelineInto(
         el,
@@ -51,7 +48,7 @@ export default class OnedayPlugin extends Plugin {
           renderMarkdown: (host, text) => {
             void MarkdownRenderer.render(this.app, text, host, ctx.sourcePath, this)
           },
-          onEdit: openTextEditor,
+          onSave: saveText,
         }
       )
       const visibleTypes = Object.keys(this.settings.typeColors).filter((t) => !doc.hiddenTypes.includes(t))
@@ -83,7 +80,18 @@ export default class OnedayPlugin extends Plugin {
           void this.applyBlockTransform(el, ctx, source, (s) => removeHiddenType(s, type))
         },
         hasText: doc.text !== undefined,
-        onEditText: openTextEditor,
+        onEditText: () => {
+          // 无文字区时「文」按钮创建空区（渲染为「点击书写…」占位）
+          if (doc.text === undefined) {
+            void this.applyBlockTransform(el, ctx, source, (s) => `${s.replace(/\n+$/, "")}\n===\n`)
+          }
+        },
+        side: doc.side ?? "right",
+        onToggleSide: () => {
+          void this.applyBlockTransform(el, ctx, source, (s) =>
+            doc.side === "left" ? removeHeaderValue(s, "side") : setHeaderValue(s, "side", "left")
+          )
+        },
       })
       // 工具栏/状态行进时间轴列（yyt：荧光笔、AI 输入框属于时间轴区域）
       const col = container.querySelector(".oneday-timeline-col")
@@ -120,13 +128,6 @@ export default class OnedayPlugin extends Plugin {
         onBlockClick: (line) => {
           toggleBlockFocus(container, line)
         },
-        onResizeEdge: (line, startMin, endMin) => {
-          void this.applyBlockTransform(el, ctx, source, (s) => {
-            const e = parseTimeline(s).entries.find((it) => it.line === line)
-            if (!e) return s
-            return replaceEntryLine(s, line, formatEntryLine({ ...e, startMin, endMin }))
-          })
-        },
         onBlockMenu: (line, x, y) => {
           const entry = doc.entries.find((e) => e.line === line)
           if (!entry) return
@@ -144,6 +145,16 @@ export default class OnedayPlugin extends Plugin {
                 return replaceEntryLine(s, ln, formatEntryLine({ ...e, type }))
               }),
             remove: (ln) => void this.applyBlockTransform(el, ctx, source, (s) => deleteEntryLine(s, ln)),
+            edit: (ln, patch) =>
+              void this.applyBlockTransform(el, ctx, source, (s) => {
+                const d = parseTimeline(s)
+                const e = d.entries.find((it) => it.line === ln)
+                if (!e) return s
+                const [sh, sm] = patch.start.split(":").map(Number)
+                const [eh, em] = patch.end.split(":").map(Number)
+                const [startMin, endMin] = normalizeSpan(sh * 60 + sm, eh * 60 + em, d.rangeStart)
+                return replaceEntryLine(s, ln, formatEntryLine({ ...e, startMin, endMin, type: patch.type, note: patch.note || undefined }))
+              }),
             togglePlan: (ln) =>
               void this.applyBlockTransform(el, ctx, source, (s) => {
                 const e = parseTimeline(s).entries.find((it) => it.line === ln)

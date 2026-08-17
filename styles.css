@@ -431,10 +431,16 @@
 
 .oneday-divider {
   flex-shrink: 0;
+  align-self: stretch; /* 修复：body 是 align-items:flex-start，无内容时高度塌成 0 */
   width: 8px;
-  margin: 0 -2px;
+  margin: 0 2px;
   cursor: col-resize;
   border-radius: 4px;
+  background: var(--background-modifier-border); /* 常驻可见 */
+}
+
+.oneday-body.side-left {
+  flex-direction: row-reverse;
 }
 
 .oneday-divider:hover,
@@ -446,4 +452,41 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+}
+
+.oneday-grip {
+  border: none;
+  background: none;
+  cursor: grab;
+  color: var(--text-muted);
+  box-shadow: none;
+  padding: 1px 4px;
+  font-size: 11px;
+  letter-spacing: -2px;
+}
+
+.oneday-grip:active {
+  cursor: grabbing;
+}
+
+.oneday-text-placeholder {
+  color: var(--text-faint);
+  font-size: 13px;
+  cursor: text;
+  padding: 4px 0;
+}
+
+.oneday-text-inline {
+  width: 100%;
+  font-size: 14px;
+  font-family: var(--font-text);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.oneday-modal-error {
+  color: var(--text-error);
+  font-size: 12px;
+  min-height: 14px;
 }
