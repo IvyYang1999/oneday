@@ -50,26 +50,6 @@ export function normalizeSpan(rawStart: number, rawEnd: number, rangeStart: numb
   return [start, end]
 }
 
-/** Flag overlapping actual (non-plan) entries; plan entries may overlap freely. */
-function findOverlaps(entries: Entry[]): ParseError[] {
-  const errors: ParseError[] = []
-  const actual = entries.filter((e) => !e.plan)
-  for (let i = 0; i < actual.length; i++) {
-    for (let j = i + 1; j < actual.length; j++) {
-      const a = actual[i]
-      const b = actual[j]
-      if (a.startMin < b.endMin && b.startMin < a.endMin) {
-        errors.push({
-          line: b.line,
-          text: "",
-          reason: `overlap with line ${a.line + 1} (${a.type})`,
-        })
-      }
-    }
-  }
-  return errors
-}
-
 export function parseTimeline(source: string): TimelineDoc {
   const doc: TimelineDoc = {
     rangeStart: DEFAULT_RANGE_START,
@@ -150,7 +130,6 @@ export function parseTimeline(source: string): TimelineDoc {
     if (a.timeMin > doc.rangeEnd) doc.rangeEnd = a.timeMin
   }
 
-  doc.errors.push(...findOverlaps(doc.entries))
   return doc
 }
 

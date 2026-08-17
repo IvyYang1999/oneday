@@ -76,13 +76,13 @@ describe("parseTimeline", () => {
     })
   })
 
-  it("flags overlapping actual entries but tolerates plan overlap", () => {
+  it("allows overlapping actual entries (并列日程并排渲染, yyt 2026-08-17)", () => {
     const doc = parseTimeline([
       "plan 08:00-12:00 math",
       "09:00-10:00 math",
       "09:30-11:00 micro",
     ].join("\n"))
-    expect(doc.errors).toHaveLength(1)
-    expect(doc.errors[0].reason).toContain("overlap")
+    expect(doc.errors).toEqual([])
+    expect(doc.entries).toHaveLength(3)
   })
 })

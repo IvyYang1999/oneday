@@ -25,10 +25,9 @@ describe("interpretResponse", () => {
     if (!r.ok) expect(r.reason).toBe("几点开始的呢？")
   })
 
-  it("rejects overlap with existing actual entries", () => {
+  it("allows overlap with existing actual entries (并列日程)", () => {
     const r = interpretResponse('{"start":"09:30","end":"10:30","type":"misc"}', DOC)
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toContain("重叠")
+    expect(r.ok).toBe(true)
   })
 
   it("rejects bad time format and tiny durations", () => {

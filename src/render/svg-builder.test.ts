@@ -62,3 +62,47 @@ describe("renderTimelineSvg", () => {
     expect(svg).toContain("a&lt;b&gt;")
   })
 })
+
+describe("parallel events (并列日程, yyt 2026-08-17)", () => {
+  it("splits overlapping blocks into side-by-side columns", () => {
+    const svg = svgOf("09:00-11:00 math\n09:30-10:30 micro 听课")
+    const rects = [...svg.matchAll(/<rect class="oneday-block"[^>]*x="([\d.]+)"[^>]*width="([\d.]+)"/g)]
+    expect(rects).toHaveLength(2)
+    const [x1, w1] = [Number(rects[0][1]), Number(rects[0][2])]
+    const [x2, w2] = [Number(rects[1][1]), Number(rects[1][2])]
+    expect(x1).not.toBe(x2) // two columns
+    expect(w1).toBeCloseTo(w2, 5)
+    expect(w1).toBeLessThan(100) // each narrower than the full track
+  })
+
+  it("non-overlapping blocks keep full width", () => {
+    const svg = svgOf("09:00-10:00 math\n10:00-11:00 micro")
+    const rects = [...svg.matchAll(/<rect class="oneday-block"[^>]*width="([\d.]+)"/g)]
+    expect(Number(rects[0][1])).toBeCloseTo(Number(rects[1][1]), 5)
+  })
+
+  it("reuses a column after a gap inside the same cluster", () => {
+    // A 09-12, B 09:30-10, C 10-12 -> B and C share col 1, total 2 cols
+    const svg = svgOf("09:00-12:00 math\n09:30-10:00 micro\n10:00-12:00 english")
+    const widths = [...svg.matchAll(/<rect class="oneday-block"[^>]*width="([\d.]+)"/g)].map((m) => Number(m[1]))
+    expect(widths.every((w) => Math.abs(w - widths[0]) < 1e-6)).toBe(true)
+  })
+})
+
+describe("note visibility (yyt 2026-08-17: 备注必须看得见)", () => {
+  it("shows the note on the right side when it does not fit inside", () => {
+    const svg = svgOf("17:00-17:30 meal 晚饭吃太多")
+    expect(svg).toContain("0.5h · 晚饭吃太多")
+  })
+
+  it("narrow columns push duration+note to the right side", () => {
+    // 3 overlapping -> columns ~49px wide < 56 -> side label
+    const svg = svgOf("09:00-12:00 math\n09:30-11:00 micro\n09:45-10:45 english 背单词打卡")
+    expect(svg).toContain("1h · 背单词打卡")
+  })
+
+  it("truncates long side notes", () => {
+    const svg = svgOf("17:00-17:30 meal 这是一段特别特别特别长的备注文字内容")
+    expect(svg).toContain("…")
+  })
+})

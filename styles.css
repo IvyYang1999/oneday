@@ -147,6 +147,7 @@
 .oneday-svg {
   cursor: crosshair;
   touch-action: none;
+  overflow: visible;
 }
 
 .oneday-svg .oneday-block {

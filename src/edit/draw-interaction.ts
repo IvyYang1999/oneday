@@ -21,11 +21,6 @@ export interface DrawDeps {
 
 const SVGNS = "http://www.w3.org/2000/svg"
 
-/** True if [start,end) overlaps any actual (non-plan) entry. Plan layers are meant to be covered (D3). */
-export function overlapsActual(doc: TimelineDoc, startMin: number, endMin: number): boolean {
-  return doc.entries.some((e) => !e.plan && e.startMin < endMin && startMin < e.endMin)
-}
-
 export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, deps: DrawDeps): void {
   const svg = container.querySelector<SVGSVGElement>("svg.oneday-svg")
   const track = container.querySelector<SVGRectElement>("rect.oneday-track")
@@ -56,11 +51,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   svg.addEventListener("pointerdown", (e: PointerEvent) => {
     if (e.button !== 0) return
-    const target = e.target as Element | null
-    const hitBlock = target?.closest("rect.oneday-block")
-    // Actual blocks: reserved for future drag-move; plan blocks: draw over them (D3).
-    if (hitBlock && !hitBlock.classList.contains("oneday-plan")) return
-
+    // 并列日程：允许从已有色块上起笔（yyt 2026-08-17）；右键菜单不受影响。
     dragging = true
     const rect = svg.getBoundingClientRect()
     dragOriginTop = rect.top
@@ -107,10 +98,6 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
     if (endMin - startMin < SNAP_MINUTES) {
       setStatus("")
-      return
-    }
-    if (overlapsActual(doc, startMin, endMin)) {
-      setStatus("与已有色块重叠，未创建")
       return
     }
     const line = formatEntryLine({ plan: false, startMin, endMin, type: deps.getActiveType() })

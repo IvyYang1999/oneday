@@ -76,7 +76,7 @@ async function drag(fromMin, toMin) {
 await drag(600, 690)
 // 2. drag up 14:00 -> 12:30 also works
 await drag(840, 750)
-// 3. overlapping the sleep block (07:00-08:00) is rejected
+// 3. overlapping the sleep block (07:00-08:00) is now allowed (并列日程)
 await drag(450, 510)
 // 4. right-click the sleep block fires menu with line 0
 await page.mouse.click(trackCX, yFor(450), { button: "right" })
@@ -90,6 +90,7 @@ await browser.close()
 const expectCreated = [
   { line: "10:00-11:30 math", startMin: 600 },
   { line: "12:30-14:00 math", startMin: 750 },
+  { line: "07:30-08:30 math", startMin: 450 },
 ]
 if (JSON.stringify(created) !== JSON.stringify(expectCreated)) { console.error("created mismatch"); process.exit(1) }
 if (menu.length !== 1 || menu[0].line !== 0) { console.error("menu mismatch"); process.exit(1) }

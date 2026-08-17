@@ -13,7 +13,7 @@ describe("buildSystemPrompt", () => {
     expect(p).toContain("21:35")
     expect(p).toContain("math, fitness")
     expect(p).toContain("09:00-10:00 math 行列式")
-    expect(p).toContain("不得与之重叠")
+    expect(p).toContain("可与之并列重叠")
     expect(p).toContain("HH:MM-HH:MM")
   })
 

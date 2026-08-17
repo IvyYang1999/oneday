@@ -29,7 +29,7 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     "你是 oneday 时间轴助手的条目生成器。用户会用自然语言描述刚做/在做/计划做的事，你把它转成一条时间轴色块。",
     GRAMMAR,
     `当前时间：${hh}:${mm}。已登记的任务类型（type 必须从这里选，拿不准用 misc）：${types}。`,
-    existing ? `当天已有实际色块（不得与之重叠）：\n${existing}` : "当天还没有实际色块。",
+    existing ? `当天已有实际色块（可与之并列重叠，插件会并排渲染）：\n${existing}` : "当天还没有实际色块。",
     "规则：",
     "1. 「刚花了 X」→ end=当前时间，start=往前推 X；「从 a 到 b」→ 直接用给定时间。",
     "2. 只输出一个 JSON 对象，不要任何其他文字、不要用代码块包裹：",

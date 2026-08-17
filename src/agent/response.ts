@@ -71,12 +71,6 @@ export function validateEntry(raw: unknown, doc: TimelineDoc): ResponseResult {
     return { ok: false, reason: "时长不足 5 分钟，疑似有误" }
   }
   const plan = obj.plan === true
-  if (!plan) {
-    const overlap = doc.entries.some((e) => !e.plan && e.startMin < endMin && startMin < e.endMin)
-    if (overlap) {
-      return { ok: false, reason: "与当天已有色块重叠，请手动调整" }
-    }
-  }
   const note = typeof obj.note === "string" && obj.note.trim() ? obj.note.trim() : undefined
   const sourceLine = formatEntryLine({ plan, startMin, endMin, type, note })
   return { ok: true, entry: { startMin, endMin, type, note, plan, sourceLine } }
