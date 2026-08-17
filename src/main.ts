@@ -14,6 +14,7 @@ import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
 import { attachResizeHandle } from "./edit/resize-handle"
 import { attachGridInteract } from "./edit/grid-interact"
 import { serializeLayoutHeader } from "./core/grid-layout"
+import { insertTimelineBlock } from "./insert"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
 /**
@@ -31,6 +32,27 @@ export default class OnedayPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings()
     this.addSettingTab(new OnedaySettingTab(this.app, this))
+
+    // 插入入口：命令面板 + 编辑器右键菜单
+    this.addCommand({
+      id: "insert-timeline-block",
+      name: "插入 Oneday 时间轴块",
+      editorCallback: (editor) => {
+        insertTimelineBlock(editor, this.app.workspace.getActiveFile()?.basename ?? null)
+      },
+    })
+    this.registerEvent(
+      this.app.workspace.on("editor-menu", (menu, editor) => {
+        menu.addItem((item) =>
+          item
+            .setTitle("插入 Oneday 时间轴")
+            .setIcon("calendar-clock")
+            .onClick(() => {
+              insertTimelineBlock(editor, this.app.workspace.getActiveFile()?.basename ?? null)
+            })
+        )
+      })
+    )
 
     this.registerMarkdownCodeBlockProcessor("timeline", (source, el, ctx) => {
       const doc = parseTimeline(source)
