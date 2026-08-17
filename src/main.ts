@@ -165,6 +165,7 @@ export default class OnedayPlugin extends Plugin {
         // 记录/计划开关 dock 在时间轴顶部右侧（管的是「往轴上画什么」，贴着轴）
         timelineSlot.prepend(buildModeToggle(this.drawMode, (mode) => {
           this.drawMode = mode
+          toolbar.el.classList.toggle("is-plan", mode === "plan") // 色板圆点同步斜线化
         }))
       }
       const col = container.querySelector(".oneday-timeline-col")
@@ -189,7 +190,7 @@ export default class OnedayPlugin extends Plugin {
         getMode: () => this.drawMode,
         typeColor: (type) => paletteForRender[type] ?? hashTypeColor(type),
         onCreate: (entryLine, startMin) => {
-          void this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entryLine, startMin))
+          void this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(this.persistLayoutOnce(s, doc, container), entryLine, startMin))
         },
         onBlockClick: (line) => {
           toggleBlockFocus(container, line)
@@ -290,10 +291,23 @@ export default class OnedayPlugin extends Plugin {
         attachDialog((dialogSlot instanceof HTMLElement ? dialogSlot : col instanceof HTMLElement ? col : container), doc, {
           settings: this.settings,
           writeEntry: (entry: ValidatedEntry) =>
-            this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entry.sourceLine, entry.startMin)),
+            this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(this.persistLayoutOnce(s, doc, container), entry.sourceLine, entry.startMin)),
         })
       }
     })
+  }
+
+  /** 无 layout 头的块在首次写入时持久化当前槽位布局（避免每次重渲染重新拟合 -> 闪缩） */
+  private persistLayoutOnce(source: string, doc: { layout?: unknown }, container: HTMLElement): string {
+    if (doc.layout !== undefined) return source
+    const body = container.querySelector(".oneday-body")
+    if (!(body instanceof HTMLElement)) return source
+    const items = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot")).map((sl) => ({
+      id: sl.dataset.slot as GridItem["id"],
+      x: Number(sl.dataset.x), y: Number(sl.dataset.y), w: Number(sl.dataset.w), h: Number(sl.dataset.h),
+    }))
+    if (items.length === 0) return source
+    return setHeaderValue(source, "layout", serializeLayoutHeader(items))
   }
 
   private insertTemplate(): { layout?: string; width?: number; hasText?: boolean } {

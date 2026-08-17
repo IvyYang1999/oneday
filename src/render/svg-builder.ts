@@ -23,7 +23,7 @@ export interface RenderOptions {
 export const FALLBACK_COLOR = "#bdbdbd"
 const PAD_TOP = AXIS_PAD_TOP
 const PAD_BOTTOM = AXIS_PAD_BOTTOM
-const PLAN_OPACITY = 0.08
+const PLAN_OPACITY = 0.12
 const BLOCK_OPACITY = 0.85
 /** Below this height (px) the duration label moves to the right of the block. */
 const MIN_INLINE_LABEL_H = 30
@@ -145,7 +145,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
   for (let h = firstHour; h <= lastHour; h++) {
     const yy = y(h * 60)
     parts.push(`<line class="oneday-grid" x1="${trackX}" y1="${yy}" x2="${trackX + trackW}" y2="${yy}"/>`)
-    parts.push(`<text class="oneday-hour" x="${LABEL_W - 6}" y="${yy + 4}" text-anchor="end">${h}</text>`)
+    parts.push(`<text class="oneday-hour" x="${LABEL_W - 6}" y="${yy + 4}" text-anchor="end">${h % 24}</text>`) // 跨零点回绕：25->1
   }
   // Track frame
   parts.push(
@@ -159,7 +159,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
       .map(
         (c, i) =>
           `<pattern id="oneday-hatch-${i}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
-          `<line x1="0" y1="0" x2="0" y2="6" stroke="${escapeXml(c)}" stroke-width="1.6" stroke-opacity="0.55"/></pattern>`
+          `<line x1="0" y1="0" x2="0" y2="6" stroke="${escapeXml(c)}" stroke-width="1.6" stroke-opacity="0.8"/></pattern>`
       )
       .join("")
     parts.push(`<defs>${defs}</defs>`)
@@ -170,7 +170,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
     const yy = y(e.startMin)
     const hh = Math.max(2, y(e.endMin) - yy)
     parts.push(
-      `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}"></rect>` +
+      `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}" stroke="${escapeXml(color)}" stroke-opacity="0.7" stroke-width="1"></rect>` +
         `<rect pointer-events="none" class="oneday-plan-hatch" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="url(#${hatchId})"/>`
     )
   }

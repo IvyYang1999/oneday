@@ -22,7 +22,7 @@ describe("renderTimelineSvg", () => {
     const svg = svgOf("plan 08:00-10:00 math\n09:00-10:00 math")
     const planIdx = svg.indexOf("oneday-plan")
     const actualIdx = svg.indexOf('fill-opacity="0.85"')
-    expect(svg).toContain('fill-opacity="0.08"') // 底色近乎无（yyt 2026-08-17）
+    expect(svg).toContain('fill-opacity="0.12"') // 淡底+彩色描边（深色模式可见性）
     expect(svg).toContain("oneday-plan-hatch") // 斜线纹理区分
     expect(planIdx).toBeGreaterThan(-1)
     expect(planIdx).toBeLessThan(actualIdx) // plan drawn first = behind
@@ -46,10 +46,11 @@ describe("renderTimelineSvg", () => {
     expect(svg).toContain(">头晕</text>")
   })
 
-  it("extends the axis past 23 for after-midnight entries (D10)", () => {
+  it("extends the axis past 23 with 24h-wrapped labels (D10, 25->1)", () => {
     const svg = svgOf("00:30-01:30 sleep")
-    expect(svg).toContain(">24</text>")
-    expect(svg).toContain(">25</text>")
+    expect(svg).toContain(">0</text>")
+    expect(svg).toContain(">1</text>")
+    expect(svg).not.toContain(">25</text>")
   })
 
   it("unknown types get a deterministic hash color (not gray, yyt 2026-08-17)", () => {

@@ -74,7 +74,7 @@ function updateExtendPreview(
     label.setAttribute("x", String(trackX - 6))
     label.setAttribute("y", String(yy + 4))
     label.setAttribute("text-anchor", "end")
-    label.textContent = String(h)
+    label.textContent = String(h % 24) // 跨零点标注回绕：25->1
     g.appendChild(label)
   }
 }
@@ -180,7 +180,24 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       }
       return
     }
-    if (!dragging) return
+    if (!dragging) {
+      // hover 光标反馈：轴端热区 -> ns-resize；色块 -> context-menu；其余 crosshair
+      const target = e.target as Element | null
+      let cursor = "crosshair"
+      if (target?.closest("rect.oneday-block")) {
+        cursor = "context-menu"
+      } else {
+        const rect = svg.getBoundingClientRect()
+        const localY = (e.clientY - rect.top) * (svgWidth / rect.width)
+        const yTop = yFromMinutes(doc.rangeStart, doc.rangeStart, deps.hourHeight)
+        const yBottom = yFromMinutes(doc.rangeEnd, doc.rangeStart, deps.hourHeight)
+        if (Math.abs(localY - yTop) <= AXIS_EDGE_PX || Math.abs(localY - yBottom) <= AXIS_EDGE_PX) {
+          cursor = "ns-resize"
+        }
+      }
+      svg.style.cursor = cursor
+      return
+    }
     const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     updateGhost(dragStartMin, cur)
   })
