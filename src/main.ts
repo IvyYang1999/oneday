@@ -196,6 +196,22 @@ export default class OnedayPlugin extends Plugin {
 
       wireTimeline()
 
+      // 初始宽度自适应内容：无 layout 头时，时间轴槽位收到内容自然宽（yyt 2026-08-17）
+      if (doc.layout === undefined && body instanceof HTMLElement) {
+        const slotEl = container.querySelector<HTMLElement>(".oneday-slot-timeline")
+        if (slotEl) {
+          window.requestAnimationFrame(() => {
+            const bodyW = body.getBoundingClientRect().width
+            const natural = (doc.width ?? this.settings.width) + SIDE_LANE_W + 8
+            if (bodyW > 200 && natural < bodyW * 0.9) {
+              const cols = Math.min(12, Math.max(2, Math.round((natural / bodyW) * 12)))
+              slotEl.dataset.w = String(cols)
+              slotEl.style.width = `${(cols / 12) * 100}%`
+            }
+          })
+        }
+      }
+
       // 轨道宽度手柄：时间轴本体右缘的窄条，拖了写回 width: 头（yyt：边界要可调）
       attachWidthHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, (totalWidth) => {
         void this.applyBlockTransform(el, ctx, source, (s) =>
