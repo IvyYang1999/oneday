@@ -426,3 +426,24 @@
   font-family: var(--font-monospace);
   font-size: 13px;
 }
+
+/* 图文分隔条 */
+
+.oneday-divider {
+  flex-shrink: 0;
+  width: 8px;
+  margin: 0 -2px;
+  cursor: col-resize;
+  border-radius: 4px;
+}
+
+.oneday-divider:hover,
+.oneday-divider.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.oneday-timeline-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}

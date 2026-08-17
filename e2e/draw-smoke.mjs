@@ -54,6 +54,7 @@ window.__menu = []
 window.__focus = []
 window.__hidden = []
 window.__shown = []
+window.__resizedges = []
 
 attachHoverInfo(container, doc)
 window.__resized = []
@@ -64,6 +65,7 @@ attachDrawInteraction(container, doc, {
   getMode: () => window.__mode,
   typeColor: (t) => COLORS[t] ?? "#bdbdbd",
   onBlockClick: (line) => window.__focus.push(line),
+  onResizeEdge: (line, startMin, endMin) => window.__resizedges.push({ line, startMin, endMin }),
   onCreate: (line, startMin) => window.__created.push({ line, startMin }),
   onBlockMenu: (line, x, y) => window.__menu.push({ line, x, y }),
 })
@@ -128,6 +130,16 @@ await page.mouse.down()
 await page.mouse.move(handle.x + 54, handle.y + 100, { steps: 4 })
 await page.mouse.up()
 
+// 5c. drag the sleep block's BOTTOM edge from 08:00 down to 09:00
+{
+  const yTop = yFor(420) + 2    // 07:00 top edge region
+  const yBottom = yFor(480) - 2 // 08:00 bottom edge region
+  await page.mouse.move(trackCX, yBottom)
+  await page.mouse.down()
+  await page.mouse.move(trackCX, yFor(540), { steps: 4 })
+  await page.mouse.up()
+}
+
 // 6. click (no drag) on the sleep block -> focus toggle callback
 await page.locator('.oneday-mode-btn[data-mode="actual"]').click()
 await page.mouse.click(trackCX, yFor(450))
@@ -163,5 +175,9 @@ const editText = await page.evaluate(() => window.__editText)
 if (editText !== 1) { console.error("editText mismatch", editText); process.exit(1) }
 const resized = await page.evaluate(() => window.__resized)
 if (resized.length !== 1 || Math.abs(resized[0] - 252) > 2) { console.error("resize mismatch", JSON.stringify(resized)); process.exit(1) }
+const edges = await page.evaluate(() => window.__resizedges)
+if (edges.length !== 1 || edges[0].line !== 0 || edges[0].startMin !== 420 || edges[0].endMin !== 540) {
+  console.error("edge resize mismatch", JSON.stringify(edges)); process.exit(1)
+}
 await browser.close()
 console.log("OK draw smoke passed")

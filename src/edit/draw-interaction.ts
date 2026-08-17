@@ -21,7 +21,12 @@ export interface DrawDeps {
   onBlockMenu: (line: number, clientX: number, clientY: number) => void
   /** 点击（未拖动）色块 -> focus 切换 */
   onBlockClick: (line: number) => void
+  /** 拖拽色块上/下沿调整起止（15min 吸附） */
+  onResizeEdge: (line: number, startMin: number, endMin: number) => void
 }
+
+/** 距色块上下沿多少 px 内算「抓住边缘」 */
+const EDGE_PX = 6
 
 const SVGNS = "http://www.w3.org/2000/svg"
 
@@ -45,6 +50,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   let downBlockLine: number | null = null
   let downY = 0
   let ghost: SVGRectElement | null = null
+  let resizing: { rect: SVGRectElement; entry: (typeof doc.entries)[number]; edge: "top" | "bottom" } | null = null
 
   const setStatus = (text: string): void => {
     if (statusEl) statusEl.textContent = text
@@ -58,10 +64,33 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   svg.addEventListener("pointerdown", (e: PointerEvent) => {
     if (e.button !== 0) return
     // 并列日程：允许从已有色块上起笔（yyt 2026-08-17）；右键菜单不受影响。
-    dragging = true
     const hit = (e.target as Element | null)?.closest("rect.oneday-block")
     downBlockLine = hit ? Number((hit as HTMLElement).dataset.line) : null
     downY = e.clientY
+
+    // 抓住色块上/下沿 -> 边缘 resize 模式
+    if (hit instanceof SVGRectElement) {
+      const localDownY = (() => {
+        const rect = svg.getBoundingClientRect()
+        return (e.clientY - rect.top) * (svgWidth / rect.width)
+      })()
+      const top = Number(hit.getAttribute("y"))
+      const bottom = top + Number(hit.getAttribute("height"))
+      const nearTop = Math.abs(localDownY - top) <= EDGE_PX
+      const nearBottom = Math.abs(localDownY - bottom) <= EDGE_PX
+      if (nearTop || nearBottom) {
+        const entry = doc.entries.find((it) => it.line === downBlockLine)
+        if (entry) {
+          resizing = { rect: hit, entry, edge: nearTop ? "top" : "bottom" }
+          const rect = svg.getBoundingClientRect()
+          dragOriginTop = rect.top
+          dragScale = svgWidth / rect.width
+          svg.setPointerCapture(e.pointerId)
+          return
+        }
+      }
+    }
+    dragging = true
     const rect = svg.getBoundingClientRect()
     dragOriginTop = rect.top
     dragScale = svgWidth / rect.width
@@ -91,12 +120,55 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   }
 
   svg.addEventListener("pointermove", (e: PointerEvent) => {
-    if (!dragging) return
+    if (resizing) {
+      const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+      const { rect, entry, edge } = resizing
+      const newStart = edge === "top" ? Math.min(cur, entry.endMin - SNAP_MINUTES) : entry.startMin
+      const newEnd = edge === "bottom" ? Math.max(cur, entry.startMin + SNAP_MINUTES) : entry.endMin
+      const y1 = yFromMinutes(newStart, doc.rangeStart, deps.hourHeight)
+      const y2 = yFromMinutes(newEnd, doc.rangeStart, deps.hourHeight)
+      rect.setAttribute("y", String(y1))
+      rect.setAttribute("height", String(Math.max(2, y2 - y1)))
+      setStatus(`${formatClock(newStart)} – ${formatClock(newEnd)} · ${formatHours(durationMinutes(newStart, newEnd))}`)
+      return
+    }
+    if (!dragging) {
+      // hover 指针反馈：靠近色块上下沿 -> ns-resize
+      const hit = (e.target as Element | null)?.closest("rect.oneday-block")
+      let cursor = "crosshair"
+      if (hit instanceof SVGRectElement) {
+        const rect = svg.getBoundingClientRect()
+        const localY = (e.clientY - rect.top) * (svgWidth / rect.width)
+        const top = Number(hit.getAttribute("y"))
+        const bottom = top + Number(hit.getAttribute("height"))
+        if (Math.abs(localY - top) <= EDGE_PX || Math.abs(localY - bottom) <= EDGE_PX) {
+          cursor = "ns-resize"
+        } else {
+          cursor = "context-menu"
+        }
+      }
+      svg.style.cursor = cursor
+      return
+    }
     const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     updateGhost(dragStartMin, cur)
   })
 
   svg.addEventListener("pointerup", (e: PointerEvent) => {
+    if (resizing) {
+      const { entry, edge } = resizing
+      resizing = null
+      svg.releasePointerCapture(e.pointerId)
+      const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+      const newStart = edge === "top" ? Math.min(cur, entry.endMin - SNAP_MINUTES) : entry.startMin
+      const newEnd = edge === "bottom" ? Math.max(cur, entry.startMin + SNAP_MINUTES) : entry.endMin
+      setStatus("")
+      if (newStart !== entry.startMin || newEnd !== entry.endMin) {
+        deps.onResizeEdge(entry.line, newStart, newEnd)
+      }
+      downBlockLine = null
+      return
+    }
     if (!dragging) return
     dragging = false
     const end = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))

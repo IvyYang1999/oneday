@@ -12,6 +12,7 @@ import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
 import { attachResizeHandle } from "./edit/resize-handle"
+import { attachDivider } from "./edit/divider"
 import { TextSectionModal } from "./edit/text-modal"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
@@ -84,15 +85,29 @@ export default class OnedayPlugin extends Plugin {
         hasText: doc.text !== undefined,
         onEditText: openTextEditor,
       })
-      container.prepend(toolbar.el)
-      const body = container.querySelector(".oneday-body")
-      if (body) body.after(toolbar.statusEl)
+      // 工具栏/状态行进时间轴列（yyt：荧光笔、AI 输入框属于时间轴区域）
+      const col = container.querySelector(".oneday-timeline-col")
+      if (col instanceof HTMLElement) {
+        col.prepend(toolbar.el)
+        const svgHolder = col.querySelector(".oneday-svg-holder")
+        if (svgHolder) svgHolder.after(toolbar.statusEl)
+      }
       attachHoverInfo(container, doc)
-      attachResizeHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, Boolean(doc.floatRight), (totalWidth) => {
-        void this.applyBlockTransform(el, ctx, source, (s) =>
-          setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
-        )
-      })
+      const body = container.querySelector(".oneday-body")
+      if (doc.text !== undefined && body instanceof HTMLElement) {
+        // 有文字区：分隔条调时间轴列宽（图文比例）
+        attachDivider(body, (doc.width ?? this.settings.width) + SIDE_LANE_W, (totalWidth) => {
+          void this.applyBlockTransform(el, ctx, source, (s) =>
+            setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
+          )
+        })
+      } else {
+        attachResizeHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, Boolean(doc.floatRight), (totalWidth) => {
+          void this.applyBlockTransform(el, ctx, source, (s) =>
+            setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
+          )
+        })
+      }
 
       attachDrawInteraction(container, doc, {
         hourHeight: this.settings.hourHeight,
@@ -104,6 +119,13 @@ export default class OnedayPlugin extends Plugin {
         },
         onBlockClick: (line) => {
           toggleBlockFocus(container, line)
+        },
+        onResizeEdge: (line, startMin, endMin) => {
+          void this.applyBlockTransform(el, ctx, source, (s) => {
+            const e = parseTimeline(s).entries.find((it) => it.line === line)
+            if (!e) return s
+            return replaceEntryLine(s, line, formatEntryLine({ ...e, startMin, endMin }))
+          })
         },
         onBlockMenu: (line, x, y) => {
           const entry = doc.entries.find((e) => e.line === line)
@@ -133,7 +155,7 @@ export default class OnedayPlugin extends Plugin {
       })
 
       if (Platform.isDesktopApp || this.settings.dialogBackend === "api") {
-        attachDialog(container, doc, {
+        attachDialog((col instanceof HTMLElement ? col : container), doc, {
           settings: this.settings,
           writeEntry: (entry: ValidatedEntry) =>
             this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entry.sourceLine, entry.startMin)),
