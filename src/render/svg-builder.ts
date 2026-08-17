@@ -173,6 +173,20 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
       `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}" stroke="${escapeXml(color)}" stroke-opacity="0.7" stroke-width="1"></rect>` +
         `<rect pointer-events="none" class="oneday-plan-hatch" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="url(#${hatchId})"/>`
     )
+    // plan 块也显示时长/备注（yyt 2026-08-17），样式淡一档
+    const label = formatHours(durationMinutes(e.startMin, e.endMin))
+    const fs = inlineFontSize(trackW - 4, hh, label)
+    if (fs > 0) {
+      const showNote = hh >= MIN_NOTE_H && e.note
+      parts.push(
+        `<text pointer-events="none" class="oneday-duration oneday-plan-label" font-size="${fs}" x="${trackX + trackW / 2}" y="${yy + hh / 2 + (showNote ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
+      )
+      if (showNote) {
+        parts.push(
+          `<text pointer-events="none" class="oneday-note oneday-plan-label" x="${trackX + trackW / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(truncate(e.note ?? ""))}</text>`
+        )
+      }
+    }
   }
 
   // Actual blocks: overlapping ones split into side-by-side columns (并列日程,

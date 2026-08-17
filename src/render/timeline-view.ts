@@ -79,7 +79,7 @@ export function renderTimelineInto(
   const timelineSvg = renderTimelineSvg(doc, { ...opts, width: baseWidth })
   const svgHeight = Number(/<svg[^>]*height="([\d.]+)"/.exec(timelineSvg)?.[1] ?? 800)
   const timelineRows = Math.ceil(svgHeight / GRID_ROW_H)
-  const items = resolveGrid(doc.layout ?? null, hasText, doc.side, timelineRows)
+  const items = resolveGrid(doc.layout ?? null, hasText, doc.side, timelineRows, doc.hiddenSlots)
   body.style.height = `${gridRows(items) * GRID_ROW_H}px`
   for (const it of items) {
     const slot = body.createDiv({ cls: `oneday-slot oneday-slot-${it.id}` })

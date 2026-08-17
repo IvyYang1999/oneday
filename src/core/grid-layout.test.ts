@@ -99,3 +99,14 @@ describe("compactGrid (重力压实)", () => {
     expect(out[0].x).toBe(0)
   })
 })
+
+describe("resolveGrid with hiddenSlots", () => {
+  it("drops hidden slots and does not re-append them", () => {
+    const grid = resolveGrid(null, false, undefined, 40, ["stats", "dialog"])
+    const ids = grid.map((i) => i.id)
+    expect(ids).toContain("toolbar")
+    expect(ids).toContain("timeline")
+    expect(ids).not.toContain("stats")
+    expect(ids).not.toContain("dialog")
+  })
+})

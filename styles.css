@@ -760,3 +760,10 @@
   color: var(--text-muted);
   font-family: var(--font-monospace);
 }
+
+/* plan 块标注（比实际块淡一档） */
+
+.oneday-svg .oneday-plan-label {
+  fill: var(--text-muted);
+  font-weight: 500;
+}

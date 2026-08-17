@@ -65,6 +65,7 @@ export function parseTimeline(source: string, opts: ParseOptions = {}): Timeline
     annotations: [],
     errors: [],
     hiddenTypes: [],
+    hiddenSlots: [],
   }
 
   const lines = source.split(/\r?\n/)
@@ -203,6 +204,13 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
       } else {
         doc.errors.push({ line, text: raw, reason: "side 只支持 left/right" })
       }
+      return
+    }
+    case "off": {
+      const ids = value.split(/[\s,，]+/).filter((t): t is import("./grid-layout").SlotId =>
+        ["toolbar", "stats", "dialog"].includes(t) // text/timeline 不允许隐藏
+      )
+      doc.hiddenSlots.push(...ids)
       return
     }
     case "hide": {

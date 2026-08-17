@@ -170,3 +170,11 @@ describe("ParseOptions default range (设置页默认时间范围)", () => {
     expect(doc.entries[0].startMin).toBe(30) // rangeStart=0 → 不再 +24h
   })
 })
+
+describe("off header (组件隐藏)", () => {
+  it("parses hideable slot ids, ignores timeline/text", () => {
+    const doc = parseTimeline("off: stats dialog timeline foo\n---\n09:00-10:00 math")
+    expect(doc.hiddenSlots).toEqual(["stats", "dialog"])
+    expect(doc.errors).toEqual([])
+  })
+})

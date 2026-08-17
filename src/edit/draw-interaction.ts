@@ -169,12 +169,17 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     if (extending) {
       const raw = minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)
       const hourSnap = Math.round(raw / 60) * 60
+      // 缩短也允许：钳在内容边界（最后一块内容整点收/起点整点放）
+      const contentEnd = Math.max(0, ...doc.entries.map((en) => en.endMin), ...doc.annotations.map((a) => a.timeMin))
+      const contentStart = Math.min(30 * 60, ...doc.entries.map((en) => en.startMin), ...doc.annotations.map((a) => a.timeMin))
       if (extending === "bottom") {
-        const target = Math.max(doc.rangeEnd, Math.min(30 * 60, hourSnap))
+        const minEnd = Math.max(doc.rangeStart + 60, contentEnd > 0 ? Math.ceil(contentEnd / 60) * 60 : 0)
+        const target = Math.max(minEnd, Math.min(30 * 60, hourSnap))
         setStatus(`结束于 ${formatClock(target % (24 * 60))}`) // 回绕显示：28点 -> 4:00
         if (extendPreview) updateExtendPreview(extendPreview, "bottom", doc.rangeEnd, target, doc.rangeStart, deps.hourHeight, trackX, trackW)
       } else {
-        const target = Math.max(0, Math.min(doc.rangeStart, hourSnap))
+        const maxStart = Math.min(doc.rangeEnd - 60, contentStart < 30 * 60 ? Math.floor(contentStart / 60) * 60 : doc.rangeEnd - 60)
+        const target = Math.max(0, Math.min(maxStart, hourSnap))
         setStatus(`开始于 ${formatClock(target % (24 * 60))}`)
         if (extendPreview) updateExtendPreview(extendPreview, "top", doc.rangeStart, target, doc.rangeStart, deps.hourHeight, trackX, trackW)
       }
@@ -212,11 +217,15 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       setStatus("")
       extendPreview?.remove()
       extendPreview = null
+      const contentEnd = Math.max(0, ...doc.entries.map((en) => en.endMin), ...doc.annotations.map((a) => a.timeMin))
+      const contentStart = Math.min(30 * 60, ...doc.entries.map((en) => en.startMin), ...doc.annotations.map((a) => a.timeMin))
       if (dir === "bottom") {
-        const target = Math.max(doc.rangeEnd, Math.min(30 * 60, hourSnap))
+        const minEnd = Math.max(doc.rangeStart + 60, contentEnd > 0 ? Math.ceil(contentEnd / 60) * 60 : 0)
+        const target = Math.max(minEnd, Math.min(30 * 60, hourSnap))
         if (target !== doc.rangeEnd) deps.onExtendRange(doc.rangeStart, target)
       } else {
-        const target = Math.max(0, Math.min(doc.rangeStart, hourSnap))
+        const maxStart = Math.min(doc.rangeEnd - 60, contentStart < 30 * 60 ? Math.floor(contentStart / 60) * 60 : doc.rangeEnd - 60)
+        const target = Math.max(0, Math.min(maxStart, hourSnap))
         if (target !== doc.rangeStart) deps.onExtendRange(target, doc.rangeEnd)
       }
       return

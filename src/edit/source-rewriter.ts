@@ -137,3 +137,32 @@ export function setTextSection(source: string, text: string): string {
   if (trimmed === "") return [...head, "==="].join("\n")
   return [...head, "===", ...trimmed.split("\n")].join("\n")
 }
+
+/** Add a component to the block's `off:` header (hide a slot). */
+export function addOffSlot(source: string, id: string): string {
+  const lines = source.split("\n")
+  const idx = lines.findIndex((l) => /^off\s*:/.test(l.trim()))
+  if (idx >= 0) {
+    const existing = lines[idx].split(":")[1].split(/[\s,，]+/).filter(Boolean)
+    if (existing.includes(id)) return source
+    lines[idx] = `off: ${[...existing, id].join(" ")}`
+    return lines.join("\n")
+  }
+  const sep = lines.findIndex((l) => l.trim() === "---")
+  lines.splice(sep >= 0 ? sep : 0, 0, `off: ${id}`)
+  return lines.join("\n")
+}
+
+/** Remove a component from the `off:` header (re-show a hidden slot). */
+export function removeOffSlot(source: string, id: string): string {
+  const lines = source.split("\n")
+  const idx = lines.findIndex((l) => /^off\s*:/.test(l.trim()))
+  if (idx < 0) return source
+  const remaining = lines[idx].split(":")[1].split(/[\s,，]+/).filter((t) => t && t !== id)
+  if (remaining.length === 0) {
+    lines.splice(idx, 1)
+  } else {
+    lines[idx] = `off: ${remaining.join(" ")}`
+  }
+  return lines.join("\n")
+}

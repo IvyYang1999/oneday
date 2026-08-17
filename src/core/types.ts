@@ -25,6 +25,8 @@ export interface TimelineDoc {
   side?: "left" | "right"
   /** 组件网格布局（`layout:` 头，id\@x,y,w,h）；缺省按 side/text 推导。 */
   layout?: import("./grid-layout").GridItem[]
+  /** 隐藏的组件（`off:` 头，如 off: stats dialog）；＋菜单可加回 */
+  hiddenSlots: import("./grid-layout").SlotId[]
 }
 
 export interface Entry {

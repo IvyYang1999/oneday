@@ -116,12 +116,13 @@ export function resolveGrid(
   parsed: GridItem[] | null,
   hasText: boolean,
   side: "left" | "right" | undefined,
-  timelineRows: number
+  timelineRows: number,
+  hiddenSlots: SlotId[] = []
 ): GridItem[] {
   const base = parsed ?? defaultGrid(hasText, side, timelineRows)
-  let items = base.filter((it) => hasText || it.id !== "text")
+  let items = base.filter((it) => (hasText || it.id !== "text") && !hiddenSlots.includes(it.id))
   const present = new Set(items.map((it) => it.id))
-  const required = SLOT_IDS.filter((id) => hasText || id !== "text")
+  const required = SLOT_IDS.filter((id) => (hasText || id !== "text") && !hiddenSlots.includes(id))
   let maxY = items.reduce((m, it) => Math.max(m, it.y + it.h), 0)
   for (const id of required) {
     if (present.has(id)) continue

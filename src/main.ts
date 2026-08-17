@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext, MarkdownRenderer, Menu, Platform, Plugin, TFile } from "obsidian"
+import { MarkdownPostProcessorContext, MarkdownRenderer, MarkdownView, Menu, Platform, Plugin, TFile } from "obsidian"
 import { normalizeSpan, parseTimeline } from "./core/parser"
 import { formatEntryLine, weekdayZh } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
@@ -7,7 +7,7 @@ import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
-import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
+import { addHiddenType, addOffSlot, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeOffSlot, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
 import { buildModeToggle, buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
@@ -299,6 +299,19 @@ export default class OnedayPlugin extends Plugin {
         const t = e.target as Element | null
         if (t?.closest("button, input, textarea, a, rect, .oneday-text-host, .oneday-add-menu")) return
         e.preventDefault()
+        // 点在组件空白上 -> 提供「隐藏此组件」（off: 头，＋菜单可加回）
+        const slotEl = t?.closest(".oneday-slot") as HTMLElement | null
+        const slotId = slotEl?.dataset.slot
+        if (slotId && ["toolbar", "stats", "dialog"].includes(slotId)) {
+          const menu = new Menu()
+          menu.addItem((item) =>
+            item.setTitle(`隐藏「${slotId}」组件（＋可加回）`).setIcon("eye-off").onClick(() => {
+              void this.applyBlockTransform(el, ctx, source, (s) => addOffSlot(s, slotId))
+            })
+          )
+          menu.showAtPosition({ x: e.clientX, y: e.clientY })
+          return
+        }
         showAddMenu(e.clientX, e.clientY)
       })
 
@@ -381,12 +394,36 @@ export default class OnedayPlugin extends Plugin {
     if (!section) throw new Error("无法定位时间轴代码块（试试切换到阅读模式再试）")
 
     const newSource = transform(source)
+    // 优先走编辑器事务（进 CM6 撤销栈，Ctrl+Z 可撤回，yyt 2026-08-17）；
+    // 找不到打开的编辑器再退回 vault.process
+    const view = this.findMarkdownView(ctx.sourcePath)
+    if (view) {
+      const editor = view.editor
+      const openFence = editor.getLine(section.lineStart) ?? ""
+      const prefix = /^(\s*(?:>\s*)*)/.exec(openFence)?.[1] ?? ""
+      const body = newSource
+        .split("\n")
+        .map((l) => (l === "" ? prefix.trimEnd() : prefix + l))
+        .join("\n")
+      editor.replaceRange(body + "\n", { line: section.lineStart + 1, ch: 0 }, { line: section.lineEnd, ch: 0 })
+      return
+    }
     await this.app.vault.process(file, (content) => {
       const lines = content.split("\n")
       // section spans the fenced block including the ``` lines.
       lines.splice(section.lineStart + 1, section.lineEnd - section.lineStart - 1, ...newSource.split("\n"))
       return lines.join("\n")
     })
+  }
+
+  private findMarkdownView(path: string): MarkdownView | null {
+    let found: MarkdownView | null = null
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      if (found) return
+      const v = leaf.view
+      if (v instanceof MarkdownView && v.file && v.file.path === path) found = v
+    })
+    return found
   }
 
   async loadSettings(): Promise<void> {
