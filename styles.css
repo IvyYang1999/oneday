@@ -610,3 +610,22 @@
 .oneday-container:hover .oneday-add-component {
   opacity: 1;
 }
+
+/* 轨道宽度手柄（时间轴本体右缘，hover 显示） */
+
+.oneday-width-handle {
+  position: absolute;
+  top: 24px;
+  bottom: 8px;
+  width: 8px;
+  margin-left: -4px;
+  cursor: col-resize;
+  z-index: 13;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.oneday-width-handle:hover,
+.oneday-width-handle.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+}
