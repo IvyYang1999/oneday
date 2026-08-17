@@ -11,10 +11,13 @@ export function renderTimelineInto(el: HTMLElement, doc: TimelineDoc, opts: Rend
   const svgHolder = container.createDiv({ cls: "oneday-svg-holder" })
   svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
   // 宽度/浮动必须设在宿主 el 上：Obsidian 的代码块宿主默认通栏，
-  // 子元素浮动不会让出左侧空间（yyt 2026-08-17 反馈）
+  // 子元素浮动不会让出左侧空间（yyt 2026-08-17 反馈）。
+  // 在 callout（> [!x|right]）内时浮动由 callout 主导（Live Preview 唯一可行路径），
+  // 我们只提供内容宽度，callout shrink-to-fit。
+  const inCallout = el.closest(".callout") !== null
   el.style.width = `${baseWidth + SIDE_LANE_W}px`
   el.classList.add("oneday-host")
-  el.classList.toggle("oneday-host-float", Boolean(doc.floatRight))
+  el.classList.toggle("oneday-host-float", Boolean(doc.floatRight) && !inCallout)
 
   const stats = statsByType(doc.entries)
   if (stats.length > 0) {

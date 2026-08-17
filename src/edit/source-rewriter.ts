@@ -101,3 +101,21 @@ export function removeHeaderValue(source: string, key: string): string {
   lines.splice(idx, 1)
   return lines.join("\n")
 }
+
+/**
+ * Replace a fenced block's body inside whole-note content, preserving any
+ * callout/quote prefix (e.g. "> ") of the opening fence on every body line.
+ * Without this, editing a timeline inside `> [!note|right]` would break the callout.
+ */
+export function replaceBlockInContent(
+  content: string,
+  section: { lineStart: number; lineEnd: number },
+  newSource: string
+): string {
+  const lines = content.split("\n")
+  const openFence = lines[section.lineStart] ?? ""
+  const prefix = /^(\s*(?:>\s*)*)/.exec(openFence)?.[1] ?? ""
+  const body = newSource.split("\n").map((l) => (l === "" ? prefix.trimEnd() : prefix + l))
+  lines.splice(section.lineStart + 1, section.lineEnd - section.lineStart - 1, ...body)
+  return lines.join("\n")
+}

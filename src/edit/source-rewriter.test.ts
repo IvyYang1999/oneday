@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceEntryLine, setHeaderValue } from "./source-rewriter"
+import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceBlockInContent, replaceEntryLine, setHeaderValue } from "./source-rewriter"
 import { parseTimeline } from "../core/parser"
 
 describe("insertEntryLine", () => {
@@ -105,5 +105,34 @@ describe("setHeaderValue / removeHeaderValue", () => {
     const doc = parseTimeline(setHeaderValue("09:00-10:00 math", "width", "300"))
     expect(doc.width).toBe(300)
     expect(doc.errors).toEqual([])
+  })
+})
+
+describe("replaceBlockInContent (callout 前缀保留)", () => {
+  it("preserves > prefix when the block lives inside a callout", () => {
+    const content = [
+      "# 日记",
+      "> [!timeline|right]",
+      "> ```timeline",
+      "> 09:00-10:00 math",
+      "> ```",
+      "正文后续",
+    ].join("\n")
+    const out = replaceBlockInContent(content, { lineStart: 2, lineEnd: 4 }, "09:00-10:00 math\n11:00-12:00 micro")
+    expect(out).toBe([
+      "# 日记",
+      "> [!timeline|right]",
+      "> ```timeline",
+      "> 09:00-10:00 math",
+      "> 11:00-12:00 micro",
+      "> ```",
+      "正文后续",
+    ].join("\n"))
+  })
+
+  it("works prefix-free outside callouts", () => {
+    const content = "```timeline\n09:00-10:00 math\n```"
+    const out = replaceBlockInContent(content, { lineStart: 0, lineEnd: 2 }, "10:00-11:00 math")
+    expect(out).toBe("```timeline\n10:00-11:00 math\n```")
   })
 })
