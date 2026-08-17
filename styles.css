@@ -452,6 +452,11 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  flex: 0 0 auto; /* 列宽由 inline style 钉死，不吃 flex 伸缩 */
+}
+
+.oneday-body {
+  width: 100%;
 }
 
 .oneday-grip {

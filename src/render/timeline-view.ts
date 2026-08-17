@@ -68,8 +68,12 @@ export function renderTimelineInto(
     // 分隔条占位（拖拽行为由 main 接 attachDivider）
     body.createDiv({ cls: "oneday-divider" })
   }
-  // 时间轴栏：工具栏/状态/统计/对话框都进这一列（yyt：和文字区分开）
+  // 时间轴栏：工具栏/状态/统计/对话框都进这一列（yyt：和文字区分开）。
+  // 宽度创建即钉死：否则列宽退化为内容驱动，工具栏一排色板把列撑宽、
+  // 文字区在编辑时被挤压（yyt 2026-08-17「双击编辑左侧变窄」）
   const col = body.createDiv({ cls: "oneday-timeline-col" })
+  col.style.width = `${baseWidth + SIDE_LANE_W}px`
+  col.style.flexShrink = "0"
   const svgHolder = col.createDiv({ cls: "oneday-svg-holder" })
   svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
   // 宽度/浮动必须设在宿主 el 上：Obsidian 的代码块宿主默认通栏，
