@@ -1,7 +1,10 @@
 /**
- * Component drag-to-reorder across columns (yyt: 组件都能用手柄拖拽移动).
- * Each slot gets a hover grip; dragging reorders live in the DOM, release
- * reports the new layout (caller persists it to the `layout:` header).
+ * Component drag-to-reorder with the "floating clone + drop placeholder"
+ * pattern (react-beautiful-dnd / SortableJS ghostClass style, yyt 2026-08-17):
+ * - grab: original slot becomes a dashed placeholder keeping its space,
+ *   a semi-transparent clone follows the cursor
+ * - move: placeholder jumps between slots = live drop-target preview
+ * - drop: clone vanishes, slot lands at the placeholder, layout persists
  * Pure DOM.
  */
 import { SlotId } from "../core/layout"
@@ -20,31 +23,46 @@ export function attachLayoutDrag(body: HTMLElement, onCommit: (cols: SlotId[][])
       if (e.button !== 0) return
       e.preventDefault()
       e.stopPropagation()
-      grip.setPointerCapture(e.pointerId)
-      slot.classList.add("is-dragging")
+
+      const rect = slot.getBoundingClientRect()
+      const clone = slot.cloneNode(true) as HTMLElement
+      clone.classList.add("oneday-drag-clone")
+      clone.style.width = `${rect.width}px`
+      clone.style.left = `${rect.left}px`
+      clone.style.top = `${rect.top}px`
+      document.body.appendChild(clone)
+      slot.classList.add("is-placeholder")
+
+      const offsetX = e.clientX - rect.left
+      const offsetY = e.clientY - rect.top
 
       const onMove = (ev: PointerEvent): void => {
+        clone.style.left = `${ev.clientX - offsetX}px`
+        clone.style.top = `${ev.clientY - offsetY}px`
+        // 落点预览：占位框移到目标槽位前/后
         const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".oneday-slot")
         if (!(target instanceof HTMLElement) || target === slot) return
-        const rect = target.getBoundingClientRect()
-        // 同列：越过中线换序；跨列：直接插入目标列
-        if (ev.clientY < rect.top + rect.height / 2) {
+        const tr = target.getBoundingClientRect()
+        if (ev.clientY < tr.top + tr.height / 2) {
           target.before(slot)
         } else {
           target.after(slot)
         }
       }
       const onUp = (): void => {
-        grip.removeEventListener("pointermove", onMove)
-        grip.removeEventListener("pointerup", onUp)
-        slot.classList.remove("is-dragging")
+        document.removeEventListener("pointermove", onMove)
+        document.removeEventListener("pointerup", onUp)
+        clone.remove()
+        slot.classList.remove("is-placeholder")
         const cols = Array.from(body.querySelectorAll<HTMLElement>(".oneday-col")).map((col) =>
           Array.from(col.querySelectorAll<HTMLElement>(".oneday-slot")).map((s) => s.dataset.slot as SlotId)
         )
         onCommit(cols.filter((c) => c.length > 0))
       }
-      grip.addEventListener("pointermove", onMove)
-      grip.addEventListener("pointerup", onUp)
+      // 监听挂在 document：拖动中原槽位 DOM 移动会导致 grip 的 pointer capture
+      // 丢失（lostpointercapture），挂 grip 上永远收不到 pointerup
+      document.addEventListener("pointermove", onMove)
+      document.addEventListener("pointerup", onUp)
     })
   }
 }
