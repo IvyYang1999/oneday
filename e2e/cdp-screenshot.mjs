@@ -5,8 +5,8 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const browser = await chromium.connectOverCDP("http://127.0.0.1:9333")
 for (const ctx of browser.contexts()) {
   for (const page of ctx.pages()) {
-    if (!(await page.evaluate(() => document.querySelector(".oneday-host") !== null).catch(() => false))) continue
-    const el = page.locator(".oneday-host").first()
+    if (!(await page.evaluate(() => [...document.querySelectorAll(".oneday-host")].some((h) => h.offsetParent !== null)).catch(() => false))) continue
+    const el = page.locator(".oneday-host:visible").first()
     await el.scrollIntoViewIfNeeded()
     await page.waitForTimeout(500)
     await el.screenshot({ path: path.join(here, ".smoke", "oneday-live-cdp.png") })

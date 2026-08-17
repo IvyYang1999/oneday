@@ -196,7 +196,8 @@ export default class OnedayPlugin extends Plugin {
       })
       container.appendChild(addComp)
 
-      container.addEventListener("contextmenu", (e: MouseEvent) => {
+      const menuSurface = (el.closest(".cm-embed-block") as HTMLElement | null) ?? container
+      menuSurface.addEventListener("contextmenu", (e: MouseEvent) => {
         const t = e.target as Element | null
         if (t?.closest("button, input, textarea, a, rect, .oneday-text-host, .oneday-add-menu")) return
         e.preventDefault()
