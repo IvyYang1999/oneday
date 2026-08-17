@@ -325,3 +325,52 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   min-width: 110px;
 }
+
+/* 分栏：居右浮动 + 拖拽手柄 */
+
+.oneday-float-right {
+  float: right;
+  margin: 0 0 12px 16px;
+}
+
+.oneday-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 15;
+}
+
+.oneday-resize-handle.is-left {
+  left: -4px;
+}
+
+.oneday-resize-handle.is-right {
+  right: -4px;
+}
+
+.oneday-resize-handle:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
+}
+
+.oneday-container.is-resizing {
+  opacity: 0.85;
+  user-select: none;
+}
+
+/* 设置页色号行：收起左侧空白，控件铺满 */
+
+.oneday-palette-setting .setting-item-info {
+  display: none;
+}
+
+.oneday-palette-setting .setting-item-control {
+  flex: 1;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.oneday-palette-setting .setting-item-control input[type="text"] {
+  flex: 1;
+}

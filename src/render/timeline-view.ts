@@ -2,13 +2,16 @@
 import { TimelineDoc } from "../core/types"
 import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
-import { renderTimelineSvg, RenderOptions, FALLBACK_COLOR } from "./svg-builder"
+import { renderTimelineSvg, RenderOptions, FALLBACK_COLOR, SIDE_LANE_W } from "./svg-builder"
 
 export function renderTimelineInto(el: HTMLElement, doc: TimelineDoc, opts: RenderOptions): HTMLElement {
   const container = el.createDiv({ cls: "oneday-container" })
 
+  const baseWidth = doc.width ?? opts.width ?? 200
   const svgHolder = container.createDiv({ cls: "oneday-svg-holder" })
-  svgHolder.innerHTML = renderTimelineSvg(doc, opts)
+  svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
+  container.style.width = `${baseWidth + SIDE_LANE_W}px`
+  if (doc.floatRight) container.addClass("oneday-float-right")
 
   const stats = statsByType(doc.entries)
   if (stats.length > 0) {

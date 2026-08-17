@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { addHiddenType, deleteEntryLine, insertEntryLine, removeHiddenType, replaceEntryLine } from "./source-rewriter"
+import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceEntryLine, setHeaderValue } from "./source-rewriter"
 import { parseTimeline } from "../core/parser"
 
 describe("insertEntryLine", () => {
@@ -79,5 +79,31 @@ describe("addHiddenType / removeHiddenType", () => {
 
   it("remove is a no-op without a hide header", () => {
     expect(removeHiddenType("09:00-10:00 math", "sleep")).toBe("09:00-10:00 math")
+  })
+})
+
+describe("setHeaderValue / removeHeaderValue", () => {
+  it("inserts before --- when header zone exists", () => {
+    expect(setHeaderValue("date: 2026-08-18\n---\n09:00-10:00 math", "width", "300"))
+      .toBe("date: 2026-08-18\nwidth: 300\n---\n09:00-10:00 math")
+  })
+
+  it("inserts at top without separator", () => {
+    expect(setHeaderValue("09:00-10:00 math", "float", "right")).toBe("float: right\n09:00-10:00 math")
+  })
+
+  it("updates in place", () => {
+    expect(setHeaderValue("width: 200\n---\n09:00-10:00 math", "width", "300")).toBe("width: 300\n---\n09:00-10:00 math")
+  })
+
+  it("removeHeaderValue drops the line, no-op when absent", () => {
+    expect(removeHeaderValue("float: right\n09:00-10:00 math", "float")).toBe("09:00-10:00 math")
+    expect(removeHeaderValue("09:00-10:00 math", "float")).toBe("09:00-10:00 math")
+  })
+
+  it("set then parse round-trips", () => {
+    const doc = parseTimeline(setHeaderValue("09:00-10:00 math", "width", "300"))
+    expect(doc.width).toBe(300)
+    expect(doc.errors).toEqual([])
   })
 })

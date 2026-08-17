@@ -104,3 +104,17 @@ describe("hide header (per-block highlighter hiding)", () => {
     expect(doc.errors).toHaveLength(1)
   })
 })
+
+describe("width/float headers (分栏)", () => {
+  it("parses width and float", () => {
+    const doc = parseTimeline("width: 300\nfloat: right\n---\n09:00-10:00 math")
+    expect(doc.width).toBe(300)
+    expect(doc.floatRight).toBe(true)
+    expect(doc.errors).toEqual([])
+  })
+
+  it("rejects bad width", () => {
+    const doc = parseTimeline("width: 50\n---\n09:00-10:00 math")
+    expect(doc.errors).toHaveLength(1)
+  })
+})

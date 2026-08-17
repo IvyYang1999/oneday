@@ -15,6 +15,10 @@ export interface TimelineDoc {
   errors: ParseError[]
   /** Per-block hidden highlighters (`hide:` header); global palette minus these is shown. */
   hiddenTypes: string[]
+  /** Per-block width override in px (`width:` header, base width without the label lane). */
+  width?: number
+  /** Float the block right so text wraps on the left (`float: right` header). */
+  floatRight?: boolean
 }
 
 export interface Entry {

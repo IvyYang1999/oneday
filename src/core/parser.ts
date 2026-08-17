@@ -160,6 +160,23 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
       doc.rangeEnd = end * 60
       return
     }
+    case "width": {
+      const n = Number(value)
+      if (!Number.isFinite(n) || n < 140 || n > 640) {
+        doc.errors.push({ line, text: raw, reason: "width 应为 140-640 的数字" })
+        return
+      }
+      doc.width = Math.round(n)
+      return
+    }
+    case "float": {
+      if (value === "right") {
+        doc.floatRight = true
+      } else {
+        doc.errors.push({ line, text: raw, reason: "float 只支持 right" })
+      }
+      return
+    }
     case "hide": {
       const types = value.split(/[\s,，]+/).filter((t) => /^[A-Za-z][\w-]*$/.test(t))
       if (types.length === 0) {

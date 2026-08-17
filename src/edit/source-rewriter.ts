@@ -76,3 +76,28 @@ export function removeHiddenType(source: string, type: string): string {
   }
   return lines.join("\n")
 }
+
+/** Set a header key (width/float/hide...), updating in place or inserting into the header zone. */
+export function setHeaderValue(source: string, key: string, value: string): string {
+  const lines = source.split("\n")
+  const re = new RegExp(`^${key}\\s*:`)
+  const idx = lines.findIndex((l) => re.test(l.trim()))
+  if (idx >= 0) {
+    lines[idx] = `${key}: ${value}`
+    return lines.join("\n")
+  }
+  // Insert before the --- separator if present, else at the top.
+  const sep = lines.findIndex((l) => l.trim() === "---")
+  lines.splice(sep >= 0 ? sep : 0, 0, `${key}: ${value}`)
+  return lines.join("\n")
+}
+
+/** Remove a header key entirely (no-op when absent). */
+export function removeHeaderValue(source: string, key: string): string {
+  const lines = source.split("\n")
+  const re = new RegExp(`^${key}\\s*:`)
+  const idx = lines.findIndex((l) => re.test(l.trim()))
+  if (idx < 0) return source
+  lines.splice(idx, 1)
+  return lines.join("\n")
+}

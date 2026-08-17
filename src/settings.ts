@@ -52,24 +52,40 @@ export class OnedaySettingTab extends PluginSettingTab {
     const renderPalette = (): void => {
       paletteEl.empty()
       for (const [type, color] of Object.entries(this.plugin.settings.typeColors)) {
-        new Setting(paletteEl)
+        const row = new Setting(paletteEl)
+        row.settingEl.addClass("oneday-palette-setting")
+        row
           .addColorPicker((cp) =>
             cp.setValue(color).onChange(async (v) => {
               this.plugin.settings.typeColors[type] = v
               await this.plugin.saveSettings()
             })
           )
-          .addText((t) =>
-            t.setValue(type).setPlaceholder("类型名").onChange(async (v) => {
-              const name = v.trim()
-              if (!/^[A-Za-z][\w-]*$/.test(name) || name === type || name in this.plugin.settings.typeColors) return
-              const entries = Object.entries(this.plugin.settings.typeColors).map(([k, c]) =>
+          .addText((t) => {
+            t.setValue(type).setPlaceholder("类型名")
+            // 改名失焦/回车才提交——逐键改名会产生中间态把 key 搞乱（yyt 2026-08-17 踩坑）
+            const commit = async (): Promise<void> => {
+              const name = t.inputEl.value.trim()
+              if (name === type) return
+              if (!/^[A-Za-z][\w-]*$/.test(name) || name in this.plugin.settings.typeColors) {
+                t.inputEl.value = type // 非法/重名：回退显示
+                return
+              }
+              const entries = Object.entries(this.plugin.settings.typeColors).map(([k, c]): [string, string] =>
                 k === type ? [name, c] : [k, c]
-              ) as Array<[string, string]>
+              )
               this.plugin.settings.typeColors = Object.fromEntries(entries)
               await this.plugin.saveSettings()
+              renderPalette()
+            }
+            t.inputEl.addEventListener("blur", () => void commit())
+            t.inputEl.addEventListener("keydown", (e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                t.inputEl.blur()
+              }
             })
-          )
+          })
           .addExtraButton((b) =>
             b.setIcon("trash").setTooltip("删除").onClick(async () => {
               delete this.plugin.settings.typeColors[type]

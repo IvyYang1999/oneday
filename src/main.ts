@@ -6,11 +6,13 @@ import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
-import { addHiddenType, deleteEntryLine, insertEntryLine, removeHiddenType, replaceEntryLine } from "./edit/source-rewriter"
+import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceEntryLine, setHeaderValue } from "./edit/source-rewriter"
 import { buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
+import { attachResizeHandle } from "./edit/resize-handle"
+import { SIDE_LANE_W } from "./render/svg-builder"
 
 /**
  * Oneday — highlighter-style daily timeline block.
@@ -45,6 +47,12 @@ export default class OnedayPlugin extends Plugin {
         hiddenTypes: doc.hiddenTypes,
         activeType: this.activeType,
         mode: this.drawMode,
+        floatRight: Boolean(doc.floatRight),
+        onToggleFloat: () => {
+          void this.applyBlockTransform(el, ctx, source, (s) =>
+            doc.floatRight ? removeHeaderValue(s, "float") : setHeaderValue(s, "float", "right")
+          )
+        },
         onSelect: (type) => {
           this.activeType = type
         },
@@ -62,6 +70,11 @@ export default class OnedayPlugin extends Plugin {
       const svgHolder = container.querySelector(".oneday-svg-holder")
       if (svgHolder) svgHolder.after(toolbar.statusEl)
       attachHoverInfo(container, doc)
+      attachResizeHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, Boolean(doc.floatRight), (totalWidth) => {
+        void this.applyBlockTransform(el, ctx, source, (s) =>
+          setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
+        )
+      })
 
       attachDrawInteraction(container, doc, {
         hourHeight: this.settings.hourHeight,

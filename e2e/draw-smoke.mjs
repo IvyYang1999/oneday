@@ -21,6 +21,7 @@ import { renderTimelineSvg } from "${path.join(here, "../src/render/svg-builder"
 import { buildToolbar } from "${path.join(here, "../src/edit/toolbar")}"
 import { attachDrawInteraction } from "${path.join(here, "../src/edit/draw-interaction")}"
 import { attachHoverInfo } from "${path.join(here, "../src/edit/hover-info")}"
+import { attachResizeHandle } from "${path.join(here, "../src/edit/resize-handle")}"
 
 const COLORS = { math: "#7fd4c1", sleep: "#d9d9d9", fitness: "#f6c667" }
 const source = "07:00-08:00 sleep\\n"
@@ -31,6 +32,8 @@ const toolbar = buildToolbar({
   hiddenTypes: ["fitness"],
   activeType: "math",
   mode: "actual",
+  floatRight: false,
+  onToggleFloat: () => { window.__floatToggles = (window.__floatToggles ?? 0) + 1 },
   onSelect: (t) => { window.__active = t },
   onModeChange: (m) => { window.__mode = m },
   onHide: (t) => window.__hidden.push(t),
@@ -51,6 +54,8 @@ window.__hidden = []
 window.__shown = []
 
 attachHoverInfo(container, doc)
+window.__resized = []
+attachResizeHandle(container, 312, false, (w) => window.__resized.push(w))
 attachDrawInteraction(container, doc, {
   hourHeight: 48,
   getActiveType: () => window.__active,
@@ -66,7 +71,8 @@ await esbuild.build({
   bundle: true, format: "iife", logLevel: "silent",
   outfile: path.join(out, "bundle.js"),
 })
-const html = `<!doctype html><html><body style="margin:0"><div id="app" style="width:200px"></div><script>${fs.readFileSync(path.join(out, "bundle.js"), "utf8")}</script></body></html>`
+const css = fs.readFileSync(path.join(here, "../styles.css"), "utf8")
+const html = `<!doctype html><html><head><style>${css}</style></head><body style="margin:0"><div id="app" style="width:200px;position:relative"></div><script>${fs.readFileSync(path.join(out, "bundle.js"), "utf8")}</script></body></html>`
 fs.writeFileSync(path.join(out, "index.html"), html)
 
 const browser = await chromium.launch()
@@ -111,6 +117,14 @@ if (!tooltipText.includes("07:00") || !tooltipText.includes("1h") || !tooltipTex
 const hoverCount = await page.evaluate(() => document.querySelectorAll(".is-hover").length)
 if (hoverCount < 1) { console.error("no hover pairing"); process.exit(1) }
 
+// 5b. float toggle button + resize handle
+await page.locator(".oneday-float-btn").click()
+const handle = await page.locator(".oneday-resize-handle").boundingBox()
+await page.mouse.move(handle.x + 4, handle.y + 100)
+await page.mouse.down()
+await page.mouse.move(handle.x + 54, handle.y + 100, { steps: 4 })
+await page.mouse.up()
+
 // 6. click (no drag) on the sleep block -> focus toggle callback
 await page.locator('.oneday-mode-btn[data-mode="actual"]').click()
 await page.mouse.click(trackCX, yFor(450))
@@ -140,5 +154,9 @@ const hidden = await page.evaluate(() => window.__hidden)
 const shown = await page.evaluate(() => window.__shown)
 if (hidden.length !== 1 || hidden[0] !== "math") { console.error("hide mismatch", JSON.stringify(hidden)); process.exit(1) }
 if (shown.length !== 1 || shown[0] !== "fitness") { console.error("show mismatch", JSON.stringify(shown)); process.exit(1) }
+const floatToggles = await page.evaluate(() => window.__floatToggles)
+if (floatToggles !== 1) { console.error("float toggle mismatch", floatToggles); process.exit(1) }
+const resized = await page.evaluate(() => window.__resized)
+if (resized.length !== 1 || Math.abs(resized[0] - 252) > 2) { console.error("resize mismatch", JSON.stringify(resized)); process.exit(1) }
 await browser.close()
 console.log("OK draw smoke passed")
