@@ -119,3 +119,15 @@ export function replaceBlockInContent(
   lines.splice(section.lineStart + 1, section.lineEnd - section.lineStart - 1, ...body)
   return lines.join("\n")
 }
+
+/** Set/replace the free-text section (`===` below the entries). Empty text removes the section. */
+export function setTextSection(source: string, text: string): string {
+  const lines = source.split("\n")
+  const sep = lines.findIndex((l) => l.trim() === "===")
+  const head = sep >= 0 ? lines.slice(0, sep) : lines
+  // trim trailing blanks in the entry zone
+  while (head.length > 0 && head[head.length - 1].trim() === "") head.pop()
+  const trimmed = text.trim()
+  if (trimmed === "") return head.join("\n")
+  return [...head, "===", ...trimmed.split("\n")].join("\n")
+}

@@ -19,6 +19,8 @@ export interface TimelineDoc {
   width?: number
   /** Float the block right so text wraps on the left (`float: right` header). */
   floatRight?: boolean
+  /** Free markdown text section (everything after a `===` line) — 块内图文混排的文。 */
+  text?: string
 }
 
 export interface Entry {

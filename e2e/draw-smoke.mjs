@@ -34,6 +34,8 @@ const toolbar = buildToolbar({
   mode: "actual",
   floatRight: false,
   onToggleFloat: () => { window.__floatToggles = (window.__floatToggles ?? 0) + 1 },
+  hasText: false,
+  onEditText: () => { window.__editText = (window.__editText ?? 0) + 1 },
   onSelect: (t) => { window.__active = t },
   onModeChange: (m) => { window.__mode = m },
   onHide: (t) => window.__hidden.push(t),
@@ -117,8 +119,9 @@ if (!tooltipText.includes("07:00") || !tooltipText.includes("1h") || !tooltipTex
 const hoverCount = await page.evaluate(() => document.querySelectorAll(".is-hover").length)
 if (hoverCount < 1) { console.error("no hover pairing"); process.exit(1) }
 
-// 5b. float toggle button + resize handle
+// 5b. float toggle button + text-section button + resize handle
 await page.locator(".oneday-float-btn").click()
+await page.locator(".oneday-text-btn").click()
 const handle = await page.locator(".oneday-resize-handle").boundingBox()
 await page.mouse.move(handle.x + 4, handle.y + 100)
 await page.mouse.down()
@@ -156,6 +159,8 @@ if (hidden.length !== 1 || hidden[0] !== "math") { console.error("hide mismatch"
 if (shown.length !== 1 || shown[0] !== "fitness") { console.error("show mismatch", JSON.stringify(shown)); process.exit(1) }
 const floatToggles = await page.evaluate(() => window.__floatToggles)
 if (floatToggles !== 1) { console.error("float toggle mismatch", floatToggles); process.exit(1) }
+const editText = await page.evaluate(() => window.__editText)
+if (editText !== 1) { console.error("editText mismatch", editText); process.exit(1) }
 const resized = await page.evaluate(() => window.__resized)
 if (resized.length !== 1 || Math.abs(resized[0] - 252) > 2) { console.error("resize mismatch", JSON.stringify(resized)); process.exit(1) }
 await browser.close()

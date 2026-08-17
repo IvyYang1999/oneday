@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceBlockInContent, replaceEntryLine, setHeaderValue } from "./source-rewriter"
+import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./source-rewriter"
 import { parseTimeline } from "../core/parser"
 
 describe("insertEntryLine", () => {
@@ -134,5 +134,27 @@ describe("replaceBlockInContent (callout 前缀保留)", () => {
     const content = "```timeline\n09:00-10:00 math\n```"
     const out = replaceBlockInContent(content, { lineStart: 0, lineEnd: 2 }, "10:00-11:00 math")
     expect(out).toBe("```timeline\n10:00-11:00 math\n```")
+  })
+})
+
+describe("setTextSection", () => {
+  it("appends a text section", () => {
+    expect(setTextSection("09:00-10:00 math", "## to do"))
+      .toBe("09:00-10:00 math\n===\n## to do")
+  })
+
+  it("replaces an existing text section", () => {
+    expect(setTextSection("09:00-10:00 math\n===\nold text\nmore", "new"))
+      .toBe("09:00-10:00 math\n===\nnew")
+  })
+
+  it("empty text removes the section", () => {
+    expect(setTextSection("09:00-10:00 math\n===\nold", "  ")).toBe("09:00-10:00 math")
+  })
+
+  it("round-trips through the parser", () => {
+    const doc = parseTimeline(setTextSection("09:00-10:00 math", "1. 任务"))
+    expect(doc.text).toBe("1. 任务")
+    expect(doc.errors).toEqual([])
   })
 })

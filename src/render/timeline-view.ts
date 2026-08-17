@@ -1,14 +1,36 @@
+/** Optional text-pane wiring (块内图文混排): render markdown + edit affordance. */
+export interface TextPaneDeps {
+  /** Render doc.text markdown into the pane (Obsidian MarkdownRenderer). */
+  renderMarkdown: (host: HTMLElement, text: string) => void
+  /** Open the text editor modal. */
+  onEdit: () => void
+}
+
 /** DOM mount: svg string + stats row + error list, into a code-block container. */
 import { TimelineDoc } from "../core/types"
 import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
 import { renderTimelineSvg, RenderOptions, FALLBACK_COLOR, SIDE_LANE_W } from "./svg-builder"
 
-export function renderTimelineInto(el: HTMLElement, doc: TimelineDoc, opts: RenderOptions): HTMLElement {
+export function renderTimelineInto(
+  el: HTMLElement,
+  doc: TimelineDoc,
+  opts: RenderOptions,
+  textPane?: TextPaneDeps
+): HTMLElement {
   const container = el.createDiv({ cls: "oneday-container" })
 
   const baseWidth = doc.width ?? opts.width ?? 200
-  const svgHolder = container.createDiv({ cls: "oneday-svg-holder" })
+  const body = container.createDiv({ cls: "oneday-body" })
+  if (textPane && doc.text !== undefined) {
+    const pane = body.createDiv({ cls: "oneday-text-pane" })
+    const editBtn = pane.createEl("button", { cls: "oneday-text-edit", text: "✎" })
+    editBtn.title = "编辑文字区"
+    editBtn.addEventListener("click", () => textPane.onEdit())
+    const host = pane.createDiv({ cls: "oneday-text-host" })
+    textPane.renderMarkdown(host, doc.text)
+  }
+  const svgHolder = body.createDiv({ cls: "oneday-svg-holder" })
   svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
   // 宽度/浮动必须设在宿主 el 上：Obsidian 的代码块宿主默认通栏，
   // 子元素浮动不会让出左侧空间（yyt 2026-08-17 反馈）。

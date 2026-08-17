@@ -387,3 +387,42 @@
 .oneday-palette-setting .setting-item-control input[type="text"] {
   flex: 1;
 }
+
+/* 块内图文混排：左文右图 */
+
+.oneday-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.oneday-text-pane {
+  flex: 1;
+  min-width: 180px;
+  position: relative;
+  font-size: 14px;
+}
+
+.oneday-text-edit {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 5;
+  opacity: 0;
+  border: none;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: none;
+  padding: 2px 8px;
+}
+
+.oneday-text-pane:hover .oneday-text-edit {
+  opacity: 1;
+}
+
+.oneday-text-modal-input {
+  width: 100%;
+  font-family: var(--font-monospace);
+  font-size: 13px;
+}

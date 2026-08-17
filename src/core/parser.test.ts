@@ -118,3 +118,22 @@ describe("width/float headers (分栏)", () => {
     expect(doc.errors).toHaveLength(1)
   })
 })
+
+describe("text section (=== 块内图文混排)", () => {
+  it("collects everything after === as free text", () => {
+    const doc = parseTimeline("09:00-10:00 math\n===\n## 明日 to do\n1. 线代第一章")
+    expect(doc.text).toBe("## 明日 to do\n1. 线代第一章")
+    expect(doc.entries).toHaveLength(1)
+    expect(doc.errors).toEqual([])
+  })
+
+  it("text section may contain entry-looking lines without being parsed", () => {
+    const doc = parseTimeline("09:00-10:00 math\n===\n12:00-13:00 这行是普通文字")
+    expect(doc.entries).toHaveLength(1)
+    expect(doc.text).toBe("12:00-13:00 这行是普通文字")
+  })
+
+  it("no text section by default", () => {
+    expect(parseTimeline("09:00-10:00 math").text).toBeUndefined()
+  })
+})

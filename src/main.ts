@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext, Platform, Plugin, TFile } from "obsidian"
+import { MarkdownPostProcessorContext, MarkdownRenderer, Platform, Plugin, TFile } from "obsidian"
 import { parseTimeline } from "./core/parser"
 import { formatEntryLine } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
@@ -6,12 +6,13 @@ import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
-import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceBlockInContent, replaceEntryLine, setHeaderValue } from "./edit/source-rewriter"
+import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
 import { buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
 import { attachResizeHandle } from "./edit/resize-handle"
+import { TextSectionModal } from "./edit/text-modal"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
 /**
@@ -32,11 +33,26 @@ export default class OnedayPlugin extends Plugin {
 
     this.registerMarkdownCodeBlockProcessor("timeline", (source, el, ctx) => {
       const doc = parseTimeline(source)
-      const container = renderTimelineInto(el, doc, {
-        typeColors: this.settings.typeColors,
-        hourHeight: this.settings.hourHeight,
-        width: this.settings.width,
-      })
+      const openTextEditor = (): void => {
+        new TextSectionModal(this.app, doc.text ?? "", (text) => {
+          void this.applyBlockTransform(el, ctx, source, (s) => setTextSection(s, text))
+        }).open()
+      }
+      const container = renderTimelineInto(
+        el,
+        doc,
+        {
+          typeColors: this.settings.typeColors,
+          hourHeight: this.settings.hourHeight,
+          width: this.settings.width,
+        },
+        {
+          renderMarkdown: (host, text) => {
+            void MarkdownRenderer.render(this.app, text, host, ctx.sourcePath, this)
+          },
+          onEdit: openTextEditor,
+        }
+      )
       const visibleTypes = Object.keys(this.settings.typeColors).filter((t) => !doc.hiddenTypes.includes(t))
       if (this.activeType === "" || !visibleTypes.includes(this.activeType)) {
         this.activeType = visibleTypes[0] ?? "misc"
@@ -65,10 +81,12 @@ export default class OnedayPlugin extends Plugin {
         onShow: (type) => {
           void this.applyBlockTransform(el, ctx, source, (s) => removeHiddenType(s, type))
         },
+        hasText: doc.text !== undefined,
+        onEditText: openTextEditor,
       })
       container.prepend(toolbar.el)
-      const svgHolder = container.querySelector(".oneday-svg-holder")
-      if (svgHolder) svgHolder.after(toolbar.statusEl)
+      const body = container.querySelector(".oneday-body")
+      if (body) body.after(toolbar.statusEl)
       attachHoverInfo(container, doc)
       attachResizeHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, Boolean(doc.floatRight), (totalWidth) => {
         void this.applyBlockTransform(el, ctx, source, (s) =>

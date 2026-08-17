@@ -61,6 +61,13 @@ export function parseTimeline(source: string): TimelineDoc {
   }
 
   const lines = source.split(/\r?\n/)
+  // `===` splits the block: entry syntax above, free markdown text below (块内图文混排).
+  const textSep = lines.findIndex((l) => l.trim() === "===")
+  if (textSep >= 0) {
+    const text = lines.splice(textSep + 1).join("\n").trim()
+    lines.splice(textSep) // drop the === line itself
+    if (text !== "") doc.text = text
+  }
   let inHeader = true
   let sawSeparator = false
 
