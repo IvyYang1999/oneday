@@ -1,6 +1,6 @@
 import { MarkdownPostProcessorContext, MarkdownRenderer, Menu, Platform, Plugin, TFile } from "obsidian"
 import { normalizeSpan, parseTimeline } from "./core/parser"
-import { formatEntryLine } from "./core/format"
+import { formatEntryLine, weekdayZh } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
 import { hashTypeColor } from "./core/type-colors"
 import { renderTimelineInto } from "./render/timeline-view"
@@ -14,7 +14,7 @@ import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
 import { applyItemToSlot, attachGridInteract } from "./edit/grid-interact"
 import { compactGrid, GRID_ROW_H, gridRows, GridItem, serializeLayoutHeader } from "./core/grid-layout"
-import { insertTimelineBlock } from "./insert"
+import { inferDate, insertTimelineBlock } from "./insert"
 import { attachWidthHandle } from "./edit/width-handle"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
@@ -160,18 +160,34 @@ export default class OnedayPlugin extends Plugin {
       const toolbarSlot = container.querySelector(".oneday-slot-toolbar")
       if (toolbarSlot) toolbarSlot.appendChild(toolbar.el)
       const timelineSlot = container.querySelector(".oneday-slot-timeline")
-      if (timelineSlot) {
+      if (timelineSlot instanceof HTMLElement) {
         timelineSlot.appendChild(toolbar.statusEl)
-        // 记录/计划开关 dock 在时间轴顶部右侧（管的是「往轴上画什么」，贴着轴）
-        timelineSlot.prepend(buildModeToggle(this.drawMode, (mode) => {
+        // 顶栏：日期+星期（跨期统计锚点）在左，记录/计划开关在右
+        const topbar = document.createElement("div")
+        topbar.className = "oneday-timeline-topbar"
+        const dateStr = doc.date ?? (() => {
+          const base = this.app.workspace.getActiveFile()?.basename ?? ""
+          return /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/.test(base) ? inferDate(base) : null
+        })()
+        if (dateStr) {
+          const dateEl = document.createElement("span")
+          dateEl.className = "oneday-date-row"
+          const wd = weekdayZh(dateStr)
+          dateEl.textContent = `${dateStr}${wd ? " " + wd : ""}`
+          topbar.appendChild(dateEl)
+        }
+        topbar.appendChild(buildModeToggle(this.drawMode, (mode) => {
           this.drawMode = mode
           toolbar.el.classList.toggle("is-plan", mode === "plan") // 色板圆点同步斜线化
         }))
+        timelineSlot.prepend(topbar)
       }
       const col = container.querySelector(".oneday-timeline-col")
       const body = container.querySelector(".oneday-body")
       // 自动量高：内容比格子高的槽位撑开格子（修新建块截断），只改显示不自动写源码
       this.fitSlotHeights(container)
+      // 初始调整全部完成后开启动画（is-settling 期间槽位不过渡，杀创建闪缩）
+      window.setTimeout(() => body?.classList.remove("is-settling"), 350)
 
       // 网格组件交互：拖拽移动 + 八向缩放，写回 layout 头——所有块可用
       if (body instanceof HTMLElement) {

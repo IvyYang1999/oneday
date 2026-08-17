@@ -171,11 +171,11 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       const hourSnap = Math.round(raw / 60) * 60
       if (extending === "bottom") {
         const target = Math.max(doc.rangeEnd, Math.min(30 * 60, hourSnap))
-        setStatus(`结束于 ${formatClock(target)}`)
+        setStatus(`结束于 ${formatClock(target % (24 * 60))}`) // 回绕显示：28点 -> 4:00
         if (extendPreview) updateExtendPreview(extendPreview, "bottom", doc.rangeEnd, target, doc.rangeStart, deps.hourHeight, trackX, trackW)
       } else {
         const target = Math.max(0, Math.min(doc.rangeStart, hourSnap))
-        setStatus(`开始于 ${formatClock(target)}`)
+        setStatus(`开始于 ${formatClock(target % (24 * 60))}`)
         if (extendPreview) updateExtendPreview(extendPreview, "top", doc.rangeStart, target, doc.rangeStart, deps.hourHeight, trackX, trackW)
       }
       return

@@ -92,7 +92,10 @@
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 2px;
-  min-height: 14px;
+}
+
+.oneday-dialog-status:empty {
+  display: none; /* 不预留空行（yyt：空一行难看） */
 }
 
 .oneday-dialog-status.oneday-dialog-error {
@@ -482,7 +485,7 @@
   position: absolute;
   overflow: auto;
   border-radius: 6px;
-  padding: 3px; /* 组件间固定 gutter，相邻手柄不再混淆 */
+  padding: 5px; /* 组件间 gutter（yyt：挨着没空隙难看） */
   box-sizing: border-box;
   outline: 1px solid transparent; /* 边缘线平时隐藏 */
   transition: left 0.15s ease, top 0.15s ease, width 0.15s ease, height 0.15s ease, outline-color 0.1s;
@@ -634,10 +637,10 @@
 .oneday-stats {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  font-family: var(--font-monospace);
-  font-size: 12px;
-  color: var(--color-red);
+  gap: 2px;
+  font-family: var(--font-text); /* 和正文一致（yyt 2026-08-17） */
+  font-size: 13px;
+  color: var(--text-normal);
 }
 
 .oneday-stat-row {
@@ -716,4 +719,44 @@
 
 .oneday-handle {
   z-index: 13;
+}
+
+.oneday-body.is-settling .oneday-slot {
+  transition: none !important; /* 初始量体/拟合不动画，否则创建色块时块会缩一下 */
+}
+
+/* 对话框 loading 内联 */
+
+.oneday-dialog {
+  position: relative;
+}
+
+.oneday-dialog-loading {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--text-muted);
+  pointer-events: none;
+  animation: oneday-pulse 1s ease-in-out infinite;
+}
+
+@keyframes oneday-pulse {
+  50% { opacity: 0.4; }
+}
+
+/* 时间轴顶栏：日期+星期 / 模式开关 */
+
+.oneday-timeline-topbar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.oneday-date-row {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
 }

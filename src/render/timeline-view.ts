@@ -71,7 +71,7 @@ export function renderTimelineInto(
 
   const baseWidth = doc.width ?? opts.width ?? 200
   const hasText = textPane !== undefined && doc.text !== undefined
-  const body = container.createDiv({ cls: "oneday-body" })
+  const body = container.createDiv({ cls: "oneday-body is-settling" })
 
   // 网格布局（yyt 2026-08-17：组件手柄拖拽移动+缩放、自动吸附+重力压实）：
   // 12 列 x 20px 行，组件几何存 dataset，交互由 main 接 attachGridInteract

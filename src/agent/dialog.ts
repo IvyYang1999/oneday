@@ -23,6 +23,9 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     cls: "oneday-dialog-input",
     attr: { type: "text", placeholder: "刚健身半小时…" },
   })
+  // loading 内联在输入行右侧（yyt：不占单独一行）
+  const loading = box.createEl("span", { cls: "oneday-dialog-loading", text: "生成中…" })
+  loading.style.display = "none"
   const status = box.createDiv({ cls: "oneday-dialog-status" })
 
   let busy = false
@@ -31,7 +34,8 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     if (text === "" || busy) return
     busy = true
     input.disabled = true
-    status.setText("生成中…")
+    loading.style.display = ""
+    status.setText("")
     status.removeClass("oneday-dialog-error")
 
     const systemPrompt = buildSystemPrompt({
@@ -54,6 +58,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
         )
 
     if (!run.ok) {
+      loading.style.display = "none"
       status.setText(run.reason)
       status.addClass("oneday-dialog-error")
       busy = false
@@ -63,6 +68,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
 
     const result = interpretResponse(run.text, doc)
     if (!result.ok) {
+      loading.style.display = "none"
       status.setText(result.reason)
       status.addClass("oneday-dialog-error")
       busy = false
@@ -70,6 +76,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       return
     }
 
+    loading.style.display = "none"
     try {
       await deps.writeEntry(result.entry)
       input.value = ""
