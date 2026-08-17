@@ -10,7 +10,7 @@
  * Cross-midnight (D10): an entry starting before rangeStart belongs to the next
  * calendar morning but the same logical day -> shifted +24h internally.
  */
-import { parseLayout } from "./layout"
+import { parseLayoutHeader } from "./grid-layout"
 import {
   Annotation,
   DAY_MINUTES,
@@ -186,9 +186,9 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
       return
     }
     case "layout": {
-      const cols = parseLayout(value)
+      const cols = parseLayoutHeader(value)
       if (!cols) {
-        doc.errors.push({ line, text: raw, reason: "layout 无法解析（应为 slot 名，用 | 分列）" })
+        doc.errors.push({ line, text: raw, reason: "layout 无法解析（应为 id@x,y,w,h）" })
         return
       }
       doc.layout = cols

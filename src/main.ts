@@ -12,9 +12,8 @@ import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
 import { attachResizeHandle } from "./edit/resize-handle"
-import { attachDivider } from "./edit/divider"
-import { attachLayoutDrag } from "./edit/layout-drag"
-import { serializeLayout } from "./core/layout"
+import { attachGridInteract } from "./edit/grid-interact"
+import { serializeLayoutHeader } from "./core/grid-layout"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
 /**
@@ -103,25 +102,19 @@ export default class OnedayPlugin extends Plugin {
       const col = container.querySelector(".oneday-timeline-col")
       attachHoverInfo(container, doc)
       const body = container.querySelector(".oneday-body")
-      if (doc.text !== undefined && body instanceof HTMLElement) {
-        // 有文字区：分隔条调时间轴列宽（图文比例）
-        attachDivider(body, (doc.width ?? this.settings.width) + SIDE_LANE_W, (totalWidth) => {
-          void this.applyBlockTransform(el, ctx, source, (s) =>
-            setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
-          )
-        })
-      } else {
+      if (doc.text === undefined) {
+        // 纯时间轴块：外缘手柄调整体宽度
         attachResizeHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, Boolean(doc.floatRight), (totalWidth) => {
           void this.applyBlockTransform(el, ctx, source, (s) =>
             setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
           )
         })
       }
-      // 组件拖拽换位（跨列），写回 layout 头——所有块都可用
+      // 网格组件交互：拖拽移动 + 八向缩放，写回 layout 头——所有块可用
       if (body instanceof HTMLElement) {
-        attachLayoutDrag(body, (cols) => {
+        attachGridInteract(body, (items) => {
           void this.applyBlockTransform(el, ctx, source, (s) =>
-            setHeaderValue(s, "layout", serializeLayout(cols))
+            setHeaderValue(s, "layout", serializeLayoutHeader(items))
           )
         })
       }

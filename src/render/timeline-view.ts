@@ -11,7 +11,7 @@ import { TimelineDoc } from "../core/types"
 import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
 import { renderTimelineSvg, RenderOptions, FALLBACK_COLOR, SIDE_LANE_W } from "./svg-builder"
-import { resolveLayout, SlotId } from "../core/layout"
+import { GRID_COLS, GRID_ROW_H, gridRows, resolveGrid } from "../core/grid-layout"
 
 /** 文字区原地编辑：点击渲染区 -> textarea；失焦/⌘Enter 保存，Esc 取消（yyt：不要弹窗）。 */
 function attachInlineTextEditor(pane: HTMLElement, text: string, deps: TextPaneDeps): void {
@@ -64,33 +64,29 @@ export function renderTimelineInto(
   const hasText = textPane !== undefined && doc.text !== undefined
   const body = container.createDiv({ cls: "oneday-body" })
 
-  // 插槽化布局（yyt 2026-08-17：组件自由拖拽换位）：列 x 插槽，顺序由 layout 头决定
-  const layout = resolveLayout(doc.layout ?? null, hasText, doc.side)
-  for (const colIds of layout) {
-    const hasTimeline = colIds.includes("timeline")
-    const col = body.createDiv({ cls: "oneday-col" + (hasTimeline ? " oneday-timeline-col" : "") })
-    if (hasTimeline) {
-      // 宽度创建即钉死：否则列宽退化为内容驱动（修「双击编辑左侧变窄」）
-      col.style.width = `${baseWidth + SIDE_LANE_W}px`
-      col.style.flexShrink = "0"
+  // 网格布局（yyt 2026-08-17：组件手柄拖拽移动+缩放、自动吸附）：
+  // 12 列 x 20px 行，组件几何存 dataset，交互由 main 接 attachGridInteract
+  const timelineRows = Math.ceil(((doc.rangeEnd - doc.rangeStart) / 60) * ((opts.hourHeight ?? 48) / GRID_ROW_H)) + 2
+  const items = resolveGrid(doc.layout ?? null, hasText, doc.side, timelineRows)
+  body.style.height = `${gridRows(items) * GRID_ROW_H}px`
+  for (const it of items) {
+    const slot = body.createDiv({ cls: `oneday-slot oneday-slot-${it.id}` })
+    slot.dataset.slot = it.id
+    slot.dataset.x = String(it.x)
+    slot.dataset.y = String(it.y)
+    slot.dataset.w = String(it.w)
+    slot.dataset.h = String(it.h)
+    slot.style.left = `${(it.x / GRID_COLS) * 100}%`
+    slot.style.width = `${(it.w / GRID_COLS) * 100}%`
+    slot.style.top = `${it.y * GRID_ROW_H}px`
+    slot.style.height = `${it.h * GRID_ROW_H}px`
+    if (it.id === "timeline") {
+      const svgHolder = slot.createDiv({ cls: "oneday-svg-holder" })
+      svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
+    } else if (it.id === "text" && textPane) {
+      const pane = slot.createDiv({ cls: "oneday-text-pane" })
+      attachInlineTextEditor(pane, doc.text ?? "", textPane)
     }
-    for (const id of colIds) {
-      const slot = col.createDiv({ cls: `oneday-slot oneday-slot-${id}` })
-      slot.dataset.slot = id satisfies SlotId
-      if (id === "timeline") {
-        const svgHolder = slot.createDiv({ cls: "oneday-svg-holder" })
-        svgHolder.innerHTML = renderTimelineSvg(doc, { ...opts, width: baseWidth })
-      } else if (id === "text" && textPane) {
-        const pane = slot.createDiv({ cls: "oneday-text-pane" })
-        attachInlineTextEditor(pane, doc.text ?? "", textPane)
-      }
-    }
-  }
-  // 双列时加分隔条（拖拽行为由 main 接 attachDivider）
-  if (layout.length > 1) {
-    const cols = Array.from(body.children)
-    const divider = createDiv({ cls: "oneday-divider" })
-    body.insertBefore(divider, cols[1])
   }
   // 宽度/浮动必须设在宿主 el 上：Obsidian 的代码块宿主默认通栏，
   // 子元素浮动不会让出左侧空间（yyt 2026-08-17 反馈）。

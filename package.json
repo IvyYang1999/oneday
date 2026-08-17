@@ -11,7 +11,7 @@
     "e2e:agent": "node e2e/agent-smoke.mjs",
     "e2e:api": "node e2e/api-smoke.mjs",
     "e2e:draw": "node e2e/draw-smoke.mjs",
-    "e2e:layout": "node e2e/layout-smoke.mjs"
+    "e2e:grid": "node e2e/grid-smoke.mjs"
   },
   "keywords": [
     "obsidian",
