@@ -13,17 +13,27 @@ export function inferDate(fileBasename: string | null, now = new Date()): string
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`
 }
 
-export function timelineTemplate(date: string): string {
-  return `\`\`\`timeline\ndate: ${date}\nrange: 7-23\n---\n\n\`\`\``
+export interface InsertTemplate {
+  layout?: string
+  width?: number
+  hasText?: boolean
 }
 
-export function insertTimelineBlock(editor: Editor, fileBasename: string | null): void {
+export function timelineTemplate(date: string, tpl: InsertTemplate = {}): string {
+  const head = [`date: ${date}`]
+  if (tpl.width) head.push(`width: ${tpl.width}`)
+  if (tpl.layout) head.push(`layout: ${tpl.layout}`)
+  const textPart = tpl.hasText ? "\n===\n" : ""
+  return `\`\`\`timeline\n${head.join("\n")}\n---\n${textPart}\`\`\``
+}
+
+export function insertTimelineBlock(editor: Editor, fileBasename: string | null, tpl: InsertTemplate = {}): void {
   const date = inferDate(fileBasename)
   const cursor = editor.getCursor()
   const line = editor.getLine(cursor.line)
   // 当前行非空 -> 换行另起；空行直接插入
   const prefix = line.trim() === "" ? "" : "\n"
-  editor.replaceRange(`${prefix}${timelineTemplate(date)}\n`, cursor)
+  editor.replaceRange(`${prefix}${timelineTemplate(date, tpl)}\n`, cursor)
   // 光标落到条目区空行（--- 的下一行）
   const entryLine = cursor.line + (prefix === "" ? 4 : 5)
   editor.setCursor({ line: entryLine, ch: 0 })

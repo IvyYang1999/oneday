@@ -18,7 +18,7 @@ fs.mkdirSync(out, { recursive: true })
 fs.writeFileSync(path.join(out, "entry.ts"), `
 import { parseTimeline } from "${path.join(here, "../src/core/parser")}"
 import { renderTimelineSvg } from "${path.join(here, "../src/render/svg-builder")}"
-import { buildToolbar } from "${path.join(here, "../src/edit/toolbar")}"
+import { buildModeToggle, buildToolbar } from "${path.join(here, "../src/edit/toolbar")}"
 import { attachDrawInteraction } from "${path.join(here, "../src/edit/draw-interaction")}"
 import { attachHoverInfo } from "${path.join(here, "../src/edit/hover-info")}"
 
@@ -30,12 +30,11 @@ const toolbar = buildToolbar({
   typeColors: COLORS,
   hiddenTypes: ["fitness"],
   activeType: "math",
-  mode: "actual",
   onSelect: (t) => { window.__active = t },
-  onModeChange: (m) => { window.__mode = m },
   onHide: (t) => window.__hidden.push(t),
   onShow: (t) => window.__shown.push(t),
 })
+container.appendChild(buildModeToggle("actual", (m) => { window.__mode = m }))
 container.appendChild(toolbar.el)
 const holder = document.createElement("div")
 holder.innerHTML = renderTimelineSvg(doc, { typeColors: COLORS })

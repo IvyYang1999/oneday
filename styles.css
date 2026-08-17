@@ -313,10 +313,7 @@
   background: var(--c, #bdbdbd);
 }
 
-.oneday-toolbar.is-plan .oneday-swatch {
-  outline: 1.5px dashed var(--text-muted); /* 计划模式：虚线描边（斜线点在深色模式像🚫） */
-  outline-offset: 1px;
-}
+/* 计划模式提示：dock 在时间轴上的开关本身高亮即可，色板不再变样 */
 
 .oneday-ctx-menu {
   position: fixed;
@@ -677,4 +674,29 @@
 
 .oneday-svg .oneday-preview-block {
   pointer-events: none; /* 乐观渲染的临时块不吃事件（盖在真块上会吞掉 hover/右键） */
+}
+
+/* 文字区编辑态：彻底无框 + 隐藏槽位手柄 */
+
+.oneday-text-inline,
+.oneday-text-inline:focus {
+  background: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.oneday-slot.is-editing .oneday-slot-grip,
+.oneday-slot.is-editing .oneday-handle {
+  display: none;
+}
+
+/* 模式开关 dock 在时间轴顶部右侧 */
+
+.oneday-mode.oneday-mode-docked {
+  display: flex;
+  width: fit-content;
+  margin-left: auto; /* 右对齐 */
+  margin-bottom: 2px;
+  padding-left: 0;
+  font-size: 11px;
 }

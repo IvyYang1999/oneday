@@ -148,8 +148,8 @@ describe("setTextSection", () => {
       .toBe("09:00-10:00 math\n===\nnew")
   })
 
-  it("empty text removes the section", () => {
-    expect(setTextSection("09:00-10:00 math\n===\nold", "  ")).toBe("09:00-10:00 math")
+  it("empty text keeps the section placeholder (yyt: 空保存不该把文字区弄没)", () => {
+    expect(setTextSection("09:00-10:00 math\n===\nold", "  ")).toBe("09:00-10:00 math\n===")
   })
 
   it("round-trips through the parser", () => {

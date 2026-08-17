@@ -23,6 +23,10 @@ export interface OnedaySettings {
   model: string
   /** 删除/改名的类型色号存档：新建块不显示，旧块里的色块/色板仍用原色（yyt 2026-08-17） */
   retiredTypeColors: Record<string, string>
+  /** 布局记忆（「设为默认布局」）：新建块按此摆放 */
+  templateLayout?: string
+  templateWidth?: number
+  templateHasText?: boolean
 }
 
 export const DEFAULT_SETTINGS: OnedaySettings = {

@@ -24,3 +24,17 @@ describe("timelineTemplate", () => {
     expect(doc.rangeStart).toBe(420)
   })
 })
+
+describe("timelineTemplate with layout memory", () => {
+  it("injects width/layout/text from template", () => {
+    const tpl = timelineTemplate("2026-08-18", { layout: "toolbar@0,0,12,3 timeline@0,3,6,40 text@6,3,6,4", width: 240, hasText: true })
+    expect(tpl).toContain("width: 240")
+    expect(tpl).toContain("layout: toolbar@0,0,12,3")
+    expect(tpl).toContain("===")
+    const body = tpl.replace(/^```timeline\n|```$/g, "")
+    const doc = parseTimeline(body)
+    expect(doc.errors).toEqual([])
+    expect(doc.width).toBe(240)
+    expect(doc.text).toBe("")
+  })
+})

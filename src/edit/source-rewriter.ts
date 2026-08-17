@@ -133,6 +133,7 @@ export function setTextSection(source: string, text: string): string {
   // trim trailing blanks in the entry zone
   while (head.length > 0 && head[head.length - 1].trim() === "") head.pop()
   const trimmed = text.trim()
-  if (trimmed === "") return head.join("\n")
+  // 空文本也保留 ===（渲染为「点击书写…」占位，yyt：空保存不该把文字区弄没）
+  if (trimmed === "") return [...head, "==="].join("\n")
   return [...head, "===", ...trimmed.split("\n")].join("\n")
 }

@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
 import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
-import { buildToolbar } from "./edit/toolbar"
+import { buildModeToggle, buildToolbar } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
@@ -46,7 +46,7 @@ export default class OnedayPlugin extends Plugin {
       id: "insert-timeline-block",
       name: "插入 Oneday 时间轴块",
       editorCallback: (editor) => {
-        insertTimelineBlock(editor, this.app.workspace.getActiveFile()?.basename ?? null)
+        insertTimelineBlock(editor, this.app.workspace.getActiveFile()?.basename ?? null, this.insertTemplate())
       },
     })
     this.registerEvent(
@@ -56,7 +56,7 @@ export default class OnedayPlugin extends Plugin {
             .setTitle("插入 Oneday 时间轴")
             .setIcon("calendar-clock")
             .onClick(() => {
-              insertTimelineBlock(editor, this.app.workspace.getActiveFile()?.basename ?? null)
+              insertTimelineBlock(editor, this.app.workspace.getActiveFile()?.basename ?? null, this.insertTemplate())
             })
         )
       })
@@ -121,6 +121,20 @@ export default class OnedayPlugin extends Plugin {
           )
         }
         menu.addItem((item) =>
+          item.setTitle("设为默认布局（新块照此摆放）").setIcon("bookmark").onClick(() => {
+            if (body instanceof HTMLElement) {
+              const items = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot")).map((sl) => ({
+                id: sl.dataset.slot as GridItem["id"],
+                x: Number(sl.dataset.x), y: Number(sl.dataset.y), w: Number(sl.dataset.w), h: Number(sl.dataset.h),
+              }))
+              this.settings.templateLayout = serializeLayoutHeader(items)
+            }
+            this.settings.templateWidth = doc.width
+            this.settings.templateHasText = doc.text !== undefined
+            void this.saveSettings()
+          })
+        )
+        menu.addItem((item) =>
           item.setTitle("重置组件布局").setIcon("layout-grid").onClick(() => {
             void this.applyBlockTransform(el, ctx, source, (s) => removeHeaderValue(s, "layout"))
           })
@@ -132,12 +146,8 @@ export default class OnedayPlugin extends Plugin {
         typeColors: paletteColors,
         hiddenTypes: doc.hiddenTypes,
         activeType: this.activeType,
-        mode: this.drawMode,
         onSelect: (type) => {
           this.activeType = type
-        },
-        onModeChange: (mode) => {
-          this.drawMode = mode
         },
         onHide: (type) => {
           void this.applyBlockTransform(el, ctx, source, (s) => addHiddenType(s, type))
@@ -150,7 +160,13 @@ export default class OnedayPlugin extends Plugin {
       const toolbarSlot = container.querySelector(".oneday-slot-toolbar")
       if (toolbarSlot) toolbarSlot.appendChild(toolbar.el)
       const timelineSlot = container.querySelector(".oneday-slot-timeline")
-      if (timelineSlot) timelineSlot.appendChild(toolbar.statusEl)
+      if (timelineSlot) {
+        timelineSlot.appendChild(toolbar.statusEl)
+        // 记录/计划开关 dock 在时间轴顶部右侧（管的是「往轴上画什么」，贴着轴）
+        timelineSlot.prepend(buildModeToggle(this.drawMode, (mode) => {
+          this.drawMode = mode
+        }))
+      }
       const col = container.querySelector(".oneday-timeline-col")
       const body = container.querySelector(".oneday-body")
       // 自动量高：内容比格子高的槽位撑开格子（修新建块截断），只改显示不自动写源码
@@ -278,6 +294,14 @@ export default class OnedayPlugin extends Plugin {
         })
       }
     })
+  }
+
+  private insertTemplate(): { layout?: string; width?: number; hasText?: boolean } {
+    return {
+      layout: this.settings.templateLayout,
+      width: this.settings.templateWidth,
+      hasText: this.settings.templateHasText,
+    }
   }
 
   /** Grow slots whose content exceeds their grid height, then re-compact (display-only). */

@@ -12,9 +12,7 @@ export interface ToolbarDeps {
   /** Types hidden in this block (hide: header). */
   hiddenTypes: string[]
   activeType: string
-  mode: DrawMode
   onSelect: (type: string) => void
-  onModeChange: (mode: DrawMode) => void
   /** Menu item: hide this swatch for this block. */
   onHide: (type: string) => void
   /** "+" menu picks a hidden type to show again. */
@@ -47,25 +45,7 @@ function showSwatchMenu(root: HTMLElement, x: number, y: number, type: string, d
 
 export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   const el = document.createElement("div")
-  el.className = "oneday-toolbar" + (deps.mode === "plan" ? " is-plan" : "")
-
-  // 计划/记录 mode toggle
-  const modeWrap = document.createElement("span")
-  modeWrap.className = "oneday-mode"
-  const modes: Array<[DrawMode, string]> = [["actual", "记录"], ["plan", "计划"]]
-  for (const [mode, label] of modes) {
-    const btn = document.createElement("button")
-    btn.className = "oneday-mode-btn" + (mode === deps.mode ? " is-active" : "")
-    btn.dataset.mode = mode
-    btn.textContent = label
-    btn.addEventListener("click", () => {
-      modeWrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
-      btn.classList.add("is-active")
-      el.classList.toggle("is-plan", mode === "plan")
-      deps.onModeChange(mode)
-    })
-    modeWrap.appendChild(btn)
-  }
+  el.className = "oneday-toolbar"
 
   // Visible swatches = global palette minus hidden
   const visible = Object.keys(deps.typeColors).filter((t) => !deps.hiddenTypes.includes(t))
@@ -127,9 +107,28 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     el.appendChild(wrap)
   }
 
-  el.appendChild(modeWrap) // 模式开关钉在工具栏最右侧
-
   const statusEl = document.createElement("div")
   statusEl.className = "oneday-draw-status"
   return { el, statusEl }
+}
+
+/** 记录/计划分段开关（独立组件，贴时间轴槽位顶部右侧，yyt 2026-08-17） */
+export function buildModeToggle(mode: DrawMode, onChange: (mode: DrawMode) => void): HTMLElement {
+  const wrap = document.createElement("div")
+  wrap.className = "oneday-mode oneday-mode-docked" + (mode === "plan" ? " is-plan" : "")
+  const modes: Array<[DrawMode, string]> = [["actual", "记录"], ["plan", "计划"]]
+  for (const [m, label] of modes) {
+    const btn = document.createElement("button")
+    btn.className = "oneday-mode-btn" + (m === mode ? " is-active" : "")
+    btn.dataset.mode = m
+    btn.textContent = label
+    btn.addEventListener("click", () => {
+      wrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
+      btn.classList.add("is-active")
+      wrap.classList.toggle("is-plan", m === "plan")
+      onChange(m)
+    })
+    wrap.appendChild(btn)
+  }
+  return wrap
 }

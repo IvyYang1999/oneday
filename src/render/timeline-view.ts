@@ -17,6 +17,7 @@ import { GRID_COLS, GRID_ROW_H, gridRows, resolveGrid } from "../core/grid-layou
 /** 文字区原地编辑：点击渲染区 -> textarea；失焦/⌘Enter 保存，Esc 取消（yyt：不要弹窗）。 */
 function attachInlineTextEditor(pane: HTMLElement, text: string, deps: TextPaneDeps): void {
   const show = (): void => {
+    pane.closest(".oneday-slot")?.classList.remove("is-editing")
     pane.empty()
     if (text.trim() === "") {
       const ph = pane.createDiv({ cls: "oneday-text-placeholder", text: "点击书写…" })
@@ -29,6 +30,7 @@ function attachInlineTextEditor(pane: HTMLElement, text: string, deps: TextPaneD
   }
   const edit = (): void => {
     pane.empty()
+    pane.closest(".oneday-slot")?.classList.add("is-editing")
     const ta = pane.createEl("textarea", { cls: "oneday-text-inline" })
     ta.value = text
     const fit = (): void => {
@@ -37,7 +39,13 @@ function attachInlineTextEditor(pane: HTMLElement, text: string, deps: TextPaneD
     }
     ta.addEventListener("input", fit)
     window.setTimeout(fit, 0)
-    const commit = (): void => deps.onSave(ta.value)
+    const commit = (): void => {
+      if (ta.value === text) {
+        show() // 没变就不写回，避免无谓重渲染
+        return
+      }
+      deps.onSave(ta.value)
+    }
     ta.addEventListener("blur", commit)
     ta.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
