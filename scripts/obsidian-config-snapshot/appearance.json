@@ -1,0 +1,10 @@
+{
+  "accentColor": "",
+  "theme": "system",
+  "cssTheme": "",
+  "showRibbon": true,
+  "showViewHeader": false,
+  "enabledCssSnippets": [
+    "hide-sidecar"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "showInlineTitle": false,
+  "promptDelete": false,
+  "alwaysUpdateLinks": true,
+  "attachmentFolderPath": "附件",
+  "showUnsupportedFiles": true,
+  "userIgnoreFilters": [
+    "sidecar"
+  ],
+  "propertiesInDocument": "hidden"
+}
