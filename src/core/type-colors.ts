@@ -27,3 +27,12 @@ export function serializeTypeColors(map: Record<string, string>): string {
     .map(([type, color]) => `${type}: ${color}`)
     .join("\n")
 }
+
+/** 未登记类型的确定性颜色：同名同色（替代全灰兜底，yyt 2026-08-17）。 */
+export function hashTypeColor(type: string): string {
+  let h = 0
+  for (const ch of type) {
+    h = (h * 31 + (ch.codePointAt(0) ?? 0)) >>> 0
+  }
+  return `hsl(${h % 360} 62% 62%)`
+}

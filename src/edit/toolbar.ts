@@ -66,7 +66,6 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     })
     modeWrap.appendChild(btn)
   }
-  el.appendChild(modeWrap)
 
   // Visible swatches = global palette minus hidden
   const visible = Object.keys(deps.typeColors).filter((t) => !deps.hiddenTypes.includes(t))
@@ -127,6 +126,8 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     wrap.append(addBtn, menu)
     el.appendChild(wrap)
   }
+
+  el.appendChild(modeWrap) // 模式开关钉在工具栏最右侧
 
   const statusEl = document.createElement("div")
   statusEl.className = "oneday-draw-status"

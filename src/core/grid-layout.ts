@@ -102,7 +102,7 @@ export function defaultGrid(hasText: boolean, side: "left" | "right" | undefined
   }
   const railCol = side === "left" ? 0 : 6
   const textCol = side === "left" ? 6 : 0
-  const items: GridItem[] = [{ id: "text", x: textCol, y: 0, w: 6, h: Math.max(8, timelineRows) }]
+  const items: GridItem[] = [{ id: "text", x: textCol, y: 0, w: 6, h: 4 }] // 默认小巧，随输入自动撑高
   let y = 0
   for (const it of rail) {
     items.push({ ...it, x: railCol, y, w: 6 })

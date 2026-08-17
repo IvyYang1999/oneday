@@ -251,7 +251,9 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 10px;
   overflow: hidden;
-  margin-right: 4px;
+  margin-left: auto; /* 钉到工具栏最右侧，与荧光笔视觉分离 */
+  padding-left: 6px;
+  border-left: 1px solid var(--background-modifier-border);
 }
 
 .oneday-mode-btn {
@@ -311,9 +313,9 @@
   background: var(--c, #bdbdbd);
 }
 
-.oneday-toolbar.is-plan .oneday-swatch-dot {
-  background: repeating-linear-gradient(45deg, var(--c, #bdbdbd) 0 2px, transparent 2px 4.5px);
-  border: 1px solid var(--c, #bdbdbd);
+.oneday-toolbar.is-plan .oneday-swatch {
+  outline: 1.5px dashed var(--text-muted); /* 计划模式：虚线描边（斜线点在深色模式像🚫） */
+  outline-offset: 1px;
 }
 
 .oneday-ctx-menu {

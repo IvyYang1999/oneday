@@ -7,6 +7,7 @@
  * notes and @annotations share one collision-avoiding layout (M4).
  */
 import { Entry, TimelineDoc } from "../core/types"
+import { hashTypeColor } from "../core/type-colors"
 import { formatClock, formatHours, durationMinutes } from "../core/duration"
 import { AXIS_PAD_TOP, AXIS_PAD_BOTTOM, LABEL_W, TRACK_PAD, inlineFontSize } from "../core/geometry"
 
@@ -152,7 +153,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
   )
 
   // Plan layer first (full-width translucent background + diagonal hatch, D3 覆盖语义)
-  const planColors = [...new Set(doc.entries.filter((e) => e.plan).map((e) => opts.typeColors[e.type] ?? FALLBACK_COLOR))]
+  const planColors = [...new Set(doc.entries.filter((e) => e.plan).map((e) => opts.typeColors[e.type] ?? hashTypeColor(e.type)))]
   if (planColors.length > 0) {
     const defs = planColors
       .map(
@@ -164,7 +165,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
     parts.push(`<defs>${defs}</defs>`)
   }
   for (const e of doc.entries.filter((e) => e.plan)) {
-    const color = opts.typeColors[e.type] ?? FALLBACK_COLOR
+    const color = opts.typeColors[e.type] ?? hashTypeColor(e.type)
     const hatchId = `oneday-hatch-${planColors.indexOf(color)}`
     const yy = y(e.startMin)
     const hh = Math.max(2, y(e.endMin) - yy)
@@ -178,7 +179,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
   // calendar-style; yyt 2026-08-17). Plans do not participate in columns.
   for (const p of placeActual(doc.entries.filter((e) => !e.plan), trackX, trackW)) {
     const e = p.entry
-    const color = opts.typeColors[e.type] ?? FALLBACK_COLOR
+    const color = opts.typeColors[e.type] ?? hashTypeColor(e.type)
     const yy = y(e.startMin)
     const hh = Math.max(2, y(e.endMin) - yy)
     parts.push(

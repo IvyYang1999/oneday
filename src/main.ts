@@ -2,6 +2,7 @@ import { MarkdownPostProcessorContext, MarkdownRenderer, Menu, Platform, Plugin,
 import { normalizeSpan, parseTimeline } from "./core/parser"
 import { formatEntryLine } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
+import { hashTypeColor } from "./core/type-colors"
 import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
@@ -86,7 +87,7 @@ export default class OnedayPlugin extends Plugin {
       // 色板 = 全局 ∪ 本块用过的类型（旧块用过的已删类型保留显示，yyt 2026-08-17）
       const usedTypes = [...new Set(doc.entries.map((e) => e.type))]
       const paletteTypes = [...Object.keys(this.settings.typeColors), ...usedTypes.filter((t) => !(t in this.settings.typeColors))]
-      const paletteColors = Object.fromEntries(paletteTypes.map((t) => [t, paletteForRender[t] ?? FALLBACK_COLOR]))
+      const paletteColors = Object.fromEntries(paletteTypes.map((t) => [t, paletteForRender[t] ?? hashTypeColor(t)]))
       const visibleTypes = paletteTypes.filter((t) => !doc.hiddenTypes.includes(t))
       if (this.activeType === "" || !visibleTypes.includes(this.activeType)) {
         this.activeType = visibleTypes[0] ?? "misc"
@@ -97,7 +98,25 @@ export default class OnedayPlugin extends Plugin {
         if (doc.text === undefined) {
           menu.addItem((item) =>
             item.setTitle("添加文字区").setIcon("file-text").onClick(() => {
-              void this.applyBlockTransform(el, ctx, source, (s) => `${s.replace(/\n+$/, "")}\n===\n`)
+              void this.applyBlockTransform(el, ctx, source, (s) => {
+                let out = `${s.replace(/\n+$/, "")}\n===\n`
+                // 落在右键点击的格子附近（yyt 2026-08-17）
+                if (body instanceof HTMLElement) {
+                  const bodyRect = body.getBoundingClientRect()
+                  if (bodyRect.width > 100) {
+                    const cellW = bodyRect.width / 12
+                    const gx = Math.min(12 - 6, Math.max(0, Math.floor((x - bodyRect.left) / cellW)))
+                    const gy = Math.max(0, Math.floor((y - bodyRect.top) / GRID_ROW_H))
+                    const items = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot")).map((sl) => ({
+                      id: sl.dataset.slot as GridItem["id"],
+                      x: Number(sl.dataset.x), y: Number(sl.dataset.y), w: Number(sl.dataset.w), h: Number(sl.dataset.h),
+                    }))
+                    items.push({ id: "text", x: gx, y: gy, w: 6, h: 4 })
+                    out = setHeaderValue(out, "layout", serializeLayoutHeader(compactGrid(items, "text")))
+                  }
+                }
+                return out
+              })
             })
           )
         }
@@ -152,7 +171,7 @@ export default class OnedayPlugin extends Plugin {
         hourHeight: this.settings.hourHeight,
         getActiveType: () => this.activeType,
         getMode: () => this.drawMode,
-        typeColor: (type) => paletteForRender[type] ?? FALLBACK_COLOR,
+        typeColor: (type) => paletteForRender[type] ?? hashTypeColor(type),
         onCreate: (entryLine, startMin) => {
           void this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entryLine, startMin))
         },

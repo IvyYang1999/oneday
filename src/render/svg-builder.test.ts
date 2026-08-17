@@ -52,9 +52,12 @@ describe("renderTimelineSvg", () => {
     expect(svg).toContain(">25</text>")
   })
 
-  it("falls back to gray for unknown types", () => {
+  it("unknown types get a deterministic hash color (not gray, yyt 2026-08-17)", () => {
     const svg = svgOf("09:00-10:00 whatever")
-    expect(svg).toContain(`fill="${FALLBACK_COLOR}"`)
+    expect(svg).not.toContain(`fill="${FALLBACK_COLOR}"`)
+    expect(svg).toContain('fill="hsl(')
+    // 同名同色
+    expect(svgOf("09:00-10:00 whatever")).toBe(svg)
   })
 
   it("escapes XML in notes and annotations", () => {

@@ -10,7 +10,8 @@ export interface TextPaneDeps {
 import { TimelineDoc } from "../core/types"
 import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
-import { renderTimelineSvg, RenderOptions, FALLBACK_COLOR, SIDE_LANE_W } from "./svg-builder"
+import { renderTimelineSvg, RenderOptions, SIDE_LANE_W } from "./svg-builder"
+import { hashTypeColor } from "../core/type-colors"
 import { GRID_COLS, GRID_ROW_H, gridRows, resolveGrid } from "../core/grid-layout"
 
 /** 文字区原地编辑：点击渲染区 -> textarea；失焦/⌘Enter 保存，Esc 取消（yyt：不要弹窗）。 */
@@ -112,18 +113,10 @@ export function renderTimelineInto(
     for (const st of stats) {
       const row = box.createDiv({ cls: "oneday-stat-row" })
       const dot = row.createEl("span", { cls: "oneday-stat-dot" })
-      dot.style.background = opts.typeColors[st.type] ?? FALLBACK_COLOR
+      dot.style.background = opts.typeColors[st.type] ?? hashTypeColor(st.type)
       row.createEl("span", { cls: "oneday-stat-type", text: st.type })
       row.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
     }
-  }
-
-  const unknown = [...new Set(doc.entries.map((e) => e.type).filter((t) => !(t in opts.typeColors)))]
-  if (unknown.length > 0) {
-    statsSlot.createDiv({
-      cls: "oneday-warning",
-      text: `未登记类型（显示为 ${FALLBACK_COLOR} 灰色）：${unknown.join(", ")}`,
-    })
   }
 
   if (doc.errors.length > 0) {
