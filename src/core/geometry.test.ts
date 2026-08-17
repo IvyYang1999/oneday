@@ -33,6 +33,6 @@ describe("inlineFontSize (时长恒居中·自适应字号)", () => {
   })
 
   it("returns 0 when nothing readable fits", () => {
-    expect(inlineFontSize(20, 10, "3.75h")).toBe(0)
+    expect(inlineFontSize(16, 10, "3.75h")).toBe(0)
   })
 })

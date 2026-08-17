@@ -31,7 +31,7 @@ describe("renderTimelineSvg", () => {
   it("keeps the duration centered with adaptive font even for thin blocks (yyt 2026-08-17)", () => {
     const svg = svgOf("17:00-17:30 math") // 30min -> 24px tall
     expect(svg).not.toContain("oneday-duration oneday-thin")
-    expect(svg).toMatch(/<text pointer-events="none" class="oneday-duration" font-size="([\d.]+)"[^>]*>0.5h<\/text>/)
+    expect(svg).toMatch(/<text pointer-events="none" class="oneday-duration" style="font-size:([\d.]+)px"[^>]*>0.5h<\/text>/)
   })
 
   it("shows the note inside tall blocks", () => {

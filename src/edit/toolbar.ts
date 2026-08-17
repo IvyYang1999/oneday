@@ -15,7 +15,7 @@ export interface ToolbarDeps {
   mode: DrawMode
   onSelect: (type: string) => void
   onModeChange: (mode: DrawMode) => void
-  /** Right-click a swatch hides it for this block. */
+  /** Menu item: hide this swatch for this block. */
   onHide: (type: string) => void
   /** "+" menu picks a hidden type to show again. */
   onShow: (type: string) => void
@@ -26,9 +26,28 @@ export interface ToolbarHandle {
   statusEl: HTMLElement
 }
 
+/** Right-click menu on a swatch (pure DOM, same pattern as the + menu). */
+function showSwatchMenu(root: HTMLElement, x: number, y: number, type: string, deps: ToolbarDeps): void {
+  root.querySelectorAll(".oneday-ctx-menu").forEach((m) => m.remove())
+  const menu = document.createElement("div")
+  menu.className = "oneday-ctx-menu"
+  menu.style.left = `${x}px`
+  menu.style.top = `${y}px`
+  const hide = document.createElement("button")
+  hide.className = "oneday-add-item"
+  hide.textContent = "在本块隐藏"
+  hide.addEventListener("click", () => {
+    menu.remove()
+    deps.onHide(type)
+  })
+  menu.appendChild(hide)
+  root.appendChild(menu)
+  document.addEventListener("click", () => menu.remove(), { once: true })
+}
+
 export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   const el = document.createElement("div")
-  el.className = "oneday-toolbar"
+  el.className = "oneday-toolbar" + (deps.mode === "plan" ? " is-plan" : "")
 
   // 计划/记录 mode toggle
   const modeWrap = document.createElement("span")
@@ -42,6 +61,7 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     btn.addEventListener("click", () => {
       modeWrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
       btn.classList.add("is-active")
+      el.classList.toggle("is-plan", mode === "plan")
       deps.onModeChange(mode)
     })
     modeWrap.appendChild(btn)
@@ -57,7 +77,7 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     btn.title = "左键选中 · 右键隐藏（本块）"
     const dot = document.createElement("span")
     dot.className = "oneday-swatch-dot"
-    dot.style.background = deps.typeColors[type]
+    dot.style.setProperty("--c", deps.typeColors[type])
     btn.appendChild(dot)
     btn.appendChild(document.createTextNode(type))
     btn.addEventListener("click", () => {
@@ -67,7 +87,8 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     })
     btn.addEventListener("contextmenu", (e) => {
       e.preventDefault()
-      deps.onHide(type)
+      e.stopPropagation()
+      showSwatchMenu(el, e.clientX, e.clientY, type, deps)
     })
     el.appendChild(btn)
   }

@@ -192,7 +192,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
       // 时长恒居中，自适应字号（yyt 2026-08-17）
       const showNoteInside = p.w >= MIN_INLINE_LABEL_W && hh >= MIN_NOTE_H && e.note
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" font-size="${fs}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + (showNoteInside ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + (showNoteInside ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
       )
       if (showNoteInside) {
         parts.push(

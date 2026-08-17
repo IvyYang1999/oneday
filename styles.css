@@ -173,9 +173,7 @@
   stroke-width: 0.6;
 }
 
-.oneday-svg .oneday-side-leader.is-displaced {
-  display: inline;
-}
+/* 避让偏移的连线也不常驻（yyt 2026-08-17），只保留 class 供测试断言 */
 
 .oneday-svg .oneday-note.oneday-side {
   fill: var(--text-muted);
@@ -305,4 +303,25 @@
 
 .oneday-add-item:hover {
   background: var(--background-secondary);
+}
+
+/* 计划模式：色板点变斜线纹，与 plan 色块视觉一致 */
+
+.oneday-swatch-dot {
+  background: var(--c, #bdbdbd);
+}
+
+.oneday-toolbar.is-plan .oneday-swatch-dot {
+  background: repeating-linear-gradient(45deg, var(--c, #bdbdbd) 0 2px, transparent 2px 4.5px);
+  border: 1px solid var(--c, #bdbdbd);
+}
+
+.oneday-ctx-menu {
+  position: fixed;
+  z-index: 30;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 110px;
 }

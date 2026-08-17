@@ -26,9 +26,9 @@ export function snapMinutes(min: number, snap = SNAP_MINUTES): number {
  * any readable label (caller falls back to the side lane).
  */
 export function inlineFontSize(w: number, h: number, text: string): number {
-  const byWidth = (w - 8) / (text.length * 0.62)
+  const byWidth = (w - 6) / (text.length * 0.6)
   const byHeight = h * 0.55
   const size = Math.min(11, byWidth, byHeight)
-  if (size < 6) return 0
+  if (size < 5.5) return 0
   return Math.floor(size * 2) / 2
 }

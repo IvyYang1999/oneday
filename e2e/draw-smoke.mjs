@@ -116,6 +116,8 @@ await page.locator('.oneday-mode-btn[data-mode="actual"]').click()
 await page.mouse.click(trackCX, yFor(450))
 // 7. toolbar: right-click a swatch hides it; "+" menu shows hidden ones back
 await page.locator('.oneday-swatch[data-type="math"]').click({ button: "right" })
+await page.waitForSelector(".oneday-ctx-menu")
+await page.locator('.oneday-ctx-menu .oneday-add-item:has-text("在本块隐藏")').click()
 await page.locator(".oneday-add").click()
 await page.locator('.oneday-add-item:has-text("fitness")').click()
 
