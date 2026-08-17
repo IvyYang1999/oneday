@@ -63,6 +63,8 @@ export default class OnedayPlugin extends Plugin {
 
     this.registerMarkdownCodeBlockProcessor("timeline", (source, el, ctx) => {
       const doc = this.parse(source)
+      // 渲染色号：全局优先，退休板兜底（删除/改名的类型在旧块里保色）
+      const paletteForRender = { ...this.settings.retiredTypeColors, ...this.settings.typeColors }
       const saveText = (text: string): void => {
         void this.applyBlockTransform(el, ctx, source, (s) => setTextSection(s, text))
       }
@@ -70,7 +72,7 @@ export default class OnedayPlugin extends Plugin {
         el,
         doc,
         {
-          typeColors: this.settings.typeColors,
+          typeColors: paletteForRender,
           hourHeight: this.settings.hourHeight,
           width: this.settings.width,
         },
@@ -81,7 +83,11 @@ export default class OnedayPlugin extends Plugin {
           onSave: saveText,
         }
       )
-      const visibleTypes = Object.keys(this.settings.typeColors).filter((t) => !doc.hiddenTypes.includes(t))
+      // 色板 = 全局 ∪ 本块用过的类型（旧块用过的已删类型保留显示，yyt 2026-08-17）
+      const usedTypes = [...new Set(doc.entries.map((e) => e.type))]
+      const paletteTypes = [...Object.keys(this.settings.typeColors), ...usedTypes.filter((t) => !(t in this.settings.typeColors))]
+      const paletteColors = Object.fromEntries(paletteTypes.map((t) => [t, paletteForRender[t] ?? FALLBACK_COLOR]))
+      const visibleTypes = paletteTypes.filter((t) => !doc.hiddenTypes.includes(t))
       if (this.activeType === "" || !visibleTypes.includes(this.activeType)) {
         this.activeType = visibleTypes[0] ?? "misc"
       }
@@ -104,7 +110,7 @@ export default class OnedayPlugin extends Plugin {
       }
 
       const toolbar = buildToolbar({
-        typeColors: this.settings.typeColors,
+        typeColors: paletteColors,
         hiddenTypes: doc.hiddenTypes,
         activeType: this.activeType,
         mode: this.drawMode,
@@ -146,7 +152,7 @@ export default class OnedayPlugin extends Plugin {
         hourHeight: this.settings.hourHeight,
         getActiveType: () => this.activeType,
         getMode: () => this.drawMode,
-        typeColor: (type) => this.settings.typeColors[type] ?? FALLBACK_COLOR,
+        typeColor: (type) => paletteForRender[type] ?? FALLBACK_COLOR,
         onCreate: (entryLine, startMin) => {
           void this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(s, entryLine, startMin))
         },
@@ -159,7 +165,7 @@ export default class OnedayPlugin extends Plugin {
         onBlockMenu: (line, x, y) => {
           const entry = doc.entries.find((e) => e.line === line)
           if (!entry) return
-          showBlockMenu(this.app, entry, Object.keys(this.settings.typeColors), x, y, {
+          showBlockMenu(this.app, entry, paletteTypes, x, y, {
             setNote: (ln, note) =>
               void this.applyBlockTransform(el, ctx, source, (s) => {
                 const e = this.parse(s).entries.find((it) => it.line === ln)
@@ -307,7 +313,13 @@ export default class OnedayPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     const data = (await this.loadData()) as Partial<OnedaySettings> | null
-    this.settings = { ...DEFAULT_SETTINGS, ...data, typeColors: { ...DEFAULT_SETTINGS.typeColors, ...(data?.typeColors ?? {}) } }
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...data,
+      // 色板不 merge 默认值：有存档就全用存档，否则删除的默认类型会复活（yyt 2026-08-17）
+      typeColors: data?.typeColors ?? { ...DEFAULT_SETTINGS.typeColors },
+      retiredTypeColors: data?.retiredTypeColors ?? {},
+    }
   }
 
   async saveSettings(): Promise<void> {

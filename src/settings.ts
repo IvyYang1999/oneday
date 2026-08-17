@@ -21,6 +21,8 @@ export interface OnedaySettings {
   apiKey: string
   baseUrl: string
   model: string
+  /** 删除/改名的类型色号存档：新建块不显示，旧块里的色块/色板仍用原色（yyt 2026-08-17） */
+  retiredTypeColors: Record<string, string>
 }
 
 export const DEFAULT_SETTINGS: OnedaySettings = {
@@ -29,6 +31,7 @@ export const DEFAULT_SETTINGS: OnedaySettings = {
   width: 200,
   rangeStartHour: 7,
   rangeEndHour: 23,
+  retiredTypeColors: {},
   dialogBackend: "api",
   provider: "openai-compatible",
   apiKey: "",
@@ -48,7 +51,7 @@ export class OnedaySettingTab extends PluginSettingTab {
 
     containerEl.createEl("h3", { text: "荧光笔色号（全局）" })
     const paletteDesc = containerEl.createEl("p", {
-      text: "类型名（中英文均可，不含空格）会写进时间轴语法，改名/删除后历史笔记里的同名色块显示为灰色。每个 block 默认显示全部荧光笔，可在块内右键色板临时隐藏。",
+      text: "这里是全局默认荧光笔，对新建块生效。删除/改名的类型会从新建块消失，但旧块里已使用的同名色块和色板仍按原色保留。每个 block 默认显示全部荧光笔，可在块内右键色板临时隐藏。",
       cls: "setting-item-description",
     })
     paletteDesc.style.marginTop = "0"
@@ -80,6 +83,7 @@ export class OnedaySettingTab extends PluginSettingTab {
                 k === type ? [name, c] : [k, c]
               )
               this.plugin.settings.typeColors = Object.fromEntries(entries)
+              this.plugin.settings.retiredTypeColors[type] ??= color // 旧名进退休板，旧块保色
               await this.plugin.saveSettings()
               renderPalette()
             }
@@ -93,6 +97,7 @@ export class OnedaySettingTab extends PluginSettingTab {
           })
           .addExtraButton((b) =>
             b.setIcon("trash").setTooltip("删除").onClick(async () => {
+              this.plugin.settings.retiredTypeColors[type] ??= this.plugin.settings.typeColors[type] // 退休板保色
               delete this.plugin.settings.typeColors[type]
               await this.plugin.saveSettings()
               renderPalette()

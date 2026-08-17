@@ -158,3 +158,20 @@ describe("setTextSection", () => {
     expect(doc.errors).toEqual([])
   })
 })
+
+describe("insertEntryLine with text section (=== 边界)", () => {
+  it("inserts before the === text section, not into it", () => {
+    const src = "date: 2026-08-17\n---\n===\n## 明日 to do\n1. 线代"
+    const out = insertEntryLine(src, "09:00-11:00 math", 9 * 60)
+    expect(out).toBe("date: 2026-08-17\n---\n09:00-11:00 math\n===\n## 明日 to do\n1. 线代")
+    const doc = parseTimeline(out)
+    expect(doc.entries).toHaveLength(1)
+    expect(doc.text).toBe("## 明日 to do\n1. 线代")
+  })
+
+  it("respects the boundary even when entries exist", () => {
+    const src = "09:00-10:00 math\n===\n文字"
+    const out = insertEntryLine(src, "21:00-21:30 fitness", 21 * 60)
+    expect(out).toBe("09:00-10:00 math\n21:00-21:30 fitness\n===\n文字")
+  })
+})

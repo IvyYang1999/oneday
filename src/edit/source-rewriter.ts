@@ -15,6 +15,11 @@ export function insertEntryLine(source: string, sourceLine: string, newStartMin:
   const trailing = lines.slice(tail)
 
   const doc = parseTimeline(source)
+  // `===` 文字区边界：条目必须插在文字区之前（yyt 2026-08-17 踩坑：无条目时
+  // 追加到末尾，落进文字区变成普通文本，色块不出现）
+  const sepIdx = body.findIndex((l) => l.trim() === "===")
+  const boundary = sepIdx >= 0 ? sepIdx : body.length
+
   // Entry lines sorted in source; find the last entry starting <= newStartMin.
   const entryLines = doc.entries.map((e) => e.line).sort((a, b) => a - b)
   let insertAt = -1
@@ -26,9 +31,9 @@ export function insertEntryLine(source: string, sourceLine: string, newStartMin:
   if (insertAt >= 0) {
     body.splice(insertAt + 1, 0, sourceLine)
   } else {
-    // Before the first entry; after header/separator if present.
+    // Before the first entry; after header/separator if present; never past ===.
     const firstEntry = entryLines[0]
-    body.splice(firstEntry !== undefined ? firstEntry : body.length, 0, sourceLine)
+    body.splice(firstEntry !== undefined ? firstEntry : boundary, 0, sourceLine)
   }
   return [...body, ...trailing].join("\n")
 }
