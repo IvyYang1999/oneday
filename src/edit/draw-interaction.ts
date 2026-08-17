@@ -21,6 +21,8 @@ export interface DrawDeps {
   onBlockMenu: (line: number, clientX: number, clientY: number) => void
   /** 点击（未拖动）色块 -> focus 切换 */
   onBlockClick: (line: number) => void
+  /** 时间轴空白处右键（可挂「添加文字区」等入口） */
+  onTrackMenu: (clientX: number, clientY: number) => void
 }
 
 const SVGNS = "http://www.w3.org/2000/svg"
@@ -124,7 +126,11 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   svg.addEventListener("contextmenu", (e: MouseEvent) => {
     const target = e.target as Element | null
     const hitBlock = target?.closest("rect.oneday-block")
-    if (!hitBlock) return
+    if (!hitBlock) {
+      e.preventDefault()
+      deps.onTrackMenu(e.clientX, e.clientY)
+      return
+    }
     e.preventDefault()
     const line = Number((hitBlock as HTMLElement).dataset.line)
     if (Number.isInteger(line)) deps.onBlockMenu(line, e.clientX, e.clientY)

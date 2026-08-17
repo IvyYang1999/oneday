@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext, MarkdownRenderer, Platform, Plugin, TFile } from "obsidian"
+import { MarkdownPostProcessorContext, MarkdownRenderer, Menu, Platform, Plugin, TFile } from "obsidian"
 import { normalizeSpan, parseTimeline } from "./core/parser"
 import { formatEntryLine } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
@@ -62,12 +62,6 @@ export default class OnedayPlugin extends Plugin {
         hiddenTypes: doc.hiddenTypes,
         activeType: this.activeType,
         mode: this.drawMode,
-        floatRight: Boolean(doc.floatRight),
-        onToggleFloat: () => {
-          void this.applyBlockTransform(el, ctx, source, (s) =>
-            doc.floatRight ? removeHeaderValue(s, "float") : setHeaderValue(s, "float", "right")
-          )
-        },
         onSelect: (type) => {
           this.activeType = type
         },
@@ -79,13 +73,6 @@ export default class OnedayPlugin extends Plugin {
         },
         onShow: (type) => {
           void this.applyBlockTransform(el, ctx, source, (s) => removeHiddenType(s, type))
-        },
-        hasText: doc.text !== undefined,
-        onEditText: () => {
-          // 无文字区时「文」按钮创建空区（渲染为「点击书写…」占位）
-          if (doc.text === undefined) {
-            void this.applyBlockTransform(el, ctx, source, (s) => `${s.replace(/\n+$/, "")}\n===\n`)
-          }
         },
       })
       // 填槽：工具栏/状态行/对话框各就各位（插槽位置由 layout 决定）
@@ -123,6 +110,16 @@ export default class OnedayPlugin extends Plugin {
         },
         onBlockClick: (line) => {
           toggleBlockFocus(container, line)
+        },
+        onTrackMenu: (x, y) => {
+          if (doc.text !== undefined) return
+          const menu = new Menu()
+          menu.addItem((item) =>
+            item.setTitle("添加文字区").setIcon("file-text").onClick(() => {
+              void this.applyBlockTransform(el, ctx, source, (s) => `${s.replace(/\n+$/, "")}\n===\n`)
+            })
+          )
+          menu.showAtPosition({ x, y })
         },
         onBlockMenu: (line, x, y) => {
           const entry = doc.entries.find((e) => e.line === line)

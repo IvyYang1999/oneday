@@ -13,12 +13,6 @@ export interface ToolbarDeps {
   hiddenTypes: string[]
   activeType: string
   mode: DrawMode
-  /** 居右浮动（分栏）状态与切换 */
-  floatRight: boolean
-  onToggleFloat: () => void
-  /** 文字区（块内图文混排） */
-  hasText: boolean
-  onEditText: () => void
   onSelect: (type: string) => void
   onModeChange: (mode: DrawMode) => void
   /** Menu item: hide this swatch for this block. */
@@ -73,20 +67,6 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     modeWrap.appendChild(btn)
   }
   el.appendChild(modeWrap)
-
-  const floatBtn = document.createElement("button")
-  floatBtn.className = "oneday-swatch oneday-float-btn" + (deps.floatRight ? " is-active" : "")
-  floatBtn.textContent = "⇥"
-  floatBtn.title = deps.floatRight ? "取消居右（分栏）" : "居右浮动，左侧文字环绕（分栏）"
-  floatBtn.addEventListener("click", () => deps.onToggleFloat())
-  el.appendChild(floatBtn)
-
-  const textBtn = document.createElement("button")
-  textBtn.className = "oneday-swatch oneday-text-btn" + (deps.hasText ? " is-active" : "")
-  textBtn.textContent = "文"
-  textBtn.title = deps.hasText ? "编辑文字区" : "添加文字区（块内左文右图）"
-  textBtn.addEventListener("click", () => deps.onEditText())
-  el.appendChild(textBtn)
 
   // Visible swatches = global palette minus hidden
   const visible = Object.keys(deps.typeColors).filter((t) => !deps.hiddenTypes.includes(t))
