@@ -1,7 +1,7 @@
 import { MarkdownPostProcessorContext, MarkdownRenderer, Menu, Platform, Plugin, TFile } from "obsidian"
 import { normalizeSpan, parseTimeline } from "./core/parser"
 import { formatEntryLine } from "./core/format"
-import { FALLBACK_COLOR } from "./render/svg-builder"
+import { FALLBACK_COLOR, renderTimelineSvg } from "./render/svg-builder"
 import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
@@ -119,7 +119,6 @@ export default class OnedayPlugin extends Plugin {
       const timelineSlot = container.querySelector(".oneday-slot-timeline")
       if (timelineSlot) timelineSlot.appendChild(toolbar.statusEl)
       const col = container.querySelector(".oneday-timeline-col")
-      attachHoverInfo(container, doc)
       const body = container.querySelector(".oneday-body")
       // 自动量高：内容比格子高的槽位撑开格子（修新建块截断），只改显示不自动写源码
       this.fitSlotHeights(container)
@@ -133,7 +132,9 @@ export default class OnedayPlugin extends Plugin {
         })
       }
 
-      attachDrawInteraction(container, doc, {
+      const wireTimeline = (): void => {
+        attachHoverInfo(container, doc)
+        attachDrawInteraction(container, doc, {
         hourHeight: this.settings.hourHeight,
         getActiveType: () => this.activeType,
         getMode: () => this.drawMode,
@@ -182,7 +183,51 @@ export default class OnedayPlugin extends Plugin {
               }),
           })
         },
+        })
+      }
+
+      wireTimeline()
+
+      // 响应式时间轴：槽位宽度变化 -> SVG 按新宽度重渲染并重接交互（网格手柄拉宽即生效）
+      const timelineSlotEl = container.querySelector<HTMLElement>(".oneday-slot-timeline")
+      let fitted = doc.layout !== undefined || doc.text !== undefined
+      let roTimer: number | null = null
+      const rewireTimeline = (): void => {
+        if (!timelineSlotEl) return
+        const slotW = timelineSlotEl.getBoundingClientRect().width
+        if (slotW < 80) return // 隐藏 tab
+        const holder = timelineSlotEl.querySelector(".oneday-svg-holder")
+        if (!holder) return
+        const baseWidth = Math.max(140, Math.round(slotW - SIDE_LANE_W - 8))
+        holder.innerHTML = renderTimelineSvg(doc, {
+          typeColors: this.settings.typeColors,
+          hourHeight: this.settings.hourHeight,
+          width: baseWidth,
+        })
+        wireTimeline()
+        this.fitSlotHeights(container)
+      }
+      const ro = new ResizeObserver(() => {
+        if (roTimer !== null) window.clearTimeout(roTimer)
+        roTimer = window.setTimeout(() => {
+          if (!fitted) {
+            fitted = true
+            // 无 layout/无文字区的纯时间轴块：槽位先收到自然宽，而不是铺满 12 列
+            if (body instanceof HTMLElement && timelineSlotEl) {
+              const bodyW = body.getBoundingClientRect().width
+              if (bodyW > 200) {
+                const natural = this.settings.width + SIDE_LANE_W + 8
+                const cols = Math.min(12, Math.max(3, Math.round((natural / bodyW) * 12)))
+                timelineSlotEl.dataset.w = String(cols)
+                timelineSlotEl.style.width = `${(cols / 12) * 100}%`
+              }
+            }
+          }
+          rewireTimeline()
+        }, 120)
       })
+      if (timelineSlotEl) ro.observe(timelineSlotEl)
+      this.register(() => ro.disconnect())
 
       // 显式「＋组件」入口：block 右下角（与荧光笔的＋无关，yyt 2026-08-17）
       const addComp = document.createElement("button")

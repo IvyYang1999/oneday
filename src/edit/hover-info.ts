@@ -19,6 +19,7 @@ export function attachHoverInfo(container: HTMLElement, doc: TimelineDoc): void 
   const svg = container.querySelector<SVGSVGElement>("svg.oneday-svg")
   if (!svg) return
 
+  container.querySelector(".oneday-tooltip")?.remove() // 幂等：响应式重渲染会重复 attach
   const tooltip = document.createElement("div")
   tooltip.className = "oneday-tooltip"
   tooltip.style.display = "none"

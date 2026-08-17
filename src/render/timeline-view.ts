@@ -98,15 +98,11 @@ export function renderTimelineInto(
   const inCallout = el.closest(".callout") !== null
   // Live Preview（CM6）里 float 无法环绕文字，只会把块推右留空洞——禁用
   const inLivePreview = el.closest(".cm-editor") !== null
-  el.style.width = hasText ? "100%" : `${baseWidth + SIDE_LANE_W}px`
-  // LP 里可见的边框/空白属于 CM 外壳 cm-embed-block；无文字区时外壳同步收窄，
-  // 否则右侧一大块空白既难看又不在我们的 DOM 里（右键都接不到）
-  const embedWrap = el.closest<HTMLElement>(".cm-embed-block")
-  if (embedWrap) {
-    embedWrap.style.width = hasText ? "" : `${baseWidth + SIDE_LANE_W}px`
-  }
+  // 宿主恒 100%：时间轴 SVG 随槽位响应式重渲染，宽度由网格手柄调（yyt 2026-08-17）
+  const useFloat = Boolean(doc.floatRight) && !inCallout && !inLivePreview
+  el.style.width = useFloat ? `${baseWidth + SIDE_LANE_W}px` : "100%"
   el.classList.add("oneday-host")
-  el.classList.toggle("oneday-host-float", Boolean(doc.floatRight) && !inCallout && !inLivePreview)
+  el.classList.toggle("oneday-host-float", useFloat)
 
   const statsSlot = container.querySelector(".oneday-slot-stats") ?? container
   const stats = statsByType(doc.entries)
