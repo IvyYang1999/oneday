@@ -187,11 +187,8 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
     }
     case "layout": {
       const cols = parseLayoutHeader(value)
-      if (!cols) {
-        doc.errors.push({ line, text: raw, reason: "layout 无法解析（应为 id@x,y,w,h）" })
-        return
-      }
-      doc.layout = cols
+      // 旧列式格式（迁移期）静默回退默认网格，不报错
+      if (cols) doc.layout = cols
       return
     }
     case "side": {

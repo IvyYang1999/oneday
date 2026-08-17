@@ -476,7 +476,7 @@
 }
 
 .oneday-body {
-  min-width: fit-content;
+  width: 100%; /* 容器是 flex column + align-items:flex-start，不写死宽度会被绝对定位子元素塌成 0 */
 }
 
 .oneday-slot {
