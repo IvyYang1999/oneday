@@ -87,12 +87,6 @@ export default class OnedayPlugin extends Plugin {
             void this.applyBlockTransform(el, ctx, source, (s) => `${s.replace(/\n+$/, "")}\n===\n`)
           }
         },
-        side: doc.side ?? "right",
-        onToggleSide: () => {
-          void this.applyBlockTransform(el, ctx, source, (s) =>
-            doc.side === "left" ? removeHeaderValue(s, "side") : setHeaderValue(s, "side", "left")
-          )
-        },
       })
       // 填槽：工具栏/状态行/对话框各就各位（插槽位置由 layout 决定）
       const toolbarSlot = container.querySelector(".oneday-slot-toolbar")

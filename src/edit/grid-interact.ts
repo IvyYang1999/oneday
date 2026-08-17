@@ -82,7 +82,18 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
         clone.style.top = `${ev.clientY - grabDY}px`
         const gx = Math.round((ev.clientX - bodyRect.left - grabDX) / cellW)
         const gy = Math.round((ev.clientY - bodyRect.top - grabDY) / GRID_ROW_H)
-        setItemOnSlot(slot, { ...item, x: gx, y: Math.max(0, gy) })
+        const next = clampItem({ ...item, x: gx, y: Math.max(0, gy) })
+        if (next.x === item.x && next.y === item.y) return
+        item.x = next.x
+        item.y = next.y
+        setItemOnSlot(slot, next)
+        // iOS 式实时重排：被拖组件优先，其余组件立刻让位（带 CSS 过渡）
+        const items = resolveOverlaps(slots.map(itemFromSlot), slot.dataset.slot as SlotId)
+        for (const other of slots) {
+          if (other === slot) continue
+          setItemOnSlot(other, items.find((it) => it.id === other.dataset.slot)!)
+        }
+        body.style.height = `${gridRows(items) * GRID_ROW_H}px`
       }
       const onUp = (): void => {
         document.removeEventListener("pointermove", onMove)
@@ -105,6 +116,7 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
         if (e.button !== 0) return
         e.preventDefault()
         e.stopPropagation()
+        slot.classList.add("is-resizing")
         const bodyRect = body.getBoundingClientRect()
         const cellW = bodyRect.width / GRID_COLS
 
@@ -125,11 +137,21 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
             hh = hh + (y - ny)
             y = ny
           }
-          setItemOnSlot(slot, { ...it, x, y, w, h: hh })
+          const resized = clampItem({ ...it, x, y, w, h: hh })
+          if (resized.x === it.x && resized.y === it.y && resized.w === it.w && resized.h === it.h) return
+          setItemOnSlot(slot, resized)
+          // 缩放同样实时下挤
+          const items = resolveOverlaps(slots.map(itemFromSlot), slot.dataset.slot as SlotId)
+          for (const other of slots) {
+            if (other === slot) continue
+            setItemOnSlot(other, items.find((o) => o.id === other.dataset.slot)!)
+          }
+          body.style.height = `${gridRows(items) * GRID_ROW_H}px`
         }
         const onUp = (): void => {
           document.removeEventListener("pointermove", onMove)
           document.removeEventListener("pointerup", onUp)
+          slot.classList.remove("is-resizing")
           finish(slot.dataset.slot as SlotId)
         }
         document.addEventListener("pointermove", onMove)

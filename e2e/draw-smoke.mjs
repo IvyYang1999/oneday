@@ -36,8 +36,6 @@ const toolbar = buildToolbar({
   onToggleFloat: () => { window.__floatToggles = (window.__floatToggles ?? 0) + 1 },
   hasText: false,
   onEditText: () => { window.__editText = (window.__editText ?? 0) + 1 },
-  side: "right",
-  onToggleSide: () => { window.__sideToggles = (window.__sideToggles ?? 0) + 1 },
   onSelect: (t) => { window.__active = t },
   onModeChange: (m) => { window.__mode = m },
   onHide: (t) => window.__hidden.push(t),
@@ -125,7 +123,6 @@ if (hoverCount < 1) { console.error("no hover pairing"); process.exit(1) }
 // 5b. float toggle button + text-section button + resize handle
 await page.locator(".oneday-float-btn").click()
 await page.locator(".oneday-text-btn").click()
-await page.locator(".oneday-grip").click()
 const handle = await page.locator(".oneday-resize-handle").boundingBox()
 await page.mouse.move(handle.x + 4, handle.y + 100)
 await page.mouse.down()
@@ -167,7 +164,5 @@ const editText = await page.evaluate(() => window.__editText)
 if (editText !== 1) { console.error("editText mismatch", editText); process.exit(1) }
 const resized = await page.evaluate(() => window.__resized)
 if (resized.length !== 1 || Math.abs(resized[0] - 252) > 2) { console.error("resize mismatch", JSON.stringify(resized)); process.exit(1) }
-const sideToggles = await page.evaluate(() => window.__sideToggles)
-if (sideToggles !== 1) { console.error("side toggle mismatch", sideToggles); process.exit(1) }
 await browser.close()
 console.log("OK draw smoke passed")
