@@ -168,9 +168,8 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
     const hatchId = `oneday-hatch-${planColors.indexOf(color)}`
     const yy = y(e.startMin)
     const hh = Math.max(2, y(e.endMin) - yy)
-    const title = `<title>${escapeXml(formatClock(e.startMin))}–${escapeXml(formatClock(e.endMin))} ${escapeXml(e.type)}${e.note ? " · " + escapeXml(e.note) : ""}</title>`
     parts.push(
-      `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}">${title}</rect>` +
+      `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}"></rect>` +
         `<rect pointer-events="none" class="oneday-plan-hatch" x="${trackX + 2}" y="${yy}" width="${trackW - 4}" height="${hh}" rx="3" fill="url(#${hatchId})"/>`
     )
   }
@@ -183,8 +182,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
     const yy = y(e.startMin)
     const hh = Math.max(2, y(e.endMin) - yy)
     parts.push(
-      `<rect class="oneday-block" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${p.x}" y="${yy}" width="${p.w}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${BLOCK_OPACITY}">` +
-        `<title>${escapeXml(formatClock(e.startMin))}–${escapeXml(formatClock(e.endMin))} ${escapeXml(e.type)}${e.note ? " · " + escapeXml(e.note) : ""}</title></rect>`
+      `<rect class="oneday-block" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${p.x}" y="${yy}" width="${p.w}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${BLOCK_OPACITY}"></rect>`
     )
     const label = formatHours(durationMinutes(e.startMin, e.endMin))
     const fs = inlineFontSize(p.w, hh, label)

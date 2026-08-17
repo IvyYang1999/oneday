@@ -165,3 +165,22 @@ describe("M4b: plan hatch + label-block association (yyt 2026-08-17)", () => {
     expect(svg).toContain('class="oneday-note oneday-side" data-line="0"')
   })
 })
+
+describe("M5b: single tooltip + tiny-column durations (yyt 2026-08-17)", () => {
+  it("renders no SVG <title> (custom tooltip only)", () => {
+    expect(svgOf("09:00-10:00 math 行列式")).not.toContain("<title>")
+  })
+
+  it("even ~20px columns in a 7-way cluster get a centered tiny duration", () => {
+    const src = [
+      "14:00-17:00 a1", "14:00-17:30 a2", "14:10-17:00 a3", "14:20-15:10 a4",
+      "14:40-18:10 a5", "15:10-18:40 a6", "16:20-19:50 a7",
+    ].join("\n")
+    const svg = svgOf(src)
+    // 7 columns -> w≈20px; durations must be inline (side lane carries notes only)
+    expect(svg).not.toContain("oneday-duration oneday-thin")
+    const small = [...svg.matchAll(/class="oneday-duration" style="font-size:([\d.]+)px"/g)].map((m) => Number(m[1]))
+    expect(small.length).toBe(7)
+    expect(Math.min(...small)).toBeGreaterThanOrEqual(4.5)
+  })
+})
