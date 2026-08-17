@@ -107,10 +107,15 @@ export function renderTimelineInto(
   const statsSlot = container.querySelector(".oneday-slot-stats") ?? container
   const stats = statsByType(doc.entries)
   if (stats.length > 0) {
-    statsSlot.createDiv({
-      cls: "oneday-stats",
-      text: stats.map((s) => `${s.type} ${formatHours(s.minutes)}`).join(" · "),
-    })
+    // 每行一个类型 + 荧光笔色点（yyt 2026-08-17）
+    const box = statsSlot.createDiv({ cls: "oneday-stats" })
+    for (const st of stats) {
+      const row = box.createDiv({ cls: "oneday-stat-row" })
+      const dot = row.createEl("span", { cls: "oneday-stat-dot" })
+      dot.style.background = opts.typeColors[st.type] ?? FALLBACK_COLOR
+      row.createEl("span", { cls: "oneday-stat-type", text: st.type })
+      row.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
+    }
   }
 
   const unknown = [...new Set(doc.entries.map((e) => e.type).filter((t) => !(t in opts.typeColors)))]

@@ -629,3 +629,50 @@
 .oneday-width-handle.is-active {
   background: color-mix(in srgb, var(--interactive-accent) 35%, transparent);
 }
+
+/* 统计列表：每行一个类型 + 色点 */
+
+.oneday-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  color: var(--color-red);
+}
+
+.oneday-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.oneday-stat-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.oneday-stat-type {
+  flex: 1;
+}
+
+.oneday-stat-hours {
+  font-weight: 600;
+}
+
+/* 轴向延展预览 */
+
+.oneday-svg .oneday-extend-zone {
+  fill: var(--interactive-accent);
+  fill-opacity: 0.08;
+}
+
+.oneday-svg .oneday-extend-tick {
+  stroke-dasharray: 4 3;
+}
+
+.oneday-svg .oneday-preview-block {
+  pointer-events: none; /* 乐观渲染的临时块不吃事件（盖在真块上会吞掉 hover/右键） */
+}

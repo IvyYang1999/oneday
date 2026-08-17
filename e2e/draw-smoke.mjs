@@ -98,6 +98,8 @@ async function drag(fromMin, toMin) {
 await drag(600, 690)
 // 2. drag up 14:00 -> 12:30 also works
 await drag(840, 750)
+const optimistic = await page.evaluate(() => document.querySelectorAll(".oneday-preview-block").length)
+if (optimistic < 2) { console.error("no optimistic preview blocks", optimistic); process.exit(1) }
 // 3. overlapping the sleep block (07:00-08:00) is now allowed (并列日程)
 await drag(450, 510)
 // 4. right-click the sleep block fires menu with line 0
@@ -123,6 +125,8 @@ if (hoverCount < 1) { console.error("no hover pairing"); process.exit(1) }
   await page.mouse.move(trackCX, yBottom + 6)
   await page.mouse.down()
   await page.mouse.move(trackCX, yFor(26 * 60 + 20), { steps: 5 }) // 26:20 -> snap 26:00
+  const previewTicks = await page.evaluate(() => document.querySelectorAll(".oneday-extend-preview .oneday-extend-tick").length)
+  if (previewTicks < 2) { console.error("no extend preview ticks", previewTicks); process.exit(1) }
   await page.mouse.up()
 }
 

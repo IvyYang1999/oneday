@@ -9,7 +9,7 @@
 import { TimelineDoc } from "../core/types"
 import { durationMinutes, formatClock, formatHours } from "../core/duration"
 import { formatEntryLine } from "../core/format"
-import { minutesFromY, snapMinutes, SNAP_MINUTES, yFromMinutes } from "../core/geometry"
+import { AXIS_PAD_TOP, minutesFromY, snapMinutes, SNAP_MINUTES, yFromMinutes } from "../core/geometry"
 
 export interface DrawDeps {
   hourHeight: number
@@ -32,6 +32,53 @@ const AXIS_EDGE_PX = 10
 
 const SVGNS = "http://www.w3.org/2000/svg"
 
+/** 延展预览层：拖动轴端时实时画出延伸区域和新小时刻度（窗口拖拽式实时反馈） */
+const AXIS_PAD_TOP_LOCAL = AXIS_PAD_TOP
+
+function updateExtendPreview(
+  g: SVGGElement,
+  dir: "top" | "bottom",
+  fromMin: number,
+  toMin: number,
+  rangeStart: number,
+  hourHeight: number,
+  trackX: number,
+  trackW: number
+): void {
+  while (g.firstChild) g.removeChild(g.firstChild)
+  if (toMin === fromMin) return
+  const y = (m: number): number => AXIS_PAD_TOP_LOCAL + ((m - rangeStart) / 60) * hourHeight
+  const y1 = y(Math.min(fromMin, toMin))
+  const y2 = y(Math.max(fromMin, toMin))
+  const zone = document.createElementNS(SVGNS, "rect")
+  zone.setAttribute("class", "oneday-extend-zone")
+  zone.setAttribute("x", String(trackX))
+  zone.setAttribute("y", String(y1))
+  zone.setAttribute("width", String(trackW))
+  zone.setAttribute("height", String(Math.max(1, y2 - y1)))
+  g.appendChild(zone)
+  const startHour = dir === "bottom" ? Math.ceil(fromMin / 60) : Math.floor(toMin / 60)
+  const endHour = dir === "bottom" ? Math.floor(toMin / 60) : Math.ceil(fromMin / 60)
+  for (let h = startHour; h <= endHour; h++) {
+    const yy = y(h * 60)
+    if (yy < y1 - 1 || yy > y2 + 1) continue
+    const line = document.createElementNS(SVGNS, "line")
+    line.setAttribute("class", "oneday-grid oneday-extend-tick")
+    line.setAttribute("x1", String(trackX))
+    line.setAttribute("y1", String(yy))
+    line.setAttribute("x2", String(trackX + trackW))
+    line.setAttribute("y2", String(yy))
+    g.appendChild(line)
+    const label = document.createElementNS(SVGNS, "text")
+    label.setAttribute("class", "oneday-hour")
+    label.setAttribute("x", String(trackX - 6))
+    label.setAttribute("y", String(yy + 4))
+    label.setAttribute("text-anchor", "end")
+    label.textContent = String(h)
+    g.appendChild(label)
+  }
+}
+
 export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, deps: DrawDeps): void {
   const svg = container.querySelector<SVGSVGElement>("svg.oneday-svg")
   const track = container.querySelector<SVGRectElement>("rect.oneday-track")
@@ -49,6 +96,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   let dragging = false
   let extending: "top" | "bottom" | null = null
+  let extendPreview: SVGGElement | null = null
   let dragStartMin = 0
   let downBlockLine: number | null = null
   let downY = 0
@@ -81,7 +129,9 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
         dragOriginTop = rect0.top
         dragScale = svgWidth / rect0.width
         svg.setPointerCapture(e.pointerId)
-        setStatus(extending === "top" ? "往下拖无效，往上拖提前开始时间" : "拖到 24 点后可继续到凌晨")
+        extendPreview = document.createElementNS(SVGNS, "g")
+        extendPreview.setAttribute("class", "oneday-extend-preview")
+        svg.appendChild(extendPreview)
         return
       }
     }
@@ -120,11 +170,13 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       const raw = minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)
       const hourSnap = Math.round(raw / 60) * 60
       if (extending === "bottom") {
-        const target = Math.max(doc.rangeStart + 60, Math.min(30 * 60, hourSnap))
+        const target = Math.max(doc.rangeEnd, Math.min(30 * 60, hourSnap))
         setStatus(`结束于 ${formatClock(target)}`)
+        if (extendPreview) updateExtendPreview(extendPreview, "bottom", doc.rangeEnd, target, doc.rangeStart, deps.hourHeight, trackX, trackW)
       } else {
-        const target = Math.max(0, Math.min(doc.rangeEnd - 60, hourSnap))
+        const target = Math.max(0, Math.min(doc.rangeStart, hourSnap))
         setStatus(`开始于 ${formatClock(target)}`)
+        if (extendPreview) updateExtendPreview(extendPreview, "top", doc.rangeStart, target, doc.rangeStart, deps.hourHeight, trackX, trackW)
       }
       return
     }
@@ -141,11 +193,13 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       extending = null
       svg.releasePointerCapture(e.pointerId)
       setStatus("")
+      extendPreview?.remove()
+      extendPreview = null
       if (dir === "bottom") {
-        const target = Math.max(doc.rangeStart + 60, Math.min(30 * 60, hourSnap))
+        const target = Math.max(doc.rangeEnd, Math.min(30 * 60, hourSnap))
         if (target !== doc.rangeEnd) deps.onExtendRange(doc.rangeStart, target)
       } else {
-        const target = Math.max(0, Math.min(doc.rangeEnd - 60, hourSnap))
+        const target = Math.max(0, Math.min(doc.rangeStart, hourSnap))
         if (target !== doc.rangeStart) deps.onExtendRange(target, doc.rangeEnd)
       }
       return
@@ -155,10 +209,10 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     const end = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     const startMin = Math.min(dragStartMin, end)
     const endMin = Math.max(dragStartMin, end)
-    removeGhost()
     svg.releasePointerCapture(e.pointerId)
 
     if (endMin - startMin < SNAP_MINUTES) {
+      removeGhost()
       setStatus("")
       // 未拖动的点击落在色块上 -> focus 切换（高亮对应备注/连线）
       if (downBlockLine !== null && Math.abs(e.clientY - downY) < 4) {
@@ -170,6 +224,12 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     downBlockLine = null
     const line = formatEntryLine({ plan: deps.getMode() === "plan", startMin, endMin, type: deps.getActiveType() })
     setStatus("")
+    // 乐观渲染：ghost 直接变成正式色块样式，写回+重渲染完成前用户无感知（yyt：创建有延迟）
+    if (ghost) {
+      ghost.setAttribute("class", "oneday-block oneday-preview-block")
+      ghost.setAttribute("fill-opacity", "0.85")
+    }
+    ghost = null
     deps.onCreate(line, startMin)
   })
 
