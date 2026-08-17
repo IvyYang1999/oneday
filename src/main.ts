@@ -162,6 +162,11 @@ export default class OnedayPlugin extends Plugin {
         onTrackMenu: (x, y) => {
           showAddMenu(x, y)
         },
+        onExtendRange: (startMin, endMin) => {
+          void this.applyBlockTransform(el, ctx, source, (s) =>
+            setHeaderValue(s, "range", `${Math.round(startMin / 60)}-${Math.round(endMin / 60)}`)
+          )
+        },
         onBlockMenu: (line, x, y) => {
           const entry = doc.entries.find((e) => e.line === line)
           if (!entry) return

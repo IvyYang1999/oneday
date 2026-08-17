@@ -23,7 +23,12 @@ export interface DrawDeps {
   onBlockClick: (line: number) => void
   /** 时间轴空白处右键（可挂「添加文字区」等入口） */
   onTrackMenu: (clientX: number, clientY: number) => void
+  /** 轴向延展：拖上/下边缘线延长当天范围（整小时吸附） */
+  onExtendRange: (startMin: number, endMin: number) => void
 }
+
+/** 轴端热区（px，svg 坐标） */
+const AXIS_EDGE_PX = 10
 
 const SVGNS = "http://www.w3.org/2000/svg"
 
@@ -43,6 +48,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   const clampMin = (m: number): number => Math.min(doc.rangeEnd, Math.max(doc.rangeStart, m))
 
   let dragging = false
+  let extending: "top" | "bottom" | null = null
   let dragStartMin = 0
   let downBlockLine: number | null = null
   let downY = 0
@@ -63,6 +69,22 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     const hit = (e.target as Element | null)?.closest("rect.oneday-block")
     downBlockLine = hit ? Number((hit as HTMLElement).dataset.line) : null
     downY = e.clientY
+
+    // 轴端热区：上/下边缘线往外拖 = 延展当天范围（整小时吸附）
+    if (!hit) {
+      const rect0 = svg.getBoundingClientRect()
+      const localY0 = (e.clientY - rect0.top) * (svgWidth / rect0.width)
+      const yTop = yFromMinutes(doc.rangeStart, doc.rangeStart, deps.hourHeight)
+      const yBottom = yFromMinutes(doc.rangeEnd, doc.rangeStart, deps.hourHeight)
+      if (Math.abs(localY0 - yTop) <= AXIS_EDGE_PX || Math.abs(localY0 - yBottom) <= AXIS_EDGE_PX) {
+        extending = Math.abs(localY0 - yTop) <= AXIS_EDGE_PX ? "top" : "bottom"
+        dragOriginTop = rect0.top
+        dragScale = svgWidth / rect0.width
+        svg.setPointerCapture(e.pointerId)
+        setStatus(extending === "top" ? "往下拖无效，往上拖提前开始时间" : "拖到 24 点后可继续到凌晨")
+        return
+      }
+    }
 
     dragging = true
     const rect = svg.getBoundingClientRect()
@@ -94,12 +116,40 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   }
 
   svg.addEventListener("pointermove", (e: PointerEvent) => {
+    if (extending) {
+      const raw = minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)
+      const hourSnap = Math.round(raw / 60) * 60
+      if (extending === "bottom") {
+        const target = Math.max(doc.rangeStart + 60, Math.min(30 * 60, hourSnap))
+        setStatus(`结束于 ${formatClock(target)}`)
+      } else {
+        const target = Math.max(0, Math.min(doc.rangeEnd - 60, hourSnap))
+        setStatus(`开始于 ${formatClock(target)}`)
+      }
+      return
+    }
     if (!dragging) return
     const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     updateGhost(dragStartMin, cur)
   })
 
   svg.addEventListener("pointerup", (e: PointerEvent) => {
+    if (extending) {
+      const raw = minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)
+      const hourSnap = Math.round(raw / 60) * 60
+      const dir = extending
+      extending = null
+      svg.releasePointerCapture(e.pointerId)
+      setStatus("")
+      if (dir === "bottom") {
+        const target = Math.max(doc.rangeStart + 60, Math.min(30 * 60, hourSnap))
+        if (target !== doc.rangeEnd) deps.onExtendRange(doc.rangeStart, target)
+      } else {
+        const target = Math.max(0, Math.min(doc.rangeEnd - 60, hourSnap))
+        if (target !== doc.rangeStart) deps.onExtendRange(target, doc.rangeEnd)
+      }
+      return
+    }
     if (!dragging) return
     dragging = false
     const end = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))

@@ -50,6 +50,7 @@ window.__focus = []
 window.__hidden = []
 window.__shown = []
 window.__trackmenu = []
+window.__extend = []
 
 attachHoverInfo(container, doc)
 attachDrawInteraction(container, doc, {
@@ -59,6 +60,7 @@ attachDrawInteraction(container, doc, {
   typeColor: (t) => COLORS[t] ?? "#bdbdbd",
   onBlockClick: (line) => window.__focus.push(line),
   onTrackMenu: (x, y) => window.__trackmenu.push({ x, y }),
+  onExtendRange: (startMin, endMin) => window.__extend.push({ startMin, endMin }),
   onCreate: (line, startMin) => window.__created.push({ line, startMin }),
   onBlockMenu: (line, x, y) => window.__menu.push({ line, x, y }),
 })
@@ -115,6 +117,15 @@ const hoverCount = await page.evaluate(() => document.querySelectorAll(".is-hove
 if (hoverCount < 1) { console.error("no hover pairing"); process.exit(1) }
 
 
+// 5d. axis extension: drag below the 23:00 line down to 26:00 (hour snap)
+{
+  const yBottom = yFor(23 * 60)
+  await page.mouse.move(trackCX, yBottom + 6)
+  await page.mouse.down()
+  await page.mouse.move(trackCX, yFor(26 * 60 + 20), { steps: 5 }) // 26:20 -> snap 26:00
+  await page.mouse.up()
+}
+
 // 6. click (no drag) on the sleep block -> focus toggle callback
 await page.locator('.oneday-mode-btn[data-mode="actual"]').click()
 await page.mouse.click(trackCX, yFor(450))
@@ -138,6 +149,10 @@ const expectCreated = [
 ]
 if (JSON.stringify(created) !== JSON.stringify(expectCreated)) { console.error("created mismatch"); process.exit(1) }
 if (menu.length !== 1 || menu[0].line !== 0) { console.error("menu mismatch"); process.exit(1) }
+const extend = await page.evaluate(() => window.__extend)
+if (extend.length !== 1 || extend[0].startMin !== 420 || extend[0].endMin !== 1560) {
+  console.error("extend mismatch", JSON.stringify(extend)); process.exit(1)
+}
 const focus = await page.evaluate(() => window.__focus)
 if (focus.length !== 1 || focus[0] !== 0) { console.error("focus mismatch", JSON.stringify(focus)); process.exit(1) }
 const hidden = await page.evaluate(() => window.__hidden)
