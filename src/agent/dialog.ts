@@ -15,13 +15,26 @@ export interface DialogDeps {
   settings: OnedaySettings
   /** Persist the entry into the note's timeline block. */
   writeEntry: (entry: ValidatedEntry) => Promise<void>
+  /** 未配置 API 时跳转设置页 */
+  openSettings: () => void
 }
 
 export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: DialogDeps): void {
   const box = container.createDiv({ cls: "oneday-dialog" })
+
+  // 未配置 API：禁用输入框 + 配置引导（yyt 2026-08-17）
+  const needsKey = deps.settings.dialogBackend === "api" && deps.settings.apiKey.trim() === ""
+  if (needsKey) {
+    const hint = box.createDiv({ cls: "oneday-dialog-needskey" })
+    hint.createEl("span", { text: "✦ 快速记录需要先配置模型 API：" })
+    const btn = hint.createEl("button", { text: "去设置填 API Key" })
+    btn.addEventListener("click", () => deps.openSettings())
+    return
+  }
+
   const input = box.createEl("input", {
     cls: "oneday-dialog-input",
-    attr: { type: "text", placeholder: "刚健身半小时…" },
+    attr: { type: "text", placeholder: "✦ 快速记录：刚健身半小时…" },
   })
   // loading 内联在输入行右侧（yyt：不占单独一行）
   const loading = box.createEl("span", { cls: "oneday-dialog-loading", text: "生成中…" })

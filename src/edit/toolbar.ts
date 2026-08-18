@@ -6,12 +6,17 @@
 
 export type DrawMode = "actual" | "plan"
 
+export type ViewMode = "all" | "actual" | "plan"
+
 export interface ToolbarDeps {
   /** Global palette (all configured types -> color). */
   typeColors: Record<string, string>
   /** Types hidden in this block (hide: header). */
   hiddenTypes: string[]
   activeType: string
+  /** 荧光笔模式（画记录/画计划） */
+  brushMode: DrawMode
+  onBrushModeChange: (mode: DrawMode) => void
   onSelect: (type: string) => void
   /** Menu item: hide this swatch for this block. */
   onHide: (type: string) => void
@@ -46,6 +51,26 @@ function showSwatchMenu(root: HTMLElement, x: number, y: number, type: string, d
 export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   const el = document.createElement("div")
   el.className = "oneday-toolbar"
+
+  // 荧光笔模式小开关（画记录/画计划，回到荧光笔区）
+  const brushWrap = document.createElement("span")
+  brushWrap.className = "oneday-mode oneday-brush-toggle" + (deps.brushMode === "plan" ? " is-plan" : "")
+  for (const [m, label] of [["actual", "记录"], ["plan", "计划"]] as Array<[DrawMode, string]>) {
+    const btn = document.createElement("button")
+    btn.className = "oneday-mode-btn" + (m === deps.brushMode ? " is-active" : "")
+    btn.dataset.mode = m
+    btn.textContent = label
+    btn.addEventListener("click", () => {
+      brushWrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
+      btn.classList.add("is-active")
+      brushWrap.classList.toggle("is-plan", m === "plan")
+      el.classList.toggle("is-plan", m === "plan")
+      deps.onBrushModeChange(m)
+    })
+    brushWrap.appendChild(btn)
+  }
+  el.appendChild(brushWrap)
+  el.classList.toggle("is-plan", deps.brushMode === "plan")
 
   // Visible swatches = global palette minus hidden
   const visible = Object.keys(deps.typeColors).filter((t) => !deps.hiddenTypes.includes(t))
@@ -126,6 +151,25 @@ export function buildModeToggle(mode: DrawMode, onChange: (mode: DrawMode) => vo
       wrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
       btn.classList.add("is-active")
       wrap.classList.toggle("is-plan", m === "plan")
+      onChange(m)
+    })
+    wrap.appendChild(btn)
+  }
+  return wrap
+}
+
+/** 视图三态切换：全部 | 记录 | 计划（yyt：直觉是切换视图而非荧光笔颜色） */
+export function buildViewToggle(mode: ViewMode, onChange: (mode: ViewMode) => void): HTMLElement {
+  const wrap = document.createElement("div")
+  wrap.className = "oneday-mode oneday-view-toggle"
+  for (const [m, label] of [["all", "全部"], ["actual", "记录"], ["plan", "计划"]] as Array<[ViewMode, string]>) {
+    const btn = document.createElement("button")
+    btn.className = "oneday-mode-btn" + (m === mode ? " is-active" : "")
+    btn.dataset.mode = m
+    btn.textContent = label
+    btn.addEventListener("click", () => {
+      wrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
+      btn.classList.add("is-active")
       onChange(m)
     })
     wrap.appendChild(btn)

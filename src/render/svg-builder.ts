@@ -18,13 +18,15 @@ export interface RenderOptions {
   hourHeight?: number
   /** total svg width, default 200 */
   width?: number
+  /** 视图：全部 / 只看记录 / 只看计划（yyt 2026-08-17） */
+  view?: "all" | "actual" | "plan"
 }
 
 export const FALLBACK_COLOR = "#bdbdbd"
 const PAD_TOP = AXIS_PAD_TOP
 const PAD_BOTTOM = AXIS_PAD_BOTTOM
 const PLAN_OPACITY = 0.12
-const BLOCK_OPACITY = 0.85
+const BLOCK_OPACITY = 0.95 // 盖住底部 plan 层，文字不糊（yyt 2026-08-17）
 /** Below this height (px) the duration label moves to the right of the block. */
 const MIN_INLINE_LABEL_H = 30
 /** Below this width (px) the duration label moves to the right (并列分列后列宽变窄). */
@@ -126,6 +128,12 @@ function truncate(text: string, max = 12): string {
 }
 
 export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string {
+  const view = opts.view ?? "all"
+  const entries = doc.entries.filter((e) => (view === "all" ? true : view === "plan" ? e.plan : !e.plan))
+  return renderTimelineSvgEntries(doc, entries, opts)
+}
+
+function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: RenderOptions): string {
   const hourHeight = opts.hourHeight ?? 48
   const baseWidth = opts.width ?? 200
   const trackX = LABEL_W
@@ -153,7 +161,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
   )
 
   // Plan layer first (full-width translucent background + diagonal hatch, D3 覆盖语义)
-  const planColors = [...new Set(doc.entries.filter((e) => e.plan).map((e) => opts.typeColors[e.type] ?? hashTypeColor(e.type)))]
+  const planColors = [...new Set(entries.filter((e) => e.plan).map((e) => opts.typeColors[e.type] ?? hashTypeColor(e.type)))]
   if (planColors.length > 0) {
     const defs = planColors
       .map(
@@ -164,7 +172,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
       .join("")
     parts.push(`<defs>${defs}</defs>`)
   }
-  for (const e of doc.entries.filter((e) => e.plan)) {
+  for (const e of entries.filter((e) => e.plan)) {
     const color = opts.typeColors[e.type] ?? hashTypeColor(e.type)
     const hatchId = `oneday-hatch-${planColors.indexOf(color)}`
     const yy = y(e.startMin)
@@ -191,7 +199,7 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
 
   // Actual blocks: overlapping ones split into side-by-side columns (并列日程,
   // calendar-style; yyt 2026-08-17). Plans do not participate in columns.
-  for (const p of placeActual(doc.entries.filter((e) => !e.plan), trackX, trackW)) {
+  for (const p of placeActual(entries.filter((e) => !e.plan), trackX, trackW)) {
     const e = p.entry
     const color = opts.typeColors[e.type] ?? hashTypeColor(e.type)
     const yy = y(e.startMin)
@@ -200,24 +208,31 @@ export function renderTimelineSvg(doc: TimelineDoc, opts: RenderOptions): string
       `<rect class="oneday-block" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${p.x}" y="${yy}" width="${p.w}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${BLOCK_OPACITY}"></rect>`
     )
     const label = formatHours(durationMinutes(e.startMin, e.endMin))
-    // 备注尽量进块内（yyt 2026-08-17）：先试「时长 · 备注」同一行，再两行，最后才去侧栏
+    // 备注排版（yyt 2026-08-17）：短备注与时长同行；长备注且块够高 ->
+    // 时长加粗居中 + 备注第二行小字不加粗；再不行才去侧栏
     const combined = e.note ? `${label} · ${truncate(e.note, 8)}` : label
     const fsCombined = e.note ? inlineFontSize(p.w, hh, combined) : 0
     const fs = inlineFontSize(p.w, hh, label)
-    if (e.note && fsCombined > 0) {
+    const shortNote = Boolean(e.note) && (e.note?.length ?? 0) <= 8
+    const canTwoLine = Boolean(e.note) && hh >= MIN_NOTE_H && fs > 0
+    if (e.note && shortNote && fsCombined > 0) {
+      parts.push(
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
+      )
+    } else if (canTwoLine) {
+      parts.push(
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 - 4}" text-anchor="middle">${label}</text>`,
+        `<text pointer-events="none" class="oneday-note" x="${p.x + p.w / 2}" y="${yy + hh / 2 + 11}" text-anchor="middle">${escapeXml(truncate(e.note ?? "", 12))}</text>`
+      )
+    } else if (e.note && fsCombined > 0) {
       parts.push(
         `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
       )
     } else if (fs > 0) {
-      const showNoteInside = p.w >= MIN_INLINE_LABEL_W && hh >= MIN_NOTE_H && e.note
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + (showNoteInside ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fs / 2 - 1.5}" text-anchor="middle">${label}</text>`
       )
-      if (showNoteInside) {
-        parts.push(
-          `<text pointer-events="none" class="oneday-note" x="${p.x + p.w / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(truncate(e.note ?? ""))}</text>`
-        )
-      } else if (e.note) {
+      if (e.note) {
         // 实在放不进 -> 右侧标注车道
         sideItems.push({ naturalY: yy + hh / 2, text: truncate(e.note, 14), cls: "oneday-note oneday-side", dataLine: e.line, anchorX: p.x + p.w })
       }

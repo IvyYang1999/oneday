@@ -21,7 +21,7 @@ describe("renderTimelineSvg", () => {
   it("renders plan blocks with a faint fill + hatch, underneath actual blocks", () => {
     const svg = svgOf("plan 08:00-10:00 math\n09:00-10:00 math")
     const planIdx = svg.indexOf("oneday-plan")
-    const actualIdx = svg.indexOf('fill-opacity="0.85"')
+    const actualIdx = svg.indexOf('fill-opacity="0.95"')
     expect(svg).toContain('fill-opacity="0.12"') // 淡底+彩色描边（深色模式可见性）
     expect(svg).toContain("oneday-plan-hatch") // 斜线纹理区分
     expect(planIdx).toBeGreaterThan(-1)

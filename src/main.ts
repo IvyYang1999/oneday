@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
 import { addHiddenType, addOffSlot, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeOffSlot, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
-import { buildModeToggle, buildToolbar } from "./edit/toolbar"
+import { buildToolbar, buildViewToggle, ViewMode } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
@@ -35,8 +35,10 @@ export default class OnedayPlugin extends Plugin {
   }
   /** Currently selected highlighter (session-scoped). */
   private activeType = ""
-  /** 记录/计划 draw mode (session-scoped). */
+  /** 荧光笔模式：画记录/画计划（session-scoped） */
   private drawMode: "actual" | "plan" = "actual"
+  /** 视图：全部/记录/计划（session-scoped） */
+  private viewMode: ViewMode = "all"
   /** 色块编辑态（跨渲染保持；Esc/点别处退出） */
   private editing: { path: string; line: number } | null = null
   /** 色板在设置里变更过（旧渲染的块提示刷新） */
@@ -81,6 +83,7 @@ export default class OnedayPlugin extends Plugin {
           typeColors: paletteForRender,
           hourHeight: this.settings.hourHeight,
           width: this.settings.width,
+          view: this.viewMode,
         },
         {
           renderMarkdown: (host, text) => {
@@ -158,6 +161,10 @@ export default class OnedayPlugin extends Plugin {
         typeColors: paletteColors,
         hiddenTypes: doc.hiddenTypes,
         activeType: this.activeType,
+        brushMode: this.drawMode,
+        onBrushModeChange: (mode) => {
+          this.drawMode = mode
+        },
         onSelect: (type) => {
           this.activeType = type
         },
@@ -175,6 +182,7 @@ export default class OnedayPlugin extends Plugin {
         badge.textContent = "↻ 荧光笔有更新，点击刷新"
         badge.addEventListener("click", () => {
           this.paletteDirty = false
+          badge.remove() // 立即消失（重渲染是后台的事）
           this.rerenderMarkdownViews()
         })
         toolbar.el.appendChild(badge)
@@ -200,9 +208,12 @@ export default class OnedayPlugin extends Plugin {
           dateEl.textContent = `${dateStr}${wd ? " " + wd : ""}`
           topbar.appendChild(dateEl)
         }
-        topbar.appendChild(buildModeToggle(this.drawMode, (mode) => {
-          this.drawMode = mode
-          toolbar.el.classList.toggle("is-plan", mode === "plan") // 色板圆点同步斜线化
+        topbar.appendChild(buildViewToggle(this.viewMode, (mode) => {
+          this.viewMode = mode
+          // 视图联动荧光笔模式（荧光笔也可单独切）
+          if (mode === "actual") this.drawMode = "actual"
+          else if (mode === "plan") this.drawMode = "plan"
+          this.rerenderMarkdownViews()
         }))
         timelineSlot.prepend(topbar)
       }
@@ -401,6 +412,12 @@ export default class OnedayPlugin extends Plugin {
         const dialogSlot = container.querySelector(".oneday-slot-dialog")
         attachDialog((dialogSlot instanceof HTMLElement ? dialogSlot : col instanceof HTMLElement ? col : container), doc, {
           settings: this.settings,
+          openSettings: () => {
+            // @ts-expect-error 内部 API
+            this.app.setting?.open?.()
+            // @ts-expect-error 内部 API
+            this.app.setting?.openTabById?.("oneday")
+          },
           writeEntry: (entry: ValidatedEntry) =>
             this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(this.persistLayoutOnce(s, doc, container), entry.sourceLine, entry.startMin)),
         })
