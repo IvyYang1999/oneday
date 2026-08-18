@@ -611,27 +611,32 @@
   opacity: 1;
 }
 
-/* 轨道宽度手柄（时间轴本体右缘，hover 显示） */
+/* 轨道宽度手柄：只让时间轴本体的右边线成为命中区 */
 
 .oneday-width-handle {
   position: absolute;
-  top: 24px;
-  bottom: 8px;
-  width: 8px;
-  margin-left: -4px;
+  width: 3px;
+  /* JS 读取实际轨道边线；3px 热区以该线为中心。 */
+  transform: translateX(-50%);
   cursor: col-resize;
   z-index: 13;
-  border-radius: 4px;
+  touch-action: none;
+  opacity: 0;
   background: transparent;
-}
-
-.oneday-slot-timeline:hover .oneday-width-handle {
-  background: color-mix(in srgb, var(--interactive-accent) 15%, transparent); /* 槽位 hover 时露怯 */
+  transition: opacity 0.08s, background-color 0.08s;
 }
 
 .oneday-width-handle:hover,
 .oneday-width-handle.is-active {
-  background: color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+  opacity: 1;
+  background: color-mix(in srgb, var(--interactive-accent) 42%, transparent);
+}
+
+/* 时间轴右侧只调整轨道宽度，不能再触发元素块的网格缩放。 */
+.oneday-slot-timeline > .oneday-handle-e,
+.oneday-slot-timeline > .oneday-handle-ne,
+.oneday-slot-timeline > .oneday-handle-se {
+  display: none;
 }
 
 /* 统计列表：每行一个类型 + 色点 */
@@ -894,40 +899,94 @@
   display: none;
 }
 
-/* 三态视图开关：精致小巧 + 修穿透 */
+/* 图层显示开关：两项可独立选中，视觉上不能粘成一整块。 */
 
-.oneday-view-toggle {
-  display: flex;
+.oneday-view-toggle.oneday-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   width: fit-content;
   margin-left: auto;
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  padding: 1px;
-  font-size: 11px;
+  padding: 3px;
+  overflow: visible;
+  background: color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  border-radius: 11px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background-primary) 72%, transparent);
   position: relative;
   z-index: 6;
 }
 
-/* 轨道宽度手柄：贴轨道竖线的超小热区（无常驻线） */
-
-.oneday-width-handle {
-  top: 20px;
-  bottom: 4px;
-  width: 6px; /* 骑线超小热区 */
+.oneday-view-toggle .oneday-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 8px;
   background: transparent;
-  cursor: col-resize;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+  transition: color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 80ms ease-out;
 }
 
-.oneday-width-handle:hover,
-.oneday-width-handle.is-active {
-  background: color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+.oneday-view-toggle .oneday-mode-btn::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  box-sizing: border-box;
+  color: currentColor;
 }
+
+.oneday-view-toggle .oneday-mode-btn[data-layer="actual"]::before {
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.oneday-view-toggle .oneday-mode-btn[data-layer="plan"]::before {
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  /* 双线斜纹（和 plan 块一致的图例），不再像禁止符号 */
+  background: repeating-linear-gradient(-45deg, currentColor 0 1.5px, transparent 1.5px 3.5px);
+}
+
+.oneday-view-toggle .oneday-mode-btn:hover:not(.is-active) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.oneday-view-toggle .oneday-mode-btn.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-primary));
+  color: var(--text-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 34%, transparent), 0 1px 2px color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+
+.oneday-view-toggle .oneday-mode-btn:active {
+  transform: scale(0.97);
+}
+
+.oneday-view-toggle .oneday-mode-btn:focus-visible {
+  outline: 2px solid var(--text-accent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oneday-view-toggle .oneday-mode-btn {
+    transition: none;
+  }
+}
+
+/* 预览线只在拖动时出现；位置和高度由实际轨道矩形决定。 */
 
 .oneday-width-preview {
   position: absolute;
-  top: 20px;
-  bottom: 4px;
   width: 0;
   border-left: 2px dashed var(--text-accent);
   z-index: 12;
@@ -953,11 +1012,4 @@
   align-self: center;
   margin-right: 4px;
   white-space: nowrap;
-}
-
-/* 元素块维度：时间轴槽位 hover 时 e 手柄明确可见 */
-
-.oneday-slot-timeline:hover > .oneday-handle-e {
-  opacity: 1;
-  background: color-mix(in srgb, var(--interactive-accent) 22%, transparent);
 }

@@ -182,18 +182,27 @@ export interface LayerView {
 export function buildLayerToggles(view: LayerView, onChange: (view: LayerView) => void): HTMLElement {
   const wrap = document.createElement("div")
   wrap.className = "oneday-mode oneday-view-toggle"
+  wrap.setAttribute("role", "group")
+  wrap.setAttribute("aria-label", "显示图层")
   const state = { ...view }
   for (const [key, label] of [["actual", "记录"], ["plan", "计划"]] as Array<["actual" | "plan", string]>) {
     const btn = document.createElement("button")
+    btn.type = "button"
     btn.className = "oneday-mode-btn" + (state[key] ? " is-active" : "")
     btn.dataset.layer = key
     btn.textContent = label
+    const syncAria = (on: boolean): void => {
+      btn.setAttribute("aria-pressed", String(on))
+      btn.title = on ? `隐藏${label}图层` : `显示${label}图层`
+    }
+    syncAria(state[key])
     btn.addEventListener("click", () => {
       const next = !state[key]
       // 最后一个亮着的不允许再灭
       if (!next && !state[key === "actual" ? "plan" : "actual"]) return
       state[key] = next
       btn.classList.toggle("is-active", next)
+      syncAria(next)
       onChange({ ...state })
     })
     wrap.appendChild(btn)
