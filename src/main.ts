@@ -44,6 +44,12 @@ export default class OnedayPlugin extends Plugin {
   /** 色板在设置里变更过（旧渲染的块提示刷新） */
   private paletteDirty = false
 
+  /** 视图类即时切换（LP/阅读模式都生效，不依赖重渲染） */
+  private applyViewClass(container: HTMLElement, mode: ViewMode): void {
+    container.classList.remove("oneday-view-all", "oneday-view-actual", "oneday-view-plan")
+    container.classList.add(`oneday-view-${mode}`)
+  }
+
   async onload(): Promise<void> {
     await this.loadSettings()
     this.addSettingTab(new OnedaySettingTab(this.app, this))
@@ -83,7 +89,6 @@ export default class OnedayPlugin extends Plugin {
           typeColors: paletteForRender,
           hourHeight: this.settings.hourHeight,
           width: this.settings.width,
-          view: this.viewMode,
         },
         {
           renderMarkdown: (host, text) => {
@@ -210,10 +215,11 @@ export default class OnedayPlugin extends Plugin {
         }
         topbar.appendChild(buildViewToggle(this.viewMode, (mode) => {
           this.viewMode = mode
+          this.applyViewClass(container, mode)
           // 视图联动荧光笔模式（荧光笔也可单独切）
           if (mode === "actual") this.drawMode = "actual"
           else if (mode === "plan") this.drawMode = "plan"
-          this.rerenderMarkdownViews()
+          toolbar.el.classList.toggle("is-plan", this.drawMode === "plan")
         }))
         timelineSlot.prepend(topbar)
       }
@@ -317,6 +323,7 @@ export default class OnedayPlugin extends Plugin {
       }
 
       wireTimeline()
+      this.applyViewClass(container, this.viewMode)
 
       // 初始宽度自适应内容：无 layout 头时，时间轴槽位收到内容自然宽（yyt 2026-08-17）
       if (doc.layout === undefined && body instanceof HTMLElement) {
@@ -335,9 +342,9 @@ export default class OnedayPlugin extends Plugin {
       }
 
       // 轨道宽度手柄：时间轴本体右缘的窄条，拖了写回 width: 头（yyt：边界要可调）
-      attachWidthHandle(container, (doc.width ?? this.settings.width) + SIDE_LANE_W, (totalWidth) => {
+      attachWidthHandle(container, doc.width ?? this.settings.width, (baseWidth) => {
         void this.applyBlockTransform(el, ctx, source, (s) =>
-          setHeaderValue(s, "width", String(totalWidth - SIDE_LANE_W))
+          setHeaderValue(s, "width", String(baseWidth))
         )
       })
 

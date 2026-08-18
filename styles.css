@@ -885,8 +885,58 @@
   cursor: pointer;
 }
 
-/* 轴右缘宽度手柄：槽位边缘常驻细线（hover 加深），和延展手柄同款语义 */
+
+/* 视图过滤（CSS 类即时切换）：记录=隐藏规划层；计划=隐藏实际层 */
+
+.oneday-view-actual .oneday-svg .oneday-plan,
+.oneday-view-actual .oneday-svg .oneday-plan-hatch,
+.oneday-view-actual .oneday-svg .oneday-plan-label {
+  display: none;
+}
+
+.oneday-view-plan .oneday-svg .oneday-block:not(.oneday-plan):not(.oneday-preview-block) {
+  display: none;
+}
+
+/* 三态视图开关：精致小巧 + 修穿透 */
+
+.oneday-view-toggle {
+  display: flex;
+  width: fit-content;
+  margin-left: auto;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 1px;
+  font-size: 11px;
+  position: relative;
+  z-index: 6;
+}
+
+/* 轨道宽度手柄：贴轨道竖线的超小热区（无常驻线） */
 
 .oneday-width-handle {
-  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  top: 20px;
+  bottom: 4px;
+  width: 8px;
+  background: transparent;
+  cursor: col-resize;
+}
+
+.oneday-width-handle:hover,
+.oneday-width-handle.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.oneday-width-preview {
+  position: absolute;
+  top: 20px;
+  bottom: 4px;
+  width: 0;
+  border-left: 2px dashed var(--text-accent);
+  z-index: 12;
+  pointer-events: none;
+  font-size: 10px;
+  color: var(--text-accent);
+  padding-left: 3px;
 }

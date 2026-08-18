@@ -122,6 +122,21 @@ function placeActual(actual: Entry[], trackX: number, trackW: number): Placed[] 
   return placed
 }
 
+/** 长备注按宽度贪心换行（yyt：字多直接多行，放不下才截断）。 */
+function wrapNote(text: string, blockW: number, maxLines: number): string[] {
+  const perLine = Math.max(3, Math.floor((blockW - 10) / 8.5)) // ~9px 字宽保守估
+  const lines: string[] = []
+  let rest = text
+  while (rest.length > 0 && lines.length < maxLines) {
+    lines.push(rest.slice(0, perLine))
+    rest = rest.slice(perLine)
+  }
+  if (rest.length > 0 && lines.length > 0) {
+    lines[lines.length - 1] = lines[lines.length - 1].slice(0, -1) + "…"
+  }
+  return lines
+}
+
 /** Side labels must stay inside the svg: cap length. */
 function truncate(text: string, max = 12): string {
   return text.length > max ? text.slice(0, max - 1) + "…" : text
@@ -220,10 +235,19 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
         `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
       )
     } else if (canTwoLine) {
+      // 长备注多行：时长加粗居中在上，备注小字换行在下（放不下才省略号）
+      const maxNoteLines = Math.max(1, Math.floor((hh - fs - 8) / 11))
+      const noteLines = wrapNote(e.note ?? "", p.w, maxNoteLines)
+      const totalH = fs + noteLines.length * 11
+      const startY = yy + (hh - totalH) / 2
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 - 4}" text-anchor="middle">${label}</text>`,
-        `<text pointer-events="none" class="oneday-note" x="${p.x + p.w / 2}" y="${yy + hh / 2 + 11}" text-anchor="middle">${escapeXml(truncate(e.note ?? "", 12))}</text>`
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${startY + fs - 2}" text-anchor="middle">${label}</text>`
       )
+      noteLines.forEach((ln, i) => {
+        parts.push(
+          `<text pointer-events="none" class="oneday-note" x="${p.x + p.w / 2}" y="${startY + fs + 11 * (i + 1)}" text-anchor="middle">${escapeXml(ln)}</text>`
+        )
+      })
     } else if (e.note && fsCombined > 0) {
       parts.push(
         `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
