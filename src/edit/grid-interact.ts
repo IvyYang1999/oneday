@@ -38,6 +38,8 @@ function setItemOnSlot(slot: HTMLElement, it: GridItem): void {
 const DIRS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const
 
 export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem[]) => void): void {
+  // 清理可能残留的拖拽克隆（pointer capture 中断时没删掉）
+  document.querySelectorAll(".oneday-drag-clone").forEach((c) => c.remove())
   const slots = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot"))
 
   const finish = (priorityId?: SlotId): void => {
@@ -98,12 +100,14 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
       const onUp = (): void => {
         document.removeEventListener("pointermove", onMove)
         document.removeEventListener("pointerup", onUp)
+        document.removeEventListener("pointercancel", onUp)
         clone.remove()
         slot.classList.remove("is-placeholder")
         finish(slot.dataset.slot as SlotId)
       }
       document.addEventListener("pointermove", onMove)
       document.addEventListener("pointerup", onUp)
+      document.addEventListener("pointercancel", onUp)
     })
 
     // ---- 8 resize handles ----

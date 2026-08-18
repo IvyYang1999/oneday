@@ -954,3 +954,10 @@
   margin-right: 4px;
   white-space: nowrap;
 }
+
+/* 元素块维度：时间轴槽位 hover 时 e 手柄明确可见 */
+
+.oneday-slot-timeline:hover > .oneday-handle-e {
+  opacity: 1;
+  background: color-mix(in srgb, var(--interactive-accent) 22%, transparent);
+}

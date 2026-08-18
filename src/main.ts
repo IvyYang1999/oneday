@@ -201,9 +201,7 @@ export default class OnedayPlugin extends Plugin {
         timelineSlot.appendChild(toolbar.statusEl)
         // 顶栏：日期+星期（跨期统计锚点）在左，记录/计划开关在右
         const topbar = document.createElement("div")
-        topbar.className = "oneday-timeline-topbar"
-        // 右缘对齐轨道竖线而不是槽位边缘（专家指出的对齐问题）
-        topbar.style.width = `${(doc.width ?? this.settings.width) - 6}px`
+        topbar.className = "oneday-timeline-topbar" // 宽度跟随元素块（槽位），非时间轴矩形
         const dateStr = doc.date ?? (() => {
           const base = this.app.workspace.getActiveFile()?.basename ?? ""
           return /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/.test(base) ? inferDate(base) : null
