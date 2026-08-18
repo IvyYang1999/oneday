@@ -16,7 +16,10 @@ export function attachWidthHandle(
   slot.querySelector(".oneday-width-handle")?.remove()
   slot.querySelector(".oneday-width-preview")?.remove()
 
-  const trackRight = LABEL_W + (baseWidth - LABEL_W - TRACK_PAD) // 轨道竖线位置
+  // 实测 svg 在槽位内的水平偏移（slot padding 等），否则手柄系统性偏内
+  const svgEl = slot.querySelector("svg.oneday-svg")
+  const svgOffset = svgEl ? svgEl.getBoundingClientRect().left - slot.getBoundingClientRect().left : 0
+  const trackRight = svgOffset + LABEL_W + (baseWidth - LABEL_W - TRACK_PAD) // 轨道竖线位置
   const handle = document.createElement("div")
   handle.className = "oneday-width-handle"
   handle.style.left = `${trackRight - 3}px` // ±3px 热区骑线（yyt：偏内侧且太宽）
@@ -35,7 +38,7 @@ export function attachWidthHandle(
     preview.className = "oneday-width-preview"
     slot.appendChild(preview)
     const place = (w: number): void => {
-      const x = LABEL_W + (w - LABEL_W - TRACK_PAD)
+      const x = svgOffset + LABEL_W + (w - LABEL_W - TRACK_PAD)
       preview.style.left = `${x}px`
       preview.textContent = `${Math.round(w)}px`
     }
@@ -43,7 +46,7 @@ export function attachWidthHandle(
 
     const onMove = (ev: PointerEvent): void => {
       const w = Math.min(640, Math.max(140, startW + (ev.clientX - startX)))
-      handle.style.left = `${LABEL_W + (w - LABEL_W - TRACK_PAD) - 3}px`
+      handle.style.left = `${svgOffset + LABEL_W + (w - LABEL_W - TRACK_PAD) - 3}px`
       place(w)
     }
     const onUp = (ev: PointerEvent): void => {
