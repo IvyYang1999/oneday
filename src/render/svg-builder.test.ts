@@ -147,9 +147,9 @@ describe("M4b: plan hatch + label-block association (yyt 2026-08-17)", () => {
   it("plan blocks get a diagonal hatch overlay (斜线纹理)", () => {
     const svg = svgOf("plan 09:00-12:00 math")
     expect(svg).toContain("<pattern")
-    expect(svg).toContain("oneday-hatch-0")
+    expect(svg).toMatch(/oneday-hatch-\d+-0/) // 每次渲染唯一 id（跨 svg 防冲撞）
     expect(svg).toContain("oneday-plan-hatch")
-    expect(svg).toContain('fill="url(#oneday-hatch-0)"')
+    expect(svg).toMatch(/fill="url\(#oneday-hatch-\d+-0\)"/)
   })
 
   it("every noted block's side label draws a leader from its own column edge", () => {

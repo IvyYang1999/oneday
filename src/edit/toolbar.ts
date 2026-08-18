@@ -172,23 +172,29 @@ export function buildModeToggle(mode: DrawMode, onChange: (mode: DrawMode) => vo
   return wrap
 }
 
-/** 视图三态切换：全部 | 记录 | 计划（yyt：直觉是切换视图而非荧光笔颜色） */
-export function buildViewToggle(mode: ViewMode, onChange: (mode: ViewMode) => void): HTMLElement {
+export interface LayerView {
+  actual: boolean
+  plan: boolean
+}
+
+/** 图层开关：记录/计划各自独立点亮，都亮=全部（yyt 2026-08-17 拍板：三态多余）。
+ *  最后亮着的那个不允许再灭（防止全空）。 */
+export function buildLayerToggles(view: LayerView, onChange: (view: LayerView) => void): HTMLElement {
   const wrap = document.createElement("div")
   wrap.className = "oneday-mode oneday-view-toggle"
-  const label = document.createElement("span")
-  label.className = "oneday-toggle-label"
-  label.textContent = "显示"
-  wrap.appendChild(label)
-  for (const [m, label] of [["all", "全部"], ["actual", "记录"], ["plan", "计划"]] as Array<[ViewMode, string]>) {
+  const state = { ...view }
+  for (const [key, label] of [["actual", "记录"], ["plan", "计划"]] as Array<["actual" | "plan", string]>) {
     const btn = document.createElement("button")
-    btn.className = "oneday-mode-btn" + (m === mode ? " is-active" : "")
-    btn.dataset.mode = m
+    btn.className = "oneday-mode-btn" + (state[key] ? " is-active" : "")
+    btn.dataset.layer = key
     btn.textContent = label
     btn.addEventListener("click", () => {
-      wrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
-      btn.classList.add("is-active")
-      onChange(m)
+      const next = !state[key]
+      // 最后一个亮着的不允许再灭
+      if (!next && !state[key === "actual" ? "plan" : "actual"]) return
+      state[key] = next
+      btn.classList.toggle("is-active", next)
+      onChange({ ...state })
     })
     wrap.appendChild(btn)
   }

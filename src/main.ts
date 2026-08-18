@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { ValidatedEntry } from "./agent/response"
 import { addHiddenType, addOffSlot, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeOffSlot, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
-import { buildToolbar, buildViewToggle, ViewMode } from "./edit/toolbar"
+import { buildLayerToggles, buildToolbar, LayerView, ViewMode } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
@@ -37,17 +37,18 @@ export default class OnedayPlugin extends Plugin {
   private activeType = ""
   /** 荧光笔模式：画记录/画计划（session-scoped） */
   private drawMode: "actual" | "plan" = "actual"
-  /** 视图：全部/记录/计划（session-scoped） */
-  private viewMode: ViewMode = "all"
+  /** 图层视图：记录/计划各自独立点亮，都亮=全部（session-scoped） */
+  private layerView: LayerView = { actual: true, plan: true }
   /** 色块编辑态（跨渲染保持；Esc/点别处退出） */
   private editing: { path: string; line: number } | null = null
   /** 色板在设置里变更过（旧渲染的块提示刷新） */
   private paletteDirty = false
 
   /** 视图类即时切换（LP/阅读模式都生效，不依赖重渲染） */
-  private applyViewClass(container: HTMLElement, mode: ViewMode): void {
+  private applyViewClass(container: HTMLElement, view: LayerView): void {
     container.classList.remove("oneday-view-all", "oneday-view-actual", "oneday-view-plan")
-    container.classList.add(`oneday-view-${mode}`)
+    const cls = view.actual && view.plan ? "all" : view.actual ? "actual" : "plan"
+    container.classList.add(`oneday-view-${cls}`)
   }
 
   async onload(): Promise<void> {
@@ -213,13 +214,13 @@ export default class OnedayPlugin extends Plugin {
           dateEl.textContent = `${dateStr}${wd ? " " + wd : ""}`
           topbar.appendChild(dateEl)
         }
-        topbar.appendChild(buildViewToggle(this.viewMode, (mode) => {
-          this.viewMode = mode
-          this.applyViewClass(container, mode)
-          // 视图联动荧光笔模式（荧光笔也可单独切）
-          if (mode === "actual") this.drawMode = "actual"
-          else if (mode === "plan") this.drawMode = "plan"
-          toolbar.setBrushMode(this.drawMode) // 联动必须同步视觉（专家指出的状态矛盾 bug）
+        topbar.appendChild(buildLayerToggles(this.layerView, (view) => {
+          this.layerView = view
+          this.applyViewClass(container, view)
+          // 只剩单图层时联动画笔（都亮则不动，画笔可独立切）
+          if (view.actual && !view.plan) this.drawMode = "actual"
+          else if (view.plan && !view.actual) this.drawMode = "plan"
+          toolbar.setBrushMode(this.drawMode)
         }))
         timelineSlot.prepend(topbar)
       }
@@ -323,7 +324,7 @@ export default class OnedayPlugin extends Plugin {
       }
 
       wireTimeline()
-      this.applyViewClass(container, this.viewMode)
+      this.applyViewClass(container, this.layerView)
 
       // 初始宽度自适应内容：无 layout 头时，时间轴槽位收到内容自然宽（yyt 2026-08-17）
       if (doc.layout === undefined && body instanceof HTMLElement) {

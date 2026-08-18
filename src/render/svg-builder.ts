@@ -38,6 +38,8 @@ export const SIDE_LANE_W = 112
 /** Vertical row height used by the side-label collision avoidance. */
 const SIDE_LINE_H = 13
 
+let hatchUid = 0
+
 function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 }
@@ -177,11 +179,13 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
 
   // Plan layer first (full-width translucent background + diagonal hatch, D3 覆盖语义)
   const planColors = [...new Set(entries.filter((e) => e.plan).map((e) => opts.typeColors[e.type] ?? hashTypeColor(e.type)))]
+  // id 必须每次渲染唯一：同页多个时间轴块的 defs 同名 id 会跨 svg 冲撞（斜线丢失/错色）
+  const uid = ++hatchUid
   if (planColors.length > 0) {
     const defs = planColors
       .map(
         (c, i) =>
-          `<pattern id="oneday-hatch-${i}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
+          `<pattern id="oneday-hatch-${uid}-${i}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
           `<line x1="0" y1="0" x2="0" y2="6" stroke="${escapeXml(c)}" stroke-width="1.6" stroke-opacity="0.8"/></pattern>`
       )
       .join("")
@@ -189,7 +193,7 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
   }
   for (const e of entries.filter((e) => e.plan)) {
     const color = opts.typeColors[e.type] ?? hashTypeColor(e.type)
-    const hatchId = `oneday-hatch-${planColors.indexOf(color)}`
+    const hatchId = `oneday-hatch-${uid}-${planColors.indexOf(color)}`
     const yy = y(e.startMin)
     const hh = Math.max(2, y(e.endMin) - yy)
     parts.push(
