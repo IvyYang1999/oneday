@@ -1013,3 +1013,45 @@
   margin-right: 4px;
   white-space: nowrap;
 }
+
+/* 图层/画笔符号体系（V2 图标派，yyt 2026-08-18 拍板） */
+
+.oneday-sym {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+}
+
+.oneday-sym-dot {
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.oneday-sym-hatch {
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: repeating-linear-gradient(-45deg, currentColor 0 1.5px, transparent 1.5px 3.5px);
+}
+
+.oneday-layer-btn {
+  gap: 5px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.oneday-eye::before {
+  content: "👁";
+  font-size: 10px;
+}
+
+.oneday-eye.is-off {
+  opacity: 0.3;
+  text-decoration: line-through;
+}
+
+.oneday-brush-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}

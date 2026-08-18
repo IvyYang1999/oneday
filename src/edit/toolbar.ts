@@ -63,9 +63,12 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   brushWrap.className = "oneday-mode oneday-brush-toggle" + (deps.brushMode === "plan" ? " is-plan" : "")
   for (const [m, label] of [["actual", "记录"], ["plan", "计划"]] as Array<[DrawMode, string]>) {
     const btn = document.createElement("button")
-    btn.className = "oneday-mode-btn" + (m === deps.brushMode ? " is-active" : "")
+    btn.className = "oneday-mode-btn oneday-brush-btn" + (m === deps.brushMode ? " is-active" : "")
     btn.dataset.mode = m
-    btn.textContent = label
+    const sym = document.createElement("span")
+    sym.className = m === "actual" ? "oneday-sym oneday-sym-dot" : "oneday-sym oneday-sym-hatch"
+    btn.appendChild(sym)
+    btn.appendChild(document.createTextNode(label))
     btn.addEventListener("click", () => {
       brushWrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
       btn.classList.add("is-active")
@@ -188,12 +191,18 @@ export function buildLayerToggles(view: LayerView, onChange: (view: LayerView) =
   for (const [key, label] of [["actual", "记录"], ["plan", "计划"]] as Array<["actual" | "plan", string]>) {
     const btn = document.createElement("button")
     btn.type = "button"
-    btn.className = "oneday-mode-btn" + (state[key] ? " is-active" : "")
+    btn.className = "oneday-mode-btn oneday-layer-btn" + (state[key] ? " is-active" : "")
     btn.dataset.layer = key
-    btn.textContent = label
+    // 图层符号（实心点=记录 / 斜纹块=计划）+ 眼睛，yyt 选定的 V2 方案
+    const sym = document.createElement("span")
+    sym.className = key === "actual" ? "oneday-sym oneday-sym-dot" : "oneday-sym oneday-sym-hatch"
+    const eye = document.createElement("span")
+    eye.className = "oneday-eye"
+    btn.append(sym, eye)
     const syncAria = (on: boolean): void => {
       btn.setAttribute("aria-pressed", String(on))
       btn.title = on ? `隐藏${label}图层` : `显示${label}图层`
+      eye.classList.toggle("is-off", !on)
     }
     syncAria(state[key])
     btn.addEventListener("click", () => {
