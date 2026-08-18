@@ -14,7 +14,8 @@ export function attachWidthHandle(
   const slot = container.querySelector<HTMLElement>(".oneday-slot-timeline")
   if (!slot) return
   slot.querySelector(".oneday-width-handle")?.remove()
-  slot.querySelector(".oneday-width-preview")?.remove()
+  // 清掉上次中断拖拽的预览残影（yyt：两条线之谜）
+  document.querySelectorAll(".oneday-width-preview").forEach((c) => c.remove())
 
   // 实测 svg 在槽位内的水平偏移（slot padding 等），否则手柄系统性偏内
   const svgEl = slot.querySelector("svg.oneday-svg")
@@ -49,15 +50,21 @@ export function attachWidthHandle(
       handle.style.left = `${svgOffset + LABEL_W + (w - LABEL_W - TRACK_PAD) - 3}px`
       place(w)
     }
-    const onUp = (ev: PointerEvent): void => {
+    const onUp = (ev: PointerEvent | null): void => {
       document.removeEventListener("pointermove", onMove)
-      document.removeEventListener("pointerup", onUp)
+      document.removeEventListener("pointerup", onUpNow)
+      document.removeEventListener("pointercancel", onCancel)
       handle.classList.remove("is-active")
       preview.remove()
-      const w = Math.min(640, Math.max(140, Math.round(startW + (ev.clientX - startX))))
-      if (Math.abs(w - startW) > 3) onCommit(w)
+      if (ev) {
+        const w = Math.min(640, Math.max(140, Math.round(startW + (ev.clientX - startX))))
+        if (Math.abs(w - startW) > 3) onCommit(w)
+      }
     }
+    const onUpNow = (ev: PointerEvent): void => onUp(ev)
+    const onCancel = (): void => onUp(null)
     document.addEventListener("pointermove", onMove)
-    document.addEventListener("pointerup", onUp)
+    document.addEventListener("pointerup", onUpNow)
+    document.addEventListener("pointercancel", onCancel)
   })
 }

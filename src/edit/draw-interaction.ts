@@ -291,6 +291,17 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     updateGhost(dragStartMin, cur)
   })
 
+  svg.addEventListener("pointercancel", () => {
+    // 中断拖拽也要清理临时元素（否则留下幽灵线）
+    extendPreview?.remove()
+    extendPreview = null
+    extending = null
+    removeGhost()
+    dragging = false
+    editDrag = null
+    setStatus("")
+  })
+
   svg.addEventListener("pointerup", (e: PointerEvent) => {
     if (editDrag) {
       const rect = editingRect()
