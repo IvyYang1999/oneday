@@ -936,27 +936,6 @@
   transition: color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 80ms ease-out;
 }
 
-.oneday-view-toggle .oneday-mode-btn::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  flex: 0 0 7px;
-  box-sizing: border-box;
-  color: currentColor;
-}
-
-.oneday-view-toggle .oneday-mode-btn[data-layer="actual"]::before {
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.oneday-view-toggle .oneday-mode-btn[data-layer="plan"]::before {
-  border: 1px solid currentColor;
-  border-radius: 2px;
-  /* 双线斜纹（和 plan 块一致的图例），不再像禁止符号 */
-  background: repeating-linear-gradient(-45deg, currentColor 0 1.5px, transparent 1.5px 3.5px);
-}
-
 .oneday-view-toggle .oneday-mode-btn:hover:not(.is-active) {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
