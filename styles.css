@@ -255,8 +255,6 @@
   border-radius: 10px;
   overflow: hidden;
   margin-left: auto; /* 钉到工具栏最右侧，与荧光笔视觉分离 */
-  padding-left: 6px;
-  border-left: 1px solid var(--background-modifier-border);
 }
 
 .oneday-mode-btn {
@@ -854,9 +852,7 @@
 /* 荧光笔模式小开关（色板前） */
 
 .oneday-brush-toggle {
-  margin-right: 6px;
-  padding-right: 6px;
-  border-right: 1px solid var(--background-modifier-border);
+  margin-right: 8px;
   display: inline-flex;
 }
 
@@ -918,7 +914,7 @@
 .oneday-width-handle {
   top: 20px;
   bottom: 4px;
-  width: 8px;
+  width: 6px; /* 骑线超小热区 */
   background: transparent;
   cursor: col-resize;
 }
@@ -939,4 +935,22 @@
   font-size: 10px;
   color: var(--text-accent);
   padding-left: 3px;
+}
+
+/* 计划视图：连实际块的标注一起隐藏（yyt 2026-08-17） */
+
+.oneday-view-plan .oneday-svg .oneday-duration:not(.oneday-plan-label),
+.oneday-view-plan .oneday-svg .oneday-note:not(.oneday-plan-label),
+.oneday-view-plan .oneday-svg .oneday-side-leader {
+  display: none;
+}
+
+/* 开关前缀标签（新增为 / 显示） */
+
+.oneday-toggle-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  align-self: center;
+  margin-right: 4px;
+  white-space: nowrap;
 }

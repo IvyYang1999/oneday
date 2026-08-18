@@ -27,6 +27,8 @@ export interface ToolbarDeps {
 export interface ToolbarHandle {
   el: HTMLElement
   statusEl: HTMLElement
+  /** 外部同步荧光笔模式视觉（视图联动时调用，专家：状态所有权必须一致） */
+  setBrushMode: (mode: DrawMode) => void
 }
 
 /** Right-click menu on a swatch (pure DOM, same pattern as the + menu). */
@@ -52,7 +54,11 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   const el = document.createElement("div")
   el.className = "oneday-toolbar"
 
-  // 荧光笔模式小开关（画记录/画计划，回到荧光笔区）
+  // 荧光笔模式小开关（新增为 记录/计划，回到荧光笔区）
+  const brushLabel = document.createElement("span")
+  brushLabel.className = "oneday-toggle-label"
+  brushLabel.textContent = "新增为"
+  el.appendChild(brushLabel)
   const brushWrap = document.createElement("span")
   brushWrap.className = "oneday-mode oneday-brush-toggle" + (deps.brushMode === "plan" ? " is-plan" : "")
   for (const [m, label] of [["actual", "记录"], ["plan", "计划"]] as Array<[DrawMode, string]>) {
@@ -132,9 +138,17 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     el.appendChild(wrap)
   }
 
+  const setBrushMode = (mode: DrawMode): void => {
+    brushWrap.querySelectorAll(".oneday-mode-btn").forEach((b) => {
+      b.classList.toggle("is-active", (b as HTMLElement).dataset.mode === mode)
+    })
+    brushWrap.classList.toggle("is-plan", mode === "plan")
+    el.classList.toggle("is-plan", mode === "plan")
+  }
+
   const statusEl = document.createElement("div")
   statusEl.className = "oneday-draw-status"
-  return { el, statusEl }
+  return { el, statusEl, setBrushMode }
 }
 
 /** 记录/计划分段开关（独立组件，贴时间轴槽位顶部右侧，yyt 2026-08-17） */
@@ -162,6 +176,10 @@ export function buildModeToggle(mode: DrawMode, onChange: (mode: DrawMode) => vo
 export function buildViewToggle(mode: ViewMode, onChange: (mode: ViewMode) => void): HTMLElement {
   const wrap = document.createElement("div")
   wrap.className = "oneday-mode oneday-view-toggle"
+  const label = document.createElement("span")
+  label.className = "oneday-toggle-label"
+  label.textContent = "显示"
+  wrap.appendChild(label)
   for (const [m, label] of [["all", "全部"], ["actual", "记录"], ["plan", "计划"]] as Array<[ViewMode, string]>) {
     const btn = document.createElement("button")
     btn.className = "oneday-mode-btn" + (m === mode ? " is-active" : "")

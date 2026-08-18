@@ -202,6 +202,8 @@ export default class OnedayPlugin extends Plugin {
         // 顶栏：日期+星期（跨期统计锚点）在左，记录/计划开关在右
         const topbar = document.createElement("div")
         topbar.className = "oneday-timeline-topbar"
+        // 右缘对齐轨道竖线而不是槽位边缘（专家指出的对齐问题）
+        topbar.style.width = `${(doc.width ?? this.settings.width) - 6}px`
         const dateStr = doc.date ?? (() => {
           const base = this.app.workspace.getActiveFile()?.basename ?? ""
           return /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/.test(base) ? inferDate(base) : null
@@ -219,7 +221,7 @@ export default class OnedayPlugin extends Plugin {
           // 视图联动荧光笔模式（荧光笔也可单独切）
           if (mode === "actual") this.drawMode = "actual"
           else if (mode === "plan") this.drawMode = "plan"
-          toolbar.el.classList.toggle("is-plan", this.drawMode === "plan")
+          toolbar.setBrushMode(this.drawMode) // 联动必须同步视觉（专家指出的状态矛盾 bug）
         }))
         timelineSlot.prepend(topbar)
       }

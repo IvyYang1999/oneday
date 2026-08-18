@@ -19,7 +19,7 @@ export function attachWidthHandle(
   const trackRight = LABEL_W + (baseWidth - LABEL_W - TRACK_PAD) // 轨道竖线位置
   const handle = document.createElement("div")
   handle.className = "oneday-width-handle"
-  handle.style.left = `${trackRight - 4}px` // ±4px 热区，贴轨道竖线
+  handle.style.left = `${trackRight - 3}px` // ±3px 热区骑线（yyt：偏内侧且太宽）
   slot.appendChild(handle)
 
   handle.addEventListener("pointerdown", (e: PointerEvent) => {
@@ -43,7 +43,7 @@ export function attachWidthHandle(
 
     const onMove = (ev: PointerEvent): void => {
       const w = Math.min(640, Math.max(140, startW + (ev.clientX - startX)))
-      handle.style.left = `${LABEL_W + (w - LABEL_W - TRACK_PAD) - 4}px`
+      handle.style.left = `${LABEL_W + (w - LABEL_W - TRACK_PAD) - 3}px`
       place(w)
     }
     const onUp = (ev: PointerEvent): void => {

@@ -124,7 +124,7 @@ function placeActual(actual: Entry[], trackX: number, trackW: number): Placed[] 
 
 /** 长备注按宽度贪心换行（yyt：字多直接多行，放不下才截断）。 */
 function wrapNote(text: string, blockW: number, maxLines: number): string[] {
-  const perLine = Math.max(3, Math.floor((blockW - 10) / 8.5)) // ~9px 字宽保守估
+  const perLine = Math.max(3, Math.floor((blockW - 16) / 8.5)) // 左右各留 ~8px margin
   const lines: string[] = []
   let rest = text
   while (rest.length > 0 && lines.length < maxLines) {
