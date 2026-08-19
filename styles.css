@@ -1138,7 +1138,7 @@
 
 .oneday-text-host p {
   margin: 0;
-  white-space: pre-wrap; /* 软换行忠实显示（对齐 textarea 的源码观感） */
+  /* 不用 pre-wrap：渲染器对硬换行输出 <br>+字面\n，pre-wrap 会二次换行出幻影空行（CDP 实证 2026-08-19） */
 }
 
 .oneday-text-host p + p {
