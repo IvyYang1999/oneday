@@ -80,7 +80,12 @@ await page.waitForTimeout(300)
 const state = await page.evaluate(() => ({
   ok: window.__ok ?? false,
   error: window.__error ?? null,
-  slots: [...document.querySelectorAll(".oneday-slot")].map((s) => ({
+  eHandles: [...document.querySelectorAll(".oneday-handle-e")].map((h) => {
+        const cs = getComputedStyle(h)
+        const r = h.getBoundingClientRect()
+        return { w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.x), opacity: cs.opacity, display: cs.display, parent: h.parentElement?.className?.slice(0,30) }
+      }),
+      slots: [...document.querySelectorAll(".oneday-slot")].map((s) => ({
     id: s.dataset.slot, html: s.innerHTML.length, display: getComputedStyle(s).display,
     w: s.getBoundingClientRect().width, h: s.getBoundingClientRect().height,
   })),

@@ -143,7 +143,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
           const h = Number(editing.getAttribute("height"))
           const bottom = top + h
           // 小块（<24px）禁用边缘判定：8px 热区会覆盖整块，双击会误触 resize（yyt 2026-08-19）
-          const edgeZone = h >= 24 ? 8 : 0
+          const edgeZone = h >= 18 ? 8 : 0 /* GAP_X 后 30min=22px，阈值 24 会误杀 */
           const nearTop = edgeZone > 0 && Math.abs(localY0 - top) <= edgeZone
           const nearBottom = edgeZone > 0 && Math.abs(localY0 - bottom) <= edgeZone
           const mode = nearTop ? "top" : nearBottom ? "bottom" : "move"
@@ -274,7 +274,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
           const top = Number(editing.getAttribute("y"))
           const h = Number(editing.getAttribute("height"))
           const bottom = top + h
-          const edgeZone = h >= 24 ? 8 : 0
+          const edgeZone = h >= 18 ? 8 : 0 /* GAP_X 后 30min=22px，阈值 24 会误杀 */
           // 光标必须设在色块自己身上（元素的 cursor 盖过 svg 的，yyt：悬停出不来）
           editing.style.cursor = edgeZone > 0 && (Math.abs(ly - top) <= edgeZone || Math.abs(ly - bottom) <= edgeZone) ? "ns-resize" : "grab"
         } else {
