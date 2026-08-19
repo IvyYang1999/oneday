@@ -6,15 +6,15 @@
 import { TimelineDoc } from "../core/types"
 import { OnedaySettings } from "../settings"
 import { buildSystemPrompt } from "./prompt"
-import { interpretResponse, ValidatedEntry } from "./response"
+import { interpretResponses, ValidatedEntry } from "./response"
 import { runEntryAgent } from "./runner"
 import { runEntryAgentApi } from "./direct-runner"
 import { obsidianTransport } from "./obsidian-transport"
 
 export interface DialogDeps {
   settings: OnedaySettings
-  /** Persist the entry into the note's timeline block. */
-  writeEntry: (entry: ValidatedEntry) => Promise<void>
+  /** Persist entries into the note's timeline block (一次可多个). */
+  writeEntries: (entries: ValidatedEntry[]) => Promise<void>
   /** 未配置 API 时跳转设置页 */
   openSettings: () => void
 }
@@ -83,7 +83,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       return
     }
 
-    const result = interpretResponse(run.text, doc)
+    const result = interpretResponses(run.text, doc)
     if (!result.ok) {
       loading.style.display = "none"
       history.push({ role: "assistant", content: run.text }) // 追问留在历史里
@@ -101,11 +101,11 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
 
     loading.style.display = "none"
     try {
-      await deps.writeEntry(result.entry)
+      await deps.writeEntries(result.entries)
       input.value = ""
       const rawCost = "costUsd" in run ? run.costUsd : undefined
       const cost = typeof rawCost === "number" ? `（$${rawCost.toFixed(4)}）` : ""
-      status.setText(`已记录 ${result.entry.sourceLine} ${cost}`)
+      status.setText(`已记录 ${result.entries.length} 条 ${cost}`)
     } catch (error) {
       status.setText(`写回失败：${error instanceof Error ? error.message : String(error)}`)
       status.addClass("oneday-dialog-error")

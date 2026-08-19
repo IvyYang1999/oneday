@@ -6,7 +6,6 @@ import { hashTypeColor } from "./core/type-colors"
 import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
-import { ValidatedEntry } from "./agent/response"
 import { addHiddenType, addOffSlot, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeOffSlot, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
 import { buildLayerToggles, buildToolbar, LayerView, ViewMode } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
@@ -426,8 +425,12 @@ export default class OnedayPlugin extends Plugin {
             // @ts-expect-error 内部 API
             this.app.setting?.openTabById?.("oneday")
           },
-          writeEntry: (entry: ValidatedEntry) =>
-            this.applyBlockTransform(el, ctx, source, (s) => insertEntryLine(this.persistLayoutOnce(s, doc, container), entry.sourceLine, entry.startMin)),
+          writeEntries: (entries) =>
+            this.applyBlockTransform(el, ctx, source, (s) => {
+              let out = this.persistLayoutOnce(s, doc, container)
+              for (const e of entries) out = insertEntryLine(out, e.sourceLine, e.startMin)
+              return out
+            }),
         })
       }
     })

@@ -25,10 +25,10 @@ export type ResponseResult =
   | { ok: true; entry: ValidatedEntry }
   | { ok: false; reason: string }
 
-/** Find the first {...} JSON object in arbitrary text (tolerates code fences). */
+/** Find the first {...} or [...] JSON value in arbitrary text (tolerates code fences). */
 export function extractJson(text: string): unknown | null {
-  const fence = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/.exec(text)
-  const candidate = fence ? fence[1] : /\{[\s\S]*\}/.exec(text)?.[0]
+  const fence = /```(?:json)?\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*```/.exec(text)
+  const candidate = fence ? fence[1] : /(\[[\s\S]*\]|\{[\s\S]*\})/.exec(text)?.[1]
   if (!candidate) return null
   try {
     return JSON.parse(candidate)
@@ -83,4 +83,24 @@ export function interpretResponse(text: string, doc: TimelineDoc): ResponseResul
     return { ok: false, reason: "返回中没有 JSON" }
   }
   return validateEntry(json, doc)
+}
+
+export type ResponsesResult =
+  | { ok: true; entries: ValidatedEntry[] }
+  | { ok: false; reason: string }
+
+/** 多段描述：一句话多个色块（JSON 数组）；单对象也接受（yyt 2026-08-19）。 */
+export function interpretResponses(text: string, doc: TimelineDoc): ResponsesResult {
+  const json = extractJson(text)
+  if (json === null) {
+    return { ok: false, reason: "返回中没有 JSON" }
+  }
+  const list = Array.isArray(json) ? json : [json]
+  const entries: ValidatedEntry[] = []
+  for (const item of list) {
+    const r = validateEntry(item, doc)
+    if (!r.ok) return { ok: false, reason: r.reason }
+    entries.push(r.entry)
+  }
+  return { ok: true, entries: entries.sort((a, b) => a.startMin - b.startMin) }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { parseTimeline } from "../core/parser"
-import { extractJson, interpretResponse } from "./response"
+import { extractJson, interpretResponse, interpretResponses } from "./response"
 
 const DOC = parseTimeline("range: 7-23\n---\n09:00-10:00 math\n")
 
@@ -43,5 +43,30 @@ describe("interpretResponse", () => {
       expect(r.entry.endMin).toBe(24 * 60 + 30)
       expect(r.entry.sourceLine).toBe("23:30-00:30 reading")
     }
+  })
+})
+
+describe("interpretResponses (一句话多个色块)", () => {
+  it("accepts an array and sorts by start time", () => {
+    const r = interpretResponses(
+      '[{"start":"10:00","end":"11:00","type":"fitness","note":"健身"},{"start":"09:00","end":"10:00","type":"math"}]',
+      DOC
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.entries).toHaveLength(2)
+      expect(r.entries[0].startMin).toBe(9 * 60) // 排过序
+    }
+  })
+
+  it("single object still works", () => {
+    const r = interpretResponses('{"start":"10:00","end":"10:30","type":"math"}', DOC)
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.entries).toHaveLength(1)
+  })
+
+  it("any invalid item fails the whole batch", () => {
+    const r = interpretResponses('[{"start":"10:00","end":"11:00","type":"math"},{"start":"bad","end":"11:00","type":"math"}]', DOC)
+    expect(r.ok).toBe(false)
   })
 })
