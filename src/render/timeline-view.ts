@@ -44,7 +44,7 @@ function attachInlineTextEditor(pane: HTMLElement, text: string, deps: InlineEdi
       ta.style.height = `${ta.scrollHeight}px`
     }
     ta.addEventListener("input", fit)
-    window.setTimeout(fit, 0)
+    fit() // 同步定高：setTimeout 会先画一帧默认高度，产生闪烁（yyt 2026-08-19）
     const commit = (): void => {
       if (ta.value === text) {
         show() // 没变就不写回，避免无谓重渲染
