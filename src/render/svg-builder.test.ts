@@ -157,7 +157,7 @@ describe("M4b: plan hatch + label-block association (yyt 2026-08-17)", () => {
     const svg = svgOf("09:00-12:00 math\n09:30-10:00 micro 听课\n09:15-09:30 english 单词", COLORS, 60)
     const leaders = [...svg.matchAll(/<line class="oneday-side-leader[^"]*" data-line="(\d+)" x1="([\d.]+)"/g)]
     expect(leaders.length).toBe(3) // 极窄轨道下无备注的 math 时长也去了侧栏
-    expect(Number(leaders[1][2])).toBeLessThan(52) // 备注块的引导线锚在自己列边缘（trackW=18，列边缘<52）
+    expect(Number(leaders[1][2])).toBeLessThan(56) // 贴边布局后列边缘右移（trackW=18+gap）
   })
 
   it("side labels carry data-line for hover/focus pairing", () => {
