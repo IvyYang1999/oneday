@@ -295,6 +295,9 @@ export default class OnedayPlugin extends Plugin {
           )
         },
         onEditNote: (ln) => editNote(ln),
+        onDeleteEntry: (ln) => {
+          void this.applyBlockTransform(el, ctx, source, (s2) => deleteEntryLine(s2, ln))
+        },
         getEditingLine: () => (this.editing?.path === ctx.sourcePath ? this.editing.line : null),
         setEditingLine: (line) => {
           this.editing = line === null ? null : { path: ctx.sourcePath, line }

@@ -32,6 +32,8 @@ export interface DrawDeps {
   onUpdateSpan: (line: number, startMin: number, endMin: number) => void
   /** 选中块双击 -> 编辑备注（色块本质是文本框，yyt 2026-08-19） */
   onEditNote: (line: number) => void
+  /** 选中块按 Delete -> 删除（yyt 2026-08-19） */
+  onDeleteEntry: (line: number) => void
 }
 
 /** 轴端热区（px，svg 坐标） */
@@ -430,8 +432,17 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   // Esc 退出编辑：document 级监听只挂一份（每次渲染重复挂会泄漏+重复触发，性能审计 2026-08-19）
   const onEditKey = (e: KeyboardEvent): void => {
-    if (e.key === "Escape" && deps.getEditingLine() !== null) {
+    const editing = deps.getEditingLine()
+    if (editing === null) return
+    if (e.key === "Escape") {
       e.preventDefault()
+      exitEdit()
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      // 选中即删除（yyt 2026-08-19）；焦点可能不在输入框，文本框内不劫持
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return
+      e.preventDefault()
+      deps.onDeleteEntry(editing)
       exitEdit()
     }
   }
@@ -440,7 +451,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     document.addEventListener("keydown", (e: KeyboardEvent) => {
       // 委托：所有实例共用一个监听，行为由当前 DOM 状态决定
       const editingSvg = document.querySelector(".oneday-svg.is-editing-block")
-      if (e.key === "Escape" && editingSvg) {
+      if (editingSvg && (e.key === "Escape" || e.key === "Delete" || e.key === "Backspace")) {
         e.preventDefault()
         editingSvg.dispatchEvent(new CustomEvent("oneday-esc"))
       }
