@@ -431,13 +431,15 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   }
 
   // Esc 退出编辑：document 级监听只挂一份（每次渲染重复挂会泄漏+重复触发，性能审计 2026-08-19）
-  const onEditKey = (e: KeyboardEvent): void => {
+  const onEditKey = (e: Event): void => {
+    const ke = e as KeyboardEvent
+    const key = (e as CustomEvent).detail?.key ?? ke.key // 委托的自定义事件没有 .key（真机翻车点）
     const editing = deps.getEditingLine()
     if (editing === null) return
-    if (e.key === "Escape") {
+    if (key === "Escape") {
       e.preventDefault()
       exitEdit()
-    } else if (e.key === "Delete" || e.key === "Backspace") {
+    } else if (key === "Delete" || key === "Backspace") {
       // 选中即删除（yyt 2026-08-19）；焦点可能不在输入框，文本框内不劫持
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return
@@ -453,7 +455,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       const editingSvg = document.querySelector(".oneday-svg.is-editing-block")
       if (editingSvg && (e.key === "Escape" || e.key === "Delete" || e.key === "Backspace")) {
         e.preventDefault()
-        editingSvg.dispatchEvent(new CustomEvent("oneday-esc"))
+        editingSvg.dispatchEvent(new CustomEvent("oneday-esc", { detail: { key: e.key } }))
       }
     })
   }
