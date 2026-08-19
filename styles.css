@@ -511,12 +511,12 @@
   border-radius: 6px;
   cursor: grab;
   box-shadow: none;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 22px;
   padding: 0;
   display: grid;
   place-content: center;
-  gap: 2px 3px;
+  gap: 2px 2px; /* 飞书比例：点距远小于点到边界的留白 */
   grid-auto-flow: row;
   grid-template-columns: repeat(2, 1.5px);
 }
