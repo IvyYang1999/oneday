@@ -207,11 +207,11 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
     if (fs > 0) {
       const showNote = hh >= MIN_NOTE_H && e.note
       parts.push(
-        `<text pointer-events="none" class="oneday-duration oneday-plan-label" font-size="${fs}" x="${trackX + trackW / 2}" y="${yy + hh / 2 + (showNote ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
+        `<text pointer-events="none" class="oneday-duration oneday-plan-label" data-line="${e.line}" font-size="${fs}" x="${trackX + trackW / 2}" y="${yy + hh / 2 + (showNote ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
       )
       if (showNote) {
         parts.push(
-          `<text pointer-events="none" class="oneday-note oneday-plan-label" x="${trackX + trackW / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(truncate(e.note ?? ""))}</text>`
+          `<text pointer-events="none" class="oneday-note oneday-plan-label" data-line="${e.line}" x="${trackX + trackW / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(truncate(e.note ?? ""))}</text>`
         )
       }
     }
@@ -237,7 +237,7 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
     const canTwoLine = Boolean(e.note) && hh >= MIN_NOTE_H && fs > 0
     if (e.note && shortNote && fsCombined > 0) {
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
+        `<text pointer-events="none" class="oneday-duration" data-line="${e.line}" style="font-size:${fsCombined}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
       )
     } else if (canTwoLine) {
       // 长备注多行：时长加粗居中在上，备注小字换行在下（放不下才省略号）
@@ -246,20 +246,20 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
       const totalH = fs + noteLines.length * 11
       const startY = yy + (hh - totalH) / 2
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${startY + fs - 2}" text-anchor="middle">${label}</text>`
+        `<text pointer-events="none" class="oneday-duration" data-line="${e.line}" style="font-size:${fs}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${startY + fs - 2}" text-anchor="middle">${label}</text>`
       )
       noteLines.forEach((ln, i) => {
         parts.push(
-          `<text pointer-events="none" class="oneday-note" style="fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${startY + fs + 11 * (i + 1)}" text-anchor="middle">${escapeXml(ln)}</text>`
+          `<text pointer-events="none" class="oneday-note" data-line="${e.line}" style="fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${startY + fs + 11 * (i + 1)}" text-anchor="middle">${escapeXml(ln)}</text>`
         )
       })
     } else if (e.note && fsCombined > 0) {
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
+        `<text pointer-events="none" class="oneday-duration" data-line="${e.line}" style="font-size:${fsCombined}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
       )
     } else if (fs > 0) {
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fs / 2 - 1.5}" text-anchor="middle">${label}</text>`
+        `<text pointer-events="none" class="oneday-duration" data-line="${e.line}" style="font-size:${fs}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fs / 2 - 1.5}" text-anchor="middle">${label}</text>`
       )
       if (e.note) {
         // 实在放不进 -> 右侧标注车道
