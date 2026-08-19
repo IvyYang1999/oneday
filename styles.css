@@ -574,7 +574,8 @@
 .oneday-handle-n, .oneday-handle-s { left: 28px; right: 8px; height: 6px; cursor: ns-resize; } /* 左端避开 grip */
 .oneday-handle-n { top: 0; }
 .oneday-handle-s { bottom: 0; }
-.oneday-handle-e, .oneday-handle-w { top: 28px; bottom: 8px; width: 6px; cursor: ew-resize; } /* 上端避开 grip */
+.oneday-handle-w { top: 28px; bottom: 8px; width: 6px; cursor: ew-resize; } /* 上端避开 grip */
+.oneday-handle-e { top: 10px; bottom: 8px; width: 6px; cursor: ew-resize; } /* 右侧无 grip，贴住 ne 角（yyt：空白带）*/
 .oneday-handle-e { right: 0; }
 .oneday-handle-w { left: 0; }
 .oneday-handle-ne, .oneday-handle-nw, .oneday-handle-se, .oneday-handle-sw { width: 10px; height: 10px; }
