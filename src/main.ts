@@ -173,7 +173,7 @@ export default class OnedayPlugin extends Plugin {
         const rect = live.querySelector(`rect.oneday-block[data-line="${ln}"]`)
         const e0 = doc.entries.find((it) => it.line === ln)
         if (!rect || !e0) return
-        openNotePopover(live, rect.getBoundingClientRect(), e0.note ?? "", (note) => {
+        openNotePopover(live, rect, rect.getBoundingClientRect(), e0.note ?? "", (note) => {
           void this.applyBlockTransform(el, ctx, source, (s) => {
             const e = this.parse(s).entries.find((it) => it.line === ln)
             if (!e) return s
@@ -304,7 +304,7 @@ export default class OnedayPlugin extends Plugin {
               const rect = live.querySelector(`rect.oneday-block[data-line="${ln}"]`)
               const e0 = doc.entries.find((it) => it.line === ln)
               if (!rect || !e0) return
-              openTimePopover(live, rect.getBoundingClientRect(), {
+              openTimePopover(live, rect, rect.getBoundingClientRect(), {
                 start: formatClockPlain(e0.startMin),
                 end: formatClockPlain(e0.endMin),
               }, (st, en) => {

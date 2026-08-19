@@ -1,3 +1,4 @@
+import { trackAnchor } from "./popover-anchor"
 /**
  * Precise time editor: small popover with start/end inputs (HH:MM free
  * typing) docked at the block's right edge — the typing-precision
@@ -5,6 +6,7 @@
  */
 export function openTimePopover(
   container: HTMLElement,
+  anchorEl: Element,
   anchorRect: { x: number; y: number; width: number; height: number },
   initial: { start: string; end: string },
   onSave: (start: string, end: string) => void
@@ -25,14 +27,17 @@ export function openTimePopover(
   end.placeholder = "HH:MM"
   pop.append(start, dash, end)
 
-  // fixed + body 挂载：脱离槽位 overflow 裁剪与滚动（yyt 2026-08-19）
-  pop.style.left = `${anchorRect.x + anchorRect.width + 6}px`
-  pop.style.top = `${anchorRect.y + anchorRect.height / 2 - 14}px`
+  // fixed + body 挂载：脱离槽位裁剪；跟随锚点滚动（yyt 2026-08-19）
+  const place = (r: { x: number; width: number; y: number; height: number }): void => {
+    pop.style.left = `${r.x + r.width + 6}px`
+    pop.style.top = `${r.y + r.height / 2 - 14}px`
+    const vw = window.innerWidth
+    const pw = pop.offsetWidth
+    if (pop.offsetLeft + pw > vw - 8) pop.style.left = `${Math.max(8, r.x - pw - 6)}px`
+  }
+  place(anchorRect)
   document.body.appendChild(pop)
-  // 超出视口右侧时翻到左侧
-  const vw = window.innerWidth
-  const pw = pop.offsetWidth
-  if (pop.offsetLeft + pw > vw - 8) pop.style.left = `${Math.max(8, anchorRect.x - pw - 6)}px`
+  trackAnchor(pop, anchorEl, place)
 
   const valid = (v: string): boolean => /^\d{1,2}:\d{2}$/.test(v.trim())
   let done = false

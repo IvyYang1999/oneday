@@ -1,3 +1,4 @@
+import { trackAnchor } from "./popover-anchor"
 /**
  * Lightweight note editor: a small floating input docked at the block's
  * right edge (yyt: 大弹窗遮挡时间轴、输入区还小). Enter/blur saves, Esc cancels.
@@ -5,6 +6,7 @@
  */
 export function openNotePopover(
   container: HTMLElement,
+  anchorEl: Element,
   anchorRect: { x: number; y: number; width: number; height: number },
   initial: string,
   onSave: (note: string) => void
@@ -19,13 +21,17 @@ export function openNotePopover(
   input.placeholder = "这段时间干了什么？"
   pop.appendChild(input)
 
-  // fixed + body 挂载：脱离槽位裁剪与滚动（yyt 2026-08-19）
-  pop.style.left = `${anchorRect.x + anchorRect.width + 6}px`
-  pop.style.top = `${anchorRect.y + anchorRect.height / 2 - 14}px`
+  // fixed + body 挂载：脱离槽位裁剪；跟随锚点滚动（yyt 2026-08-19）
+  const place = (r: { x: number; width: number; y: number; height: number }): void => {
+    pop.style.left = `${r.x + r.width + 6}px`
+    pop.style.top = `${r.y + r.height / 2 - 14}px`
+    const vw = window.innerWidth
+    const pw = pop.offsetWidth
+    if (pop.offsetLeft + pw > vw - 8) pop.style.left = `${Math.max(8, r.x - pw - 6)}px`
+  }
+  place(anchorRect)
   document.body.appendChild(pop)
-  const vw = window.innerWidth
-  const pw = pop.offsetWidth
-  if (pop.offsetLeft + pw > vw - 8) pop.style.left = `${Math.max(8, anchorRect.x - pw - 6)}px`
+  trackAnchor(pop, anchorEl, place)
 
   let done = false
   const finish = (save: boolean): void => {
