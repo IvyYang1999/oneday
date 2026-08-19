@@ -63,6 +63,20 @@ export default class OnedayPlugin extends Plugin {
         insertTimelineBlock(editor, this.app.workspace.getActiveFile()?.basename ?? null, this.insertTemplate())
       },
     })
+    // 撤销/重做全局兜底（yyt 2026-08-19）：指针操作后焦点常在 body/组件上，
+    // CM6 收不到 Cmd/Ctrl+Z；目标不在 .cm-editor 内时转发给活跃视图的撤销栈
+    this.registerDomEvent(document, "keydown", (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return
+      const target = e.target as HTMLElement | null
+      if (target?.closest(".cm-editor")) return // 焦点本来就在编辑器里，走原生路径
+      const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+      if (!view) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.shiftKey) view.editor.redo()
+      else view.editor.undo()
+    }, { capture: true })
+
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu, editor) => {
         menu.addItem((item) =>
@@ -404,18 +418,6 @@ export default class OnedayPlugin extends Plugin {
         showAddMenu(r.left, r.top)
       })
       container.appendChild(addComp)
-
-      // 块内撤销/重做转发（yyt 2026-08-19：焦点在 block 内时 CM6 收不到 Ctrl+Z）
-      container.addEventListener("keydown", (e: KeyboardEvent) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
-          const view = this.findMarkdownView(ctx.sourcePath)
-          if (!view) return
-          e.preventDefault()
-          e.stopPropagation()
-          if (e.shiftKey) view.editor.redo()
-          else view.editor.undo()
-        }
-      })
 
       const menuSurface = (el.closest(".cm-embed-block") as HTMLElement | null) ?? container
       menuSurface.addEventListener("contextmenu", (e: MouseEvent) => {
