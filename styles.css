@@ -781,8 +781,8 @@
 /* 备注小浮窗（色块右侧） */
 
 .oneday-note-popover {
-  position: absolute;
-  z-index: 40;
+  position: fixed;
+  z-index: 1000;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
@@ -1168,8 +1168,8 @@
 /* 精确起止小浮窗 */
 
 .oneday-time-popover {
-  position: absolute;
-  z-index: 40;
+  position: fixed;
+  z-index: 1000;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;

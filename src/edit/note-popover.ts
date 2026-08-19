@@ -19,11 +19,13 @@ export function openNotePopover(
   input.placeholder = "这段时间干了什么？"
   pop.appendChild(input)
 
-  // 贴在色块右侧（相对 container 定位）
-  const cr = container.getBoundingClientRect()
-  pop.style.left = `${anchorRect.x - cr.x + anchorRect.width + 6}px`
-  pop.style.top = `${anchorRect.y - cr.y + anchorRect.height / 2 - 14}px`
-  container.appendChild(pop)
+  // fixed + body 挂载：脱离槽位裁剪与滚动（yyt 2026-08-19）
+  pop.style.left = `${anchorRect.x + anchorRect.width + 6}px`
+  pop.style.top = `${anchorRect.y + anchorRect.height / 2 - 14}px`
+  document.body.appendChild(pop)
+  const vw = window.innerWidth
+  const pw = pop.offsetWidth
+  if (pop.offsetLeft + pw > vw - 8) pop.style.left = `${Math.max(8, anchorRect.x - pw - 6)}px`
 
   let done = false
   const finish = (save: boolean): void => {

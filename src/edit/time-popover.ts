@@ -25,10 +25,14 @@ export function openTimePopover(
   end.placeholder = "HH:MM"
   pop.append(start, dash, end)
 
-  const cr = container.getBoundingClientRect()
-  pop.style.left = `${anchorRect.x - cr.x + anchorRect.width + 6}px`
-  pop.style.top = `${anchorRect.y - cr.y + anchorRect.height / 2 - 14}px`
-  container.appendChild(pop)
+  // fixed + body 挂载：脱离槽位 overflow 裁剪与滚动（yyt 2026-08-19）
+  pop.style.left = `${anchorRect.x + anchorRect.width + 6}px`
+  pop.style.top = `${anchorRect.y + anchorRect.height / 2 - 14}px`
+  document.body.appendChild(pop)
+  // 超出视口右侧时翻到左侧
+  const vw = window.innerWidth
+  const pw = pop.offsetWidth
+  if (pop.offsetLeft + pw > vw - 8) pop.style.left = `${Math.max(8, anchorRect.x - pw - 6)}px`
 
   const valid = (v: string): boolean => /^\d{1,2}:\d{2}$/.test(v.trim())
   let done = false
