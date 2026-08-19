@@ -595,14 +595,18 @@ export default class OnedayPlugin extends Plugin {
     const p = this.pendingScroll
     if (!p || p.path !== path) return
     this.pendingScroll = null
-    const slots = Array.from(container.querySelectorAll<HTMLElement>(".oneday-slot")).filter((s) => /^text\d*$/.test(s.dataset.slot ?? ""))
-    slots.forEach((slot, i) => {
-      if (p.textScrolls[i] !== undefined) slot.scrollTop = p.textScrolls[i]
-    })
-    if (p.editor) {
-      const view = this.findMarkdownView(path)
-      view?.editor.scrollTo(p.editor.left, p.editor.top)
+    const apply = (): void => {
+      const slots = Array.from(container.querySelectorAll<HTMLElement>(".oneday-slot")).filter((s) => /^text\d*$/.test(s.dataset.slot ?? ""))
+      slots.forEach((slot, i) => {
+        if (p.textScrolls[i] !== undefined) slot.scrollTop = p.textScrolls[i]
+      })
+      if (p.editor) {
+        const view = this.findMarkdownView(path)
+        view?.editor.scrollTo(p.editor.left, p.editor.top)
+      }
     }
+    apply()
+    window.setTimeout(apply, 350) // markdown 异步填充后再补一次（yyt：恢复被异步内容顶掉）
   }
 
   /** Sole write path into markdown (D7/D3 共用): transform block source, splice back. */

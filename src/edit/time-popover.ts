@@ -53,7 +53,11 @@ export function openTimePopover(
     }
   }
   // 气泡内点击不夺焦（yyt：点到浮窗就消失——blur 用预填值"成功保存"把自己关了）
-  pop.addEventListener("mousedown", (e) => e.preventDefault())
+  // 气泡内点击不夺焦——但输入框本身要能点（preventDefault 会连焦点一起吞，yyt 2026-08-19）
+  pop.addEventListener("mousedown", (e) => {
+    const t = e.target as HTMLElement
+    if (t !== start && t !== end) e.preventDefault()
+  })
   for (const input of [start, end]) {
     input.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter") {
