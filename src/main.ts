@@ -92,7 +92,10 @@ export default class OnedayPlugin extends Plugin {
         },
         {
           renderMarkdown: (host, text) => {
-            void MarkdownRenderer.render(this.app, text, host, ctx.sourcePath, this)
+            // 单换行 -> markdown 硬换行（行尾两空格）：无论 Obsidian 段落策略如何，
+            // 单换行都留在同一段落内，p+p 间距只对应源码真正的空行（yyt 2026-08-19）
+            const normalized = text.replace(/(?<!\n)\n(?!\n)/g, "  \n")
+            void MarkdownRenderer.render(this.app, normalized, host, ctx.sourcePath, this)
           },
           onSave: saveText,
         }
