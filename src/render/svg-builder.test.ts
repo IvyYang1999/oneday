@@ -31,7 +31,7 @@ describe("renderTimelineSvg", () => {
   it("keeps the duration centered with adaptive font even for thin blocks (yyt 2026-08-17)", () => {
     const svg = svgOf("17:00-17:30 math") // 30min -> 24px tall
     expect(svg).not.toContain("oneday-duration oneday-thin")
-    expect(svg).toMatch(/<text pointer-events="none" class="oneday-duration" style="font-size:([\d.]+)px;fill:#[0-9a-f]+"[^>]*>0.5h<\/text>/)
+    expect(svg).toMatch(/<text pointer-events="none" class="oneday-duration" style="font-size:([\d.]+)px;fill:(?:#[0-9a-f]+|hsl\([^)]+\))"[^>]*>0.5h<\/text>/)
   })
 
   it("shows note combined with duration inside the block (yyt 2026-08-17)", () => {
@@ -179,7 +179,7 @@ describe("M5b: single tooltip + tiny-column durations (yyt 2026-08-17)", () => {
     const svg = svgOf(src)
     // 7 columns -> w≈20px; durations must be inline (side lane carries notes only)
     expect(svg).not.toContain("oneday-duration oneday-thin")
-    const small = [...svg.matchAll(/class="oneday-duration" style="font-size:([\d.]+)px;fill:#[0-9a-f]+"/g)].map((m) => Number(m[1]))
+    const small = [...svg.matchAll(/class="oneday-duration" style="font-size:([\d.]+)px;fill:(?:#[0-9a-f]+|hsl\([^)]+\))"/g)].map((m) => Number(m[1]))
     expect(small.length).toBe(7)
     expect(Math.min(...small)).toBeGreaterThanOrEqual(4.5)
   })

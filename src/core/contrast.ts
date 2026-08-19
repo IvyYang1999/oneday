@@ -40,3 +40,49 @@ export function readableTextColor(bgColor: string): string {
   if (lum === null) return "#1a1a1a"
   return lum < 0.42 ? "#ffffff" : "#1a1a1a"
 }
+
+/** WCAG 对比度（1-21）。 */
+export function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a) ?? 0
+  const lb = relativeLuminance(b) ?? 0
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  if (max === min) return [0, 0, l]
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  let h = 0
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60
+  else if (max === g) h = ((b - r) / d + 2) * 60
+  else h = ((r - g) / d + 4) * 60
+  return [h, s, l]
+}
+
+/**
+ * 派生文字色（chromajs darken/saturate 思路，依赖-free 版）：
+ * 与底色同色相；浅底 -> 加深加饱和（深蓝配浅蓝），深底 -> 同色系浅色。
+ * 保证与底色 WCAG 对比度 >= 4.5，不满足就继续压/提亮度。
+ */
+export function relatedTextColor(bgColor: string): string {
+  const rgb = parseColor(bgColor)
+  if (!rgb) return "#1a1a1a"
+  const [h, s, l] = rgbToHsl(...rgb)
+  // 近灰底色：无色系可派生，退回中性色
+  if (s < 0.08) return l < 0.5 ? "#ffffff" : "#1a1a1a"
+
+  const dark = l > 0.45
+  let textL = dark ? 0.22 : 0.9
+  const textS = dark ? Math.min(0.9, s + 0.25) : Math.min(0.6, s + 0.1)
+  for (let i = 0; i < 12; i++) {
+    const candidate = `hsl(${Math.round(h)} ${Math.round(textS * 100)}% ${Math.round(textL * 100)}%)`
+    if (contrastRatio(candidate, bgColor) >= 4.5) return candidate
+    textL += dark ? -0.05 : 0.05
+    if (textL < 0.05) return "#1a1a1a"
+    if (textL > 0.97) return "#ffffff"
+  }
+  return dark ? "#1a1a1a" : "#ffffff"
+}

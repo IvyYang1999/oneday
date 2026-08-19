@@ -12,6 +12,7 @@ import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
 import { renderTimelineSvg, RenderOptions, SIDE_LANE_W } from "./svg-builder"
 import { hashTypeColor } from "../core/type-colors"
+import { relatedTextColor } from "../core/contrast"
 import { GRID_COLS, GRID_ROW_H, gridRows, isTextSlot, resolveGrid } from "../core/grid-layout"
 
 interface InlineEditorDeps {
@@ -137,7 +138,8 @@ export function renderTimelineInto(
       const color = opts.typeColors[st.type] ?? hashTypeColor(st.type)
       bar.style.background = color
       bar.style.width = `${Math.max(3, (st.minutes / maxMin) * 100)}%`
-      bar.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
+      const label = bar.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
+      label.style.color = relatedTextColor(color) // 柱上标签也派生反色
     }
   }
 

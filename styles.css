@@ -1066,8 +1066,7 @@
 .oneday-stat-hours {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.75);
-  mix-blend-mode: luminosity;
+  /* 颜色由 JS 派生（relatedTextColor），不需要 blend hack */
 }
 
 /* 快速记录多行输入 */
