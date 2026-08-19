@@ -399,6 +399,7 @@
   min-width: 180px;
   position: relative;
   font-size: 14px;
+  padding-top: 20px; /* 顶部永远留一行给手柄（yyt：编辑/渲染都从第二行起，不跳变） */
 }
 
 .oneday-text-edit {
@@ -1126,10 +1127,8 @@
   margin-top: 0 !important;
 }
 
-/* 手柄常驻淡显，hover 全亮（不然找不到） */
-
 .oneday-slot-grip {
-  opacity: 0.25;
+  opacity: 0; /* hover 才显示（yyt 撤回常驻淡显） */
 }
 
 .oneday-slot:hover .oneday-slot-grip {

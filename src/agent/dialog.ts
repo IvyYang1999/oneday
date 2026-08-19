@@ -40,7 +40,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
   const ta = input as unknown as HTMLTextAreaElement
   const fitInput = (): void => {
     ta.style.height = "0px"
-    ta.style.height = `${ta.scrollHeight}px`
+    ta.style.height = `${Math.max(32, ta.scrollHeight)}px` // 最小高度兜底（yyt：输入框扁了）
   }
   ta.addEventListener("input", fitInput)
   window.setTimeout(fitInput, 0)
