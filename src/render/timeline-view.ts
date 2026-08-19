@@ -134,12 +134,18 @@ export function renderTimelineInto(
       const row = box.createDiv({ cls: "oneday-stat-row" })
       row.createEl("span", { cls: "oneday-stat-type", text: st.type })
       const barWrap = row.createDiv({ cls: "oneday-stat-bar-wrap" })
-      const bar = barWrap.createDiv({ cls: "oneday-stat-bar" })
       const color = opts.typeColors[st.type] ?? hashTypeColor(st.type)
+      const pct = Math.max(3, (st.minutes / maxMin) * 100)
+      const bar = barWrap.createDiv({ cls: "oneday-stat-bar" })
       bar.style.background = color
-      bar.style.width = `${Math.max(3, (st.minutes / maxMin) * 100)}%`
-      const label = bar.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
-      label.style.color = relatedTextColor(color) // 柱上标签也派生反色
+      bar.style.width = `${pct}%`
+      // 短柱子标签放柱外右侧（否则被裁切，yyt 2026-08-19）
+      if (pct < 15) {
+        barWrap.createEl("span", { cls: "oneday-stat-hours oneday-stat-hours-out", text: formatHours(st.minutes) })
+      } else {
+        const label = bar.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
+        label.style.color = relatedTextColor(color) // 柱上标签派生反色
+      }
     }
   }
 

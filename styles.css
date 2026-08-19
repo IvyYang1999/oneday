@@ -1091,3 +1091,16 @@
 .oneday-view-none .oneday-svg .oneday-plan-label {
   display: none;
 }
+
+/* 短柱标签放柱外 */
+
+.oneday-stat-bar-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.oneday-stat-hours-out {
+  color: var(--text-normal);
+  margin-left: 5px;
+  padding-right: 0;
+}
