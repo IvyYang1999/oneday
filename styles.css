@@ -1134,3 +1134,19 @@
 .oneday-slot:hover .oneday-slot-grip {
   opacity: 1;
 }
+
+/* 文字区：编辑/渲染两态行距一致（yyt 2026-08-19） */
+
+.oneday-text-host,
+.oneday-text-inline {
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.oneday-text-host p {
+  margin: 0.5em 0;
+}
+
+.oneday-text-host p:first-child {
+  margin-top: 0;
+}
