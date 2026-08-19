@@ -521,15 +521,12 @@
   grid-template-rows: repeat(3, 2px);
 }
 
-/* 六点手柄（2 列 × 3 行，业界 grip 惯用视觉） */
-.oneday-slot-grip::before,
-.oneday-slot-grip::after {
-  content: "";
+/* 六点手柄（2 列 × 3 行）：JS 生成 span，CSS grid 布局（伪元素方案作废） */
+.oneday-slot-grip span {
   width: 2px;
   height: 2px;
   border-radius: 50%;
   background: var(--text-muted);
-  box-shadow: 0 5px 0 var(--text-muted), 0 -5px 0 var(--text-muted);
 }
 
 .oneday-slot:hover .oneday-slot-grip {

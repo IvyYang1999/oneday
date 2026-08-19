@@ -56,6 +56,8 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
     const grip = document.createElement("button")
     grip.className = "oneday-slot-grip"
     grip.title = "拖拽移动此组件"
+    // 六个真实点元素（伪元素在 button+grid 下不可靠，真机曾变形，yyt 2026-08-19）
+    for (let i = 0; i < 6; i++) grip.appendChild(document.createElement("span"))
     slot.appendChild(grip)
 
     grip.addEventListener("pointerdown", (e: PointerEvent) => {
