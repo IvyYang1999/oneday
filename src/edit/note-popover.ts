@@ -53,6 +53,11 @@ export function openNotePopover(
     }
     e.stopPropagation()
   })
-  input.addEventListener("blur", () => finish(true))
+  pop.addEventListener("focusout", () => {
+    if (done) return
+    window.setTimeout(() => {
+      if (!pop.contains(document.activeElement)) finish(true)
+    }, 0)
+  })
   window.setTimeout(() => input.focus(), 0)
 }

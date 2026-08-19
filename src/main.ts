@@ -606,7 +606,16 @@ export default class OnedayPlugin extends Plugin {
       }
     }
     apply()
-    window.setTimeout(apply, 350) // markdown 异步填充后再补一次（yyt：恢复被异步内容顶掉）
+    // 等真实的异步渲染落定（MarkdownRenderer.render 的 Promise），不盲猜时长（专家方案）
+    const asyncRenders = container.querySelectorAll<HTMLElement>(".oneday-text-host")
+    const settle = Array.from(asyncRenders).map((h) => new Promise<void>((resolve) => {
+      const mo = new MutationObserver(() => {
+        if (h.childElementCount > 0) { mo.disconnect(); resolve() }
+      })
+      mo.observe(h, { childList: true })
+      window.setTimeout(() => { mo.disconnect(); resolve() }, 2000) // 兜底上限
+    }))
+    void Promise.all(settle).then(apply)
   }
 
   /** Sole write path into markdown (D7/D3 共用): transform block source, splice back. */
@@ -622,6 +631,7 @@ export default class OnedayPlugin extends Plugin {
     if (!section) throw new Error("无法定位时间轴代码块（试试切换到阅读模式再试）")
 
     const newSource = transform(source)
+    if (newSource === source) return // 无变化不写（专家：避免无谓整块重写→重渲染→滚顶）
     this.captureScroll(ctx, el.closest(".oneday-container") as HTMLElement ?? el)
     // 优先走编辑器事务（进 CM6 撤销栈，Ctrl+Z 可撤回，yyt 2026-08-17）；
     // 找不到打开的编辑器再退回 vault.process

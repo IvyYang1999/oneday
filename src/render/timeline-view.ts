@@ -52,16 +52,24 @@ function attachInlineTextEditor(pane: HTMLElement, text: string, deps: InlineEdi
       }
       deps.onSave(ta.value)
     }
-    ta.addEventListener("blur", commit)
+    // 容器级 focusout（专家方案）：焦点离开整个文字区才提交
+    pane.addEventListener("focusout", () => {
+      window.setTimeout(() => {
+        if (pane.querySelector("textarea") && !pane.contains(document.activeElement)) commit()
+      }, 0)
+    })
+    let esc = false
     ta.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        ta.blur()
+        commit()
+        show()
       } else if (e.key === "Escape") {
-        ta.removeEventListener("blur", commit)
+        esc = true
         show()
       }
     })
+    void esc
     ta.focus()
   }
   show()
