@@ -24,14 +24,15 @@ export function buildSystemPrompt(ctx: PromptContext): string {
 
   const existing = ctx.doc.entries
     .filter((e) => !e.plan)
-    .map((e) => `  ${formatClock(e.startMin)}-${formatClock(e.endMin)} ${e.type}${e.note ? " " + e.note : ""}`)
+    .sort((a, b) => a.startMin - b.startMin)
+    .map((e, i) => `  ${i + 1}) ${formatClock(e.startMin)}-${formatClock(e.endMin)} ${e.type}${e.note ? " " + e.note : ""}`)
     .join("\n")
 
   return [
     "你是 oneday 时间轴助手的条目生成器。用户会用自然语言描述刚做/在做/计划做的事，你把它转成一条时间轴色块。",
     GRAMMAR,
     `当前时间：${hh}:${mm}。时间轴起点：${formatClock(ctx.doc.rangeStart)}（「起床」类表述从这里开始算睡觉时段）。已登记的任务类型（type 必须从这里选，拿不准用 misc）：${types}。`,
-    existing ? `当天已有实际色块（可与之并列重叠，插件会并排渲染）：\n${existing}` : "当天还没有实际色块。",
+    existing ? `当天已有实际色块（编号供修改/删除引用；可与之并列重叠）：\n${existing}` : "当天还没有实际色块。",
     "规则：",
     "1. 「刚花了 X」→ end=当前时间，start=往前推 X；「从 a 到 b」→ 直接用给定时间。",
     "   「我 X 点起床/才起」→ sleep 块：start=时间轴起点，end=X。「昨晚 X 点睡」→ 跨零点当日的凌晨（如 01:00）。",

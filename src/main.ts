@@ -1,5 +1,5 @@
 import { MarkdownPostProcessorContext, MarkdownRenderer, MarkdownView, Menu, Platform, Plugin, TFile } from "obsidian"
-import { parseTimeline } from "./core/parser"
+import { normalizeSpan, parseTimeline } from "./core/parser"
 import { formatEntryLine, weekdayZh } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
 import { hashTypeColor } from "./core/type-colors"
@@ -425,10 +425,35 @@ export default class OnedayPlugin extends Plugin {
             // @ts-expect-error 内部 API
             this.app.setting?.openTabById?.("oneday")
           },
-          writeEntries: (entries) =>
+          writeActions: (actions) =>
             this.applyBlockTransform(el, ctx, source, (s) => {
               let out = this.persistLayoutOnce(s, doc, container)
-              for (const e of entries) out = insertEntryLine(out, e.sourceLine, e.startMin)
+              for (const a of actions) {
+                if (a.kind === "create") {
+                  out = insertEntryLine(out, a.entry.sourceLine, a.entry.startMin)
+                  continue
+                }
+                // target 是请求时刻的编号；写入时按当前源码重取（时间排序、plan 除外）
+                const d = this.parse(out)
+                const target = d.entries.filter((e) => !e.plan).sort((x, y) => x.startMin - y.startMin)[a.targetIndex]
+                if (!target) continue
+                if (a.kind === "delete") {
+                  out = deleteEntryLine(out, target.line)
+                } else {
+                  const [startMin, endMin] = normalizeSpan(
+                    a.patch.startMin ?? target.startMin,
+                    a.patch.endMin ?? target.endMin,
+                    d.rangeStart
+                  )
+                  out = replaceEntryLine(out, target.line, formatEntryLine({
+                    ...target,
+                    startMin,
+                    endMin,
+                    type: a.patch.type ?? target.type,
+                    note: a.patch.note !== undefined ? (a.patch.note || undefined) : target.note,
+                  }))
+                }
+              }
               return out
             }),
         })

@@ -89,6 +89,16 @@ export type ResponsesResult =
   | { ok: true; entries: ValidatedEntry[] }
   | { ok: false; reason: string }
 
+/** target = 提示词里「已有色块」列表的编号（1 起，按开始时间排序，plan 除外） */
+export type AgentAction =
+  | { kind: "create"; entry: ValidatedEntry }
+  | { kind: "update"; targetIndex: number; patch: { startMin?: number; endMin?: number; type?: string; note?: string } }
+  | { kind: "delete"; targetIndex: number }
+
+export type ActionsResult =
+  | { ok: true; actions: AgentAction[] }
+  | { ok: false; reason: string }
+
 /** 多段描述：一句话多个色块（JSON 数组）；单对象也接受（yyt 2026-08-19）。 */
 export function interpretResponses(text: string, doc: TimelineDoc): ResponsesResult {
   const json = extractJson(text)
@@ -103,4 +113,62 @@ export function interpretResponses(text: string, doc: TimelineDoc): ResponsesRes
     entries.push(r.entry)
   }
   return { ok: true, entries: entries.sort((a, b) => a.startMin - b.startMin) }
+}
+
+/** 编辑动作管道：create（裸对象）/ update / delete / error，数组混合。 */
+export function interpretActions(text: string, doc: TimelineDoc): ActionsResult {
+  const json = extractJson(text)
+  if (json === null) {
+    return { ok: false, reason: "返回中没有 JSON" }
+  }
+  const list = Array.isArray(json) ? json : [json]
+  const actions: AgentAction[] = []
+  for (const raw of list) {
+    if (raw === null || typeof raw !== "object") return { ok: false, reason: "返回不是 JSON 对象" }
+    const obj = raw as Record<string, unknown>
+    if (typeof obj.error === "string") return { ok: false, reason: obj.error }
+    const action = typeof obj.action === "string" ? obj.action : "create"
+
+    if (action === "create") {
+      const r = validateEntry(obj, doc)
+      if (!r.ok) return { ok: false, reason: r.reason }
+      actions.push({ kind: "create", entry: r.entry })
+      continue
+    }
+
+    // update / delete 需要 target
+    const target = typeof obj.target === "number" ? obj.target : NaN
+    const actualCount = doc.entries.filter((e) => !e.plan).length
+    if (!Number.isInteger(target) || target < 1 || target > actualCount) {
+      return { ok: false, reason: `target 应为 1-${actualCount} 的编号` }
+    }
+    if (action === "delete") {
+      actions.push({ kind: "delete", targetIndex: target - 1 })
+      continue
+    }
+    if (action === "update") {
+      const patch: { startMin?: number; endMin?: number; type?: string; note?: string } = {}
+      if (obj.start !== undefined) {
+        const v = parseClock(obj.start)
+        if (v === null) return { ok: false, reason: "start 时间格式应为 HH:MM" }
+        patch.startMin = v
+      }
+      if (obj.end !== undefined) {
+        const v = parseClock(obj.end)
+        if (v === null) return { ok: false, reason: "end 时间格式应为 HH:MM" }
+        patch.endMin = v
+      }
+      if (obj.type !== undefined) {
+        const t = String(obj.type).trim()
+        if (!/^\S+$/.test(t)) return { ok: false, reason: "type 不能含空白字符" }
+        patch.type = t
+      }
+      if (obj.note !== undefined) patch.note = String(obj.note).trim()
+      if (Object.keys(patch).length === 0) return { ok: false, reason: "update 没有要改的字段" }
+      actions.push({ kind: "update", targetIndex: target - 1, patch })
+      continue
+    }
+    return { ok: false, reason: `未知 action：${action}` }
+  }
+  return { ok: true, actions }
 }
