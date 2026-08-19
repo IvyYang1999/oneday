@@ -1144,9 +1144,10 @@
 }
 
 .oneday-text-host p {
-  margin: 0.5em 0;
+  margin: 0;
+  white-space: pre-wrap; /* 软换行忠实显示（对齐 textarea 的源码观感） */
 }
 
-.oneday-text-host p:first-child {
-  margin-top: 0;
+.oneday-text-host p + p {
+  margin-top: 1.6em; /* 段落空行 = 恰好一个空行高度，与编辑态一致 */
 }
