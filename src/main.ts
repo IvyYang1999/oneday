@@ -261,6 +261,7 @@ export default class OnedayPlugin extends Plugin {
       const body = container.querySelector(".oneday-body")
       // 自动量高：内容比格子高的槽位撑开格子（修新建块截断），只改显示不自动写源码
       this.fitSlotHeights(container)
+      this.restoreScroll(ctx.sourcePath, container)
       // 初始调整全部完成后开启动画（is-settling 期间槽位不过渡，杀创建闪缩）
       window.setTimeout(() => body?.classList.remove("is-settling"), 350)
 
@@ -573,6 +574,37 @@ export default class OnedayPlugin extends Plugin {
     }
   }
 
+  /** 写回前的滚动位置（text 槽内部滚动 + 编辑器页面滚动），渲染后恢复（yyt：编辑/创建后跳顶部） */
+  private pendingScroll: { path: string; textScrolls: number[]; editor: { top: number; left: number } | null } | null = null
+
+  private captureScroll(ctx: MarkdownPostProcessorContext, container: HTMLElement): void {
+    const textScrolls: number[] = []
+    container.querySelectorAll<HTMLElement>(".oneday-slot").forEach((slot) => {
+      if (/^text\d*$/.test(slot.dataset.slot ?? "")) textScrolls.push(slot.scrollTop)
+    })
+    const view = this.findMarkdownView(ctx.sourcePath)
+    let editor: { top: number; left: number } | null = null
+    if (view) {
+      const info = view.editor.getScrollInfo()
+      editor = { top: info.top, left: info.left }
+    }
+    this.pendingScroll = { path: ctx.sourcePath, textScrolls, editor }
+  }
+
+  private restoreScroll(path: string, container: HTMLElement): void {
+    const p = this.pendingScroll
+    if (!p || p.path !== path) return
+    this.pendingScroll = null
+    const slots = Array.from(container.querySelectorAll<HTMLElement>(".oneday-slot")).filter((s) => /^text\d*$/.test(s.dataset.slot ?? ""))
+    slots.forEach((slot, i) => {
+      if (p.textScrolls[i] !== undefined) slot.scrollTop = p.textScrolls[i]
+    })
+    if (p.editor) {
+      const view = this.findMarkdownView(path)
+      view?.editor.scrollTo(p.editor.left, p.editor.top)
+    }
+  }
+
   /** Sole write path into markdown (D7/D3 共用): transform block source, splice back. */
   private async applyBlockTransform(
     el: HTMLElement,
@@ -586,6 +618,7 @@ export default class OnedayPlugin extends Plugin {
     if (!section) throw new Error("无法定位时间轴代码块（试试切换到阅读模式再试）")
 
     const newSource = transform(source)
+    this.captureScroll(ctx, el.closest(".oneday-container") as HTMLElement ?? el)
     // 优先走编辑器事务（进 CM6 撤销栈，Ctrl+Z 可撤回，yyt 2026-08-17）；
     // 找不到打开的编辑器再退回 vault.process
     const view = this.findMarkdownView(ctx.sourcePath)

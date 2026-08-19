@@ -33,6 +33,7 @@ export function openNotePopover(
   document.body.appendChild(pop)
   trackAnchor(pop, anchorEl, place)
 
+  pop.addEventListener("mousedown", (e) => e.preventDefault()) // 气泡内点击不夺焦
   let done = false
   const finish = (save: boolean): void => {
     if (done) return
