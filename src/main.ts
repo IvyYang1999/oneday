@@ -45,7 +45,7 @@ export default class OnedayPlugin extends Plugin {
 
   /** 视图类即时切换（LP/阅读模式都生效，不依赖重渲染） */
   private applyViewClass(container: HTMLElement, view: LayerView): void {
-    container.classList.remove("oneday-view-all", "oneday-view-actual", "oneday-view-plan")
+    container.classList.remove("oneday-view-all", "oneday-view-actual", "oneday-view-plan", "oneday-view-none")
     const cls = view.actual && view.plan ? "all" : view.actual ? "actual" : view.plan ? "plan" : "none"
     container.classList.add(`oneday-view-${cls}`)
   }

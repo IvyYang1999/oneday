@@ -1019,11 +1019,6 @@
   align-items: center;
 }
 
-.oneday-eye::before {
-  content: "👁";
-  font-size: 10px;
-}
-
 .oneday-eye.is-off {
   opacity: 0.3;
   text-decoration: line-through;
