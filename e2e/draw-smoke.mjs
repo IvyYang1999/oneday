@@ -52,6 +52,7 @@ window.__shown = []
 window.__trackmenu = []
 window.__extend = []
 window.__editing = null
+window.__editnotes = []
 window.__span = []
 
 attachHoverInfo(container, doc)
@@ -63,6 +64,7 @@ attachDrawInteraction(container, doc, {
   onBlockClick: (line) => window.__focus.push(line),
   onTrackMenu: (x, y) => window.__trackmenu.push({ x, y }),
   onExtendRange: (startMin, endMin) => window.__extend.push({ startMin, endMin }),
+  onEditNote: (line) => window.__editnotes.push(line),
   getEditingLine: () => window.__editing,
   setEditingLine: (l) => { window.__editing = l },
   onUpdateSpan: (line, startMin, endMin) => window.__span.push({ line, startMin, endMin }),
@@ -181,6 +183,11 @@ const extend = await page.evaluate(() => window.__extend)
 if (extend.length !== 1 || extend[0].startMin !== 420 || extend[0].endMin !== 1560) {
   console.error("extend mismatch", JSON.stringify(extend)); process.exit(1)
 }
+// 5f. dblclick on a block -> edit its note
+await page.locator('rect.oneday-block[data-line="0"]').dispatchEvent("dblclick")
+
+const editnotes = await page.evaluate(() => window.__editnotes)
+if (editnotes.length !== 1 || editnotes[0] !== 0) { console.error("editnote mismatch", JSON.stringify(editnotes)); process.exit(1) }
 const focus = await page.evaluate(() => window.__focus)
 if (focus.length !== 1 || focus[0] !== 0) { console.error("focus mismatch", JSON.stringify(focus)); process.exit(1) }
 const editingNow = await page.evaluate(() => window.__editing)

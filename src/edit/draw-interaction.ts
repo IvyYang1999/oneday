@@ -30,6 +30,8 @@ export interface DrawDeps {
   setEditingLine: (line: number | null) => void
   /** 编辑态提交新的起止（移动/边缘拖拽） */
   onUpdateSpan: (line: number, startMin: number, endMin: number) => void
+  /** 选中块双击 -> 编辑备注（色块本质是文本框，yyt 2026-08-19） */
+  onEditNote: (line: number) => void
 }
 
 /** 轴端热区（px，svg 坐标） */
@@ -428,6 +430,22 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   // 进入编辑态的视觉同步（挂载时若已在编辑态则恢复）
   syncEditVisual()
+
+  svg.addEventListener("dblclick", (e: MouseEvent) => {
+    const target = (e.target as Element | null)?.closest("rect.oneday-block")
+    if (!target) return
+    const line = Number((target as HTMLElement).dataset.line)
+    if (!Number.isInteger(line)) return
+    e.preventDefault()
+    e.stopPropagation()
+    // 双击 = 选中并进编辑态 + 直接改备注（不要求先单击选中——单击 toggle 会吃掉预选）
+    if (deps.getEditingLine() !== line) {
+      deps.setEditingLine(line)
+      deps.onBlockClick(line)
+      syncEditVisual()
+    }
+    deps.onEditNote(line)
+  })
 
   svg.addEventListener("contextmenu", (e: MouseEvent) => {
     const target = e.target as Element | null

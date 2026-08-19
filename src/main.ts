@@ -162,6 +162,19 @@ export default class OnedayPlugin extends Plugin {
         menu.showAtPosition({ x, y })
       }
 
+      const editNote = (ln: number): void => {
+        const rect = container.querySelector(`rect.oneday-block[data-line="${ln}"]`)
+        const e0 = doc.entries.find((it) => it.line === ln)
+        if (!rect || !e0) return
+        openNotePopover(container, rect.getBoundingClientRect(), e0.note ?? "", (note) => {
+          void this.applyBlockTransform(el, ctx, source, (s) => {
+            const e = this.parse(s).entries.find((it) => it.line === ln)
+            if (!e) return s
+            return replaceEntryLine(s, ln, formatEntryLine({ ...e, note: note || undefined }))
+          })
+        })
+      }
+
       const toolbar = buildToolbar({
         typeColors: paletteColors,
         hiddenTypes: doc.hiddenTypes,
@@ -260,6 +273,7 @@ export default class OnedayPlugin extends Plugin {
             setHeaderValue(s, "range", `${Math.round(startMin / 60)}-${Math.round(endMin / 60)}`)
           )
         },
+        onEditNote: (ln) => editNote(ln),
         getEditingLine: () => (this.editing?.path === ctx.sourcePath ? this.editing.line : null),
         setEditingLine: (line) => {
           this.editing = line === null ? null : { path: ctx.sourcePath, line }
@@ -276,18 +290,7 @@ export default class OnedayPlugin extends Plugin {
           const entry = doc.entries.find((e) => e.line === line)
           if (!entry) return
           showBlockMenu(this.app, entry, paletteTypes, x, y, {
-            editNote: (ln) => {
-              const rect = container.querySelector(`rect.oneday-block[data-line="${ln}"]`)
-              const e0 = doc.entries.find((it) => it.line === ln)
-              if (!rect || !e0) return
-              openNotePopover(container, rect.getBoundingClientRect(), e0.note ?? "", (note) => {
-                void this.applyBlockTransform(el, ctx, source, (s) => {
-                  const e = this.parse(s).entries.find((it) => it.line === ln)
-                  if (!e) return s
-                  return replaceEntryLine(s, ln, formatEntryLine({ ...e, note: note || undefined }))
-                })
-              })
-            },
+            editNote,
             editSpan: (ln) => {
               this.editing = { path: ctx.sourcePath, line: ln }
               const svgEl = container.querySelector("svg.oneday-svg")
