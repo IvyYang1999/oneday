@@ -8,6 +8,7 @@
  */
 import { Entry, TimelineDoc } from "../core/types"
 import { hashTypeColor } from "../core/type-colors"
+import { readableTextColor } from "../core/contrast"
 import { formatClock, formatHours, durationMinutes } from "../core/duration"
 import { AXIS_PAD_TOP, AXIS_PAD_BOTTOM, LABEL_W, TRACK_PAD, inlineFontSize } from "../core/geometry"
 
@@ -236,7 +237,7 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
     const canTwoLine = Boolean(e.note) && hh >= MIN_NOTE_H && fs > 0
     if (e.note && shortNote && fsCombined > 0) {
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px;fill:${readableTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
       )
     } else if (canTwoLine) {
       // 长备注多行：时长加粗居中在上，备注小字换行在下（放不下才省略号）
@@ -245,20 +246,20 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
       const totalH = fs + noteLines.length * 11
       const startY = yy + (hh - totalH) / 2
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${startY + fs - 2}" text-anchor="middle">${label}</text>`
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px;fill:${readableTextColor(color)}" x="${p.x + p.w / 2}" y="${startY + fs - 2}" text-anchor="middle">${label}</text>`
       )
       noteLines.forEach((ln, i) => {
         parts.push(
-          `<text pointer-events="none" class="oneday-note" x="${p.x + p.w / 2}" y="${startY + fs + 11 * (i + 1)}" text-anchor="middle">${escapeXml(ln)}</text>`
+          `<text pointer-events="none" class="oneday-note" style="fill:${readableTextColor(color)}" x="${p.x + p.w / 2}" y="${startY + fs + 11 * (i + 1)}" text-anchor="middle">${escapeXml(ln)}</text>`
         )
       })
     } else if (e.note && fsCombined > 0) {
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fsCombined}px;fill:${readableTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
       )
     } else if (fs > 0) {
       parts.push(
-        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fs / 2 - 1.5}" text-anchor="middle">${label}</text>`
+        `<text pointer-events="none" class="oneday-duration" style="font-size:${fs}px;fill:${readableTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fs / 2 - 1.5}" text-anchor="middle">${label}</text>`
       )
       if (e.note) {
         // 实在放不进 -> 右侧标注车道

@@ -46,7 +46,7 @@ export default class OnedayPlugin extends Plugin {
   /** 视图类即时切换（LP/阅读模式都生效，不依赖重渲染） */
   private applyViewClass(container: HTMLElement, view: LayerView): void {
     container.classList.remove("oneday-view-all", "oneday-view-actual", "oneday-view-plan")
-    const cls = view.actual && view.plan ? "all" : view.actual ? "actual" : "plan"
+    const cls = view.actual && view.plan ? "all" : view.actual ? "actual" : view.plan ? "plan" : "none"
     container.classList.add(`oneday-view-${cls}`)
   }
 
@@ -415,9 +415,9 @@ export default class OnedayPlugin extends Plugin {
         showAddMenu(e.clientX, e.clientY)
       })
 
-      if (Platform.isDesktopApp || this.settings.dialogBackend === "api") {
-        const dialogSlot = container.querySelector(".oneday-slot-dialog")
-        attachDialog((dialogSlot instanceof HTMLElement ? dialogSlot : col instanceof HTMLElement ? col : container), doc, {
+      const dialogSlot = container.querySelector(".oneday-slot-dialog")
+      if ((Platform.isDesktopApp || this.settings.dialogBackend === "api") && dialogSlot instanceof HTMLElement) {
+        attachDialog(dialogSlot, doc, {
           settings: this.settings,
           openSettings: () => {
             // @ts-expect-error 内部 API

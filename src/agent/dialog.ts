@@ -32,10 +32,18 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     return
   }
 
-  const input = box.createEl("input", {
+  // 自动增高的多行输入（yyt：多事件时内容长）
+  const input = box.createEl("textarea", {
     cls: "oneday-dialog-input",
-    attr: { type: "text", placeholder: "✦ 快速记录：刚健身半小时…" },
-  })
+    attr: { placeholder: "✦ 快速记录：刚健身半小时…", rows: "1" },
+  }) as unknown as HTMLInputElement
+  const ta = input as unknown as HTMLTextAreaElement
+  const fitInput = (): void => {
+    ta.style.height = "0px"
+    ta.style.height = `${ta.scrollHeight}px`
+  }
+  ta.addEventListener("input", fitInput)
+  window.setTimeout(fitInput, 0)
   // loading 内联在输入行右侧（yyt：不占单独一行）
   const loading = box.createEl("span", { cls: "oneday-dialog-loading", text: "生成中…" })
   loading.style.display = "none"
@@ -45,10 +53,10 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
   const history: Array<{ role: "user" | "assistant"; content: string }> = []
   let busy = false
   const submit = async (): Promise<void> => {
-    const text = input.value.trim()
+    const text = ta.value.trim()
     if (text === "" || busy) return
     busy = true
-    input.disabled = true
+    ta.disabled = true
     loading.style.display = ""
     status.setText("")
     status.removeClass("oneday-dialog-error")
@@ -79,7 +87,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       status.setText(run.reason)
       status.addClass("oneday-dialog-error")
       busy = false
-      input.disabled = false
+      ta.disabled = false
       return
     }
 
@@ -90,19 +98,21 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       status.setText(result.reason)
       status.addClass("oneday-dialog-error")
       busy = false
-      input.disabled = false
-      input.value = ""
-      input.placeholder = "补充回答它的问题…"
+      ta.disabled = false
+      ta.value = ""
+      fitInput()
+      ta.placeholder = "补充回答它的问题…"
       return
     }
     // 成功：本轮任务完成，重置会话
     history.length = 0
-    input.placeholder = "✦ 快速记录：刚健身半小时…"
+    ta.placeholder = "✦ 快速记录：刚健身半小时…"
 
     loading.style.display = "none"
     try {
       await deps.writeActions(result.actions)
-      input.value = ""
+      ta.value = ""
+      fitInput()
       const rawCost = "costUsd" in run ? run.costUsd : undefined
       const cost = typeof rawCost === "number" ? `（$${rawCost.toFixed(4)}）` : ""
       const kinds = { create: 0, update: 0, delete: 0 }
@@ -114,11 +124,11 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       status.addClass("oneday-dialog-error")
     }
     busy = false
-    input.disabled = false
+    ta.disabled = false
   }
 
-  input.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.key === "Enter") {
+  ta.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       void submit()
     }

@@ -175,6 +175,9 @@ export function buildModeToggle(mode: DrawMode, onChange: (mode: DrawMode) => vo
   return wrap
 }
 
+const EYE_OPEN_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'
+const EYE_OFF_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.6A9.5 9.5 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.44 9.44 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/></svg>'
+
 export interface LayerView {
   actual: boolean
   plan: boolean
@@ -193,23 +196,21 @@ export function buildLayerToggles(view: LayerView, onChange: (view: LayerView) =
     btn.type = "button"
     btn.className = "oneday-mode-btn oneday-layer-btn" + (state[key] ? " is-active" : "")
     btn.dataset.layer = key
-    // 图层符号（实心点=记录 / 斜纹块=计划）+ 眼睛，yyt 选定的 V2 方案
-    const sym = document.createElement("span")
-    sym.className = key === "actual" ? "oneday-sym oneday-sym-dot" : "oneday-sym oneday-sym-hatch"
+    // 文字 + Lucide eye/eye-off 图标（yyt 2026-08-19：不要 emoji）
+    const text = document.createElement("span")
+    text.textContent = label
     const eye = document.createElement("span")
     eye.className = "oneday-eye"
-    btn.append(sym, eye)
+    btn.append(text, eye)
     const syncAria = (on: boolean): void => {
       btn.setAttribute("aria-pressed", String(on))
       btn.title = on ? `隐藏${label}图层` : `显示${label}图层`
-      eye.classList.toggle("is-off", !on)
+      eye.innerHTML = on ? EYE_OPEN_SVG : EYE_OFF_SVG
     }
     syncAria(state[key])
     btn.addEventListener("click", () => {
       const next = !state[key]
-      // 最后一个亮着的不允许再灭
-      if (!next && !state[key === "actual" ? "plan" : "actual"]) return
-      state[key] = next
+      state[key] = next // 允许全灭（yyt：什么都不显示也是合法状态）
       btn.classList.toggle("is-active", next)
       syncAria(next)
       onChange({ ...state })

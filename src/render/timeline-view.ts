@@ -123,22 +123,26 @@ export function renderTimelineInto(
   el.classList.add("oneday-host")
   el.classList.toggle("oneday-host-float", useFloat)
 
-  const statsSlot = container.querySelector(".oneday-slot-stats") ?? container
+  const statsSlot = container.querySelector(".oneday-slot-stats") // 被 off: 隐藏时不兜底渲染
   const stats = statsByType(doc.entries)
-  if (stats.length > 0) {
+  if (stats.length > 0 && statsSlot) {
     // 每行一个类型 + 荧光笔色点（yyt 2026-08-17）
-    const box = statsSlot.createDiv({ cls: "oneday-stats" })
+    const box = (statsSlot as HTMLElement).createDiv({ cls: "oneday-stats" })
+    const maxMin = Math.max(...stats.map((st) => st.minutes), 1)
     for (const st of stats) {
       const row = box.createDiv({ cls: "oneday-stat-row" })
-      const dot = row.createEl("span", { cls: "oneday-stat-dot" })
-      dot.style.background = opts.typeColors[st.type] ?? hashTypeColor(st.type)
       row.createEl("span", { cls: "oneday-stat-type", text: st.type })
-      row.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
+      const barWrap = row.createDiv({ cls: "oneday-stat-bar-wrap" })
+      const bar = barWrap.createDiv({ cls: "oneday-stat-bar" })
+      const color = opts.typeColors[st.type] ?? hashTypeColor(st.type)
+      bar.style.background = color
+      bar.style.width = `${Math.max(3, (st.minutes / maxMin) * 100)}%`
+      bar.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
     }
   }
 
-  if (doc.errors.length > 0) {
-    const box = statsSlot.createDiv({ cls: "oneday-errors" })
+  if (doc.errors.length > 0 && statsSlot) {
+    const box = (statsSlot as HTMLElement).createDiv({ cls: "oneday-errors" })
     for (const err of doc.errors) {
       box.createDiv({ text: `第 ${err.line + 1} 行：${err.reason}${err.text ? `（${err.text.trim()}）` : ""}` })
     }

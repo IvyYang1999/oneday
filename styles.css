@@ -1034,3 +1034,66 @@
   align-items: center;
   gap: 5px;
 }
+
+/* 统计柱状图 */
+
+.oneday-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.oneday-stat-type {
+  flex-shrink: 0;
+  min-width: 42px;
+  font-size: 12px;
+  color: var(--text-normal);
+}
+
+.oneday-stat-bar-wrap {
+  flex: 1;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  height: 16px;
+  overflow: hidden;
+}
+
+.oneday-stat-bar {
+  height: 100%;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 4px;
+  min-width: 24px;
+}
+
+.oneday-stat-hours {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.75);
+  mix-blend-mode: luminosity;
+}
+
+/* 快速记录多行输入 */
+
+.oneday-dialog-input {
+  resize: none;
+  overflow: hidden;
+  line-height: 1.5;
+  padding: 6px 10px;
+}
+
+.oneday-dialog {
+  position: relative;
+}
+
+/* 全灭视图：什么都不显示 */
+
+.oneday-view-none .oneday-svg .oneday-block,
+.oneday-view-none .oneday-svg .oneday-plan-hatch,
+.oneday-view-none .oneday-svg .oneday-duration,
+.oneday-view-none .oneday-svg .oneday-note,
+.oneday-view-none .oneday-svg .oneday-plan-label {
+  display: none;
+}
