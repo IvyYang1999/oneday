@@ -1164,3 +1164,33 @@
   outline: none !important;
   border: none !important;
 }
+
+/* 精确起止小浮窗 */
+
+.oneday-time-popover {
+  position: absolute;
+  z-index: 40;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.oneday-time-popover input {
+  width: 52px;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  padding: 2px 4px;
+}
+
+.oneday-time-popover span {
+  color: var(--text-muted);
+}

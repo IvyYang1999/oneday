@@ -1,6 +1,6 @@
 import { MarkdownPostProcessorContext, MarkdownRenderer, MarkdownView, Menu, Platform, Plugin, TFile } from "obsidian"
 import { normalizeSpan, parseTimeline } from "./core/parser"
-import { formatEntryLine, weekdayZh } from "./core/format"
+import { formatClockPlain, formatEntryLine, weekdayZh } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
 import { hashTypeColor } from "./core/type-colors"
 import { renderTimelineInto } from "./render/timeline-view"
@@ -16,6 +16,7 @@ import { compactGrid, GRID_ROW_H, gridRows, GridItem, serializeLayoutHeader } fr
 import { inferDate, insertTimelineBlock } from "./insert"
 import { attachWidthHandle } from "./edit/width-handle"
 import { openNotePopover } from "./edit/note-popover"
+import { openTimePopover } from "./edit/time-popover"
 import { SIDE_LANE_W } from "./render/svg-builder"
 
 /**
@@ -297,6 +298,27 @@ export default class OnedayPlugin extends Plugin {
           if (!entry) return
           showBlockMenu(this.app, entry, paletteTypes, x, y, {
             editNote,
+            editTimes: (ln) => {
+              const live = container.isConnected ? container : (document.querySelector(".oneday-container") as HTMLElement | null)
+              if (!live) return
+              const rect = live.querySelector(`rect.oneday-block[data-line="${ln}"]`)
+              const e0 = doc.entries.find((it) => it.line === ln)
+              if (!rect || !e0) return
+              openTimePopover(live, rect.getBoundingClientRect(), {
+                start: formatClockPlain(e0.startMin),
+                end: formatClockPlain(e0.endMin),
+              }, (st, en) => {
+                void this.applyBlockTransform(el, ctx, source, (s2) => {
+                  const d = this.parse(s2)
+                  const e = d.entries.find((it) => it.line === ln)
+                  if (!e) return s2
+                  const [sh, sm] = st.split(":").map(Number)
+                  const [eh, em] = en.split(":").map(Number)
+                  const [startMin, endMin] = normalizeSpan(sh * 60 + sm, eh * 60 + em, d.rangeStart)
+                  return replaceEntryLine(s2, ln, formatEntryLine({ ...e, startMin, endMin }))
+                })
+              })
+            },
             editSpan: (ln) => {
               this.editing = { path: ctx.sourcePath, line: ln }
               const svgEl = container.querySelector("svg.oneday-svg")

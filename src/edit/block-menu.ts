@@ -14,6 +14,8 @@ export interface BlockMenuActions {
   togglePlan: (line: number) => void
   /** 进入交互式编辑态（边缘拖拽改起止、中部拖动移动） */
   editSpan: (line: number) => void
+  /** 精确起止时间（HH:MM 输入） */
+  editTimes: (line: number) => void
 }
 
 export function showBlockMenu(
@@ -36,6 +38,12 @@ export function showBlockMenu(
     item.setTitle("编辑起止 / 移动（交互式）")
       .setIcon("move")
       .onClick(() => actions.editSpan(entry.line))
+  )
+
+  menu.addItem((item) =>
+    item.setTitle("精确起止…（HH:MM）")
+      .setIcon("clock")
+      .onClick(() => actions.editTimes(entry.line))
   )
 
   menu.addItem((item) =>

@@ -100,6 +100,8 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   let dragScale = 1
   const toLocalY = (clientY: number): number => (clientY - dragOriginTop) * dragScale
   const clampMin = (m: number): number => Math.min(doc.rangeEnd, Math.max(doc.rangeStart, m))
+  let fineSnap = false // ⌥Option 按下时 1 分钟吸附（yyt：精确编辑入口）
+  const snapMin = (m: number): number => snapMinutes(m, fineSnap ? 1 : SNAP_MINUTES)
 
   let dragging = false
   let extending: "top" | "bottom" | null = null
@@ -122,6 +124,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   svg.addEventListener("pointerdown", (e: PointerEvent) => {
     if (e.button !== 0) return
+    fineSnap = e.altKey
     // 编辑态：目标块的边缘/中部手势优先
     const editing = editingRect()
     if (editing) {
@@ -147,7 +150,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
             mode,
             startMin: entry.startMin,
             endMin: entry.endMin,
-            grabOffsetMin: snapMinutes(minutesFromY(localY0, doc.rangeStart, deps.hourHeight)) - entry.startMin,
+            grabOffsetMin: snapMin(minutesFromY(localY0, doc.rangeStart, deps.hourHeight)) - entry.startMin,
           }
           svg.setPointerCapture(e.pointerId)
           return
@@ -189,7 +192,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     const rect = svg.getBoundingClientRect()
     dragOriginTop = rect.top
     dragScale = svgWidth / rect.width
-    dragStartMin = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+    dragStartMin = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     svg.setPointerCapture(e.pointerId)
 
     ghost = document.createElementNS(SVGNS, "rect")
@@ -221,7 +224,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
         editDrag = null
         return
       }
-      const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+      const cur = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
       const { mode, grabOffsetMin } = editDrag
       let ns = editDrag.startMin
       let ne = editDrag.endMin
@@ -296,7 +299,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       svg.style.cursor = cursor
       return
     }
-    const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+    const cur = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     updateGhost(dragStartMin, cur)
   })
 
@@ -321,7 +324,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       setStatus("")
       if (rect) {
         const line = Number(rect.dataset.line)
-        const cur = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+        const cur = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
         let ns = drag.startMin
         let ne = drag.endMin
         if (drag.mode === "top") ns = Math.min(cur, drag.endMin - SNAP_MINUTES)
@@ -364,12 +367,12 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     }
     if (!dragging) return
     dragging = false
-    const end = clampMin(snapMinutes(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+    const end = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     const startMin = Math.min(dragStartMin, end)
     const endMin = Math.max(dragStartMin, end)
     svg.releasePointerCapture(e.pointerId)
 
-    if (endMin - startMin < SNAP_MINUTES) {
+    if (endMin - startMin < (fineSnap ? 1 : SNAP_MINUTES)) {
       removeGhost()
       setStatus("")
       // 未拖动的点击落在色块上 -> 选中即编辑（yyt 2026-08-19：选中态默认进入编辑态）
