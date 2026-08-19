@@ -134,9 +134,10 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
         if (entry) {
           const top = Number(editing.getAttribute("y"))
           const bottom = top + Number(editing.getAttribute("height"))
-          const nearTop = Math.abs(localY0 - top) <= 5
-          const nearBottom = Math.abs(localY0 - bottom) <= 5
+          const nearTop = Math.abs(localY0 - top) <= 8
+          const nearBottom = Math.abs(localY0 - bottom) <= 8
           const mode = nearTop ? "top" : nearBottom ? "bottom" : "move"
+          svg.style.cursor = mode === "move" ? "grabbing" : "ns-resize" // 拖拽中保持（yyt：一闪而过）
           editDrag = {
             mode,
             startMin: entry.startMin,
@@ -262,7 +263,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
           const ly = (e.clientY - rect0.top) * (svgWidth / rect0.width)
           const top = Number(editing.getAttribute("y"))
           const bottom = top + Number(editing.getAttribute("height"))
-          svg.style.cursor = Math.abs(ly - top) <= 5 || Math.abs(ly - bottom) <= 5 ? "ns-resize" : "grab"
+          svg.style.cursor = Math.abs(ly - top) <= 8 || Math.abs(ly - bottom) <= 8 ? "ns-resize" : "grab"
         } else {
           svg.style.cursor = "default"
         }
@@ -308,6 +309,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       const drag = editDrag
       editDrag = null
       svg.releasePointerCapture(e.pointerId)
+      svg.style.cursor = ""
       setStatus("")
       if (rect) {
         const line = Number(rect.dataset.line)
