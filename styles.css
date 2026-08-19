@@ -196,7 +196,7 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   padding: 6px 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   font-size: 12px;
   max-width: 240px;
 }
@@ -286,7 +286,7 @@
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   min-width: 110px;
 }
 
@@ -322,7 +322,7 @@
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   min-width: 110px;
 }
 
@@ -506,13 +506,13 @@
   left: 3px; /* 统一左上角 */
   z-index: 14; /* 必须高于缩放手柄（13），否则角上 pointerdown 被吞 */
   opacity: 0;
-  border: none;
-  background: var(--background-secondary);
-  border-radius: 4px; /* 统一圆角 */
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  border-radius: 6px; /* 与浮层族统一 */
   cursor: grab;
   box-shadow: none;
-  width: 18px; /* 统一尺寸 */
-  height: 16px;
+  width: 20px;
+  height: 18px;
   padding: 0;
   font-size: 10px;
   line-height: 16px;
@@ -540,7 +540,7 @@
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
 }
 
 .oneday-slot.is-placeholder {
@@ -786,7 +786,7 @@
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   padding: 4px;
 }
 
