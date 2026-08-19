@@ -633,13 +633,6 @@
   background: color-mix(in srgb, var(--interactive-accent) 42%, transparent);
 }
 
-/* 时间轴右侧只调整轨道宽度，不能再触发元素块的网格缩放。 */
-.oneday-slot-timeline > .oneday-handle-e,
-.oneday-slot-timeline > .oneday-handle-ne,
-.oneday-slot-timeline > .oneday-handle-se {
-  display: none;
-}
-
 /* 统计列表：每行一个类型 + 色点 */
 
 .oneday-stats {
@@ -1150,4 +1143,9 @@
 
 .oneday-text-host p + p {
   margin-top: 1.6em; /* 段落空行 = 恰好一个空行高度，与编辑态一致 */
+}
+
+/* 隐藏 CM6 代码块的「编辑这个区块」按钮（oneday 块自有完整编辑 UI，且它和我们顶栏重叠） */
+.cm-embed-block:has(.oneday-host) > .edit-block-button {
+  display: none;
 }
