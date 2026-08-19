@@ -55,7 +55,6 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
     // ---- move grip ----
     const grip = document.createElement("button")
     grip.className = "oneday-slot-grip"
-    grip.textContent = "⋮⋮"
     grip.title = "拖拽移动此组件"
     slot.appendChild(grip)
 
