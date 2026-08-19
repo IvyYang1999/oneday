@@ -444,14 +444,13 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   syncEditVisual()
 
   svg.addEventListener("dblclick", (e: MouseEvent) => {
-    const target = (e.target as Element | null)?.closest("rect.oneday-block")
-    // pointer capture 会把 dblclick 的 target 重定向到 svg——回退到编辑态色块
-    let line = target ? Number((target as HTMLElement).dataset.line) : NaN
-    if (!Number.isInteger(line)) {
-      const cur = deps.getEditingLine()
-      if (cur === null) return
-      line = cur
-    }
+    // dblclick 的 target 取自 pointerup——capture 期间被重定向成 svg；
+    // 且第二击 pointerup 的 no-move 分支已退出编辑态。所以一律用 elementFromPoint 找真实色块
+    const hit = (e.target as Element | null)?.closest("rect.oneday-block")
+      ?? (document.elementFromPoint(e.clientX, e.clientY)?.closest("rect.oneday-block") as Element | null)
+    if (!hit) return
+    const line = Number((hit as HTMLElement).dataset.line)
+    if (!Number.isInteger(line)) return
     e.preventDefault()
     e.stopPropagation()
     // 双击 = 选中并进编辑态 + 直接改备注（不要求先单击选中——单击 toggle 会吃掉预选）

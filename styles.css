@@ -1146,3 +1146,14 @@
 .cm-embed-block:has(.oneday-host) > .edit-block-button {
   display: none;
 }
+
+/* 快速记录输入框：无系统 focus 阴影/轮廓（yyt：选中态阴影奇怪） */
+
+.oneday-dialog-input,
+.oneday-dialog-input:focus,
+.oneday-text-inline,
+.oneday-text-inline:focus {
+  box-shadow: none !important;
+  outline: none !important;
+  border: 1px solid var(--background-modifier-border) !important;
+}
