@@ -1149,11 +1149,18 @@
 
 /* 快速记录输入框：无系统 focus 阴影/轮廓（yyt：选中态阴影奇怪） */
 
+/* 快速记录输入框：无 focus 阴影，统一细边框 */
 .oneday-dialog-input,
-.oneday-dialog-input:focus,
+.oneday-dialog-input:focus {
+  box-shadow: none !important;
+  outline: none !important;
+  border: 1px solid var(--background-modifier-border) !important;
+}
+
+/* 文字区编辑框：完全无框（有框=内框观感，yyt 2026-08-19） */
 .oneday-text-inline,
 .oneday-text-inline:focus {
   box-shadow: none !important;
   outline: none !important;
-  border: 1px solid var(--background-modifier-border) !important;
+  border: none !important;
 }
