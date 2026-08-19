@@ -323,6 +323,9 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
         }
         if (ns !== drag.startMin || ne !== drag.endMin) {
           deps.onUpdateSpan(line, ns, ne)
+        } else if (Math.abs(e.clientY - downY) < 4) {
+          // 选中态再点一下（没动）-> 退出编辑
+          exitEdit()
         }
       }
       return
@@ -359,9 +362,13 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     if (endMin - startMin < SNAP_MINUTES) {
       removeGhost()
       setStatus("")
-      // 未拖动的点击落在色块上 -> focus 切换（高亮对应备注/连线）
+      // 未拖动的点击落在色块上 -> 选中即编辑（yyt 2026-08-19：选中态默认进入编辑态）
       if (downBlockLine !== null && Math.abs(e.clientY - downY) < 4) {
         deps.onBlockClick(downBlockLine)
+        if (deps.getEditingLine() !== downBlockLine) {
+          deps.setEditingLine(downBlockLine)
+          syncEditVisual()
+        }
       }
       downBlockLine = null
       return
@@ -397,6 +404,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     deps.setEditingLine(null)
     editDrag = null
     syncEditVisual()
+    container.querySelectorAll(".is-focus").forEach((el) => el.classList.remove("is-focus"))
   }
 
   const onEditKey = (e: KeyboardEvent): void => {

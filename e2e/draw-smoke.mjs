@@ -18,7 +18,7 @@ fs.mkdirSync(out, { recursive: true })
 fs.writeFileSync(path.join(out, "entry.ts"), `
 import { parseTimeline } from "${path.join(here, "../src/core/parser")}"
 import { renderTimelineSvg } from "${path.join(here, "../src/render/svg-builder")}"
-import { buildModeToggle, buildToolbar } from "${path.join(here, "../src/edit/toolbar")}"
+import { buildToolbar } from "${path.join(here, "../src/edit/toolbar")}"
 import { attachDrawInteraction } from "${path.join(here, "../src/edit/draw-interaction")}"
 import { attachHoverInfo } from "${path.join(here, "../src/edit/hover-info")}"
 
@@ -30,11 +30,12 @@ const toolbar = buildToolbar({
   typeColors: COLORS,
   hiddenTypes: ["fitness"],
   activeType: "math",
+  brushMode: "actual",
+  onBrushModeChange: (m) => { window.__mode = m },
   onSelect: (t) => { window.__active = t },
   onHide: (t) => window.__hidden.push(t),
   onShow: (t) => window.__shown.push(t),
 })
-container.appendChild(buildModeToggle("actual", (m) => { window.__mode = m }))
 container.appendChild(toolbar.el)
 const holder = document.createElement("div")
 holder.innerHTML = renderTimelineSvg(doc, { typeColors: COLORS })
@@ -110,7 +111,7 @@ await drag(450, 510)
 await page.mouse.click(trackCX, yFor(450), { button: "right" })
 
 // 5. plan mode: drag creates a plan-prefixed entry
-await page.locator('.oneday-mode-btn[data-mode="plan"]').click()
+await page.locator('.oneday-brush-toggle .oneday-mode-btn[data-mode="plan"]').click()
 await drag(900, 960) // 15:00-16:00 in plan mode
 
 await page.mouse.move(trackCX, yFor(455))
@@ -148,7 +149,7 @@ await page.mouse.move(trackCX, yFor(1200)) // 空白处 -> 退出编辑
 await page.mouse.down()
 await page.mouse.up()
 
-await page.locator('.oneday-mode-btn[data-mode="actual"]').click()
+await page.locator('.oneday-brush-toggle .oneday-mode-btn[data-mode="actual"]').click()
 await page.mouse.click(trackCX, yFor(630)) // sleep 块已被移到 10:00-11:00
 // 7. toolbar: right-click a swatch hides it; "+" menu shows hidden ones back
 await page.locator('.oneday-swatch[data-type="math"]').click({ button: "right" })
@@ -176,14 +177,14 @@ const expectedSpans = [
   { line: 0, startMin: 600, endMin: 660 },   // 移动 +3h -> 10:00-11:00
 ]
 if (JSON.stringify(spans) !== JSON.stringify(expectedSpans)) { console.error("span mismatch", JSON.stringify(spans)); process.exit(1) }
-const editingAfter = await page.evaluate(() => window.__editing)
-if (editingAfter !== null) { console.error("edit mode not exited", editingAfter); process.exit(1) }
 const extend = await page.evaluate(() => window.__extend)
 if (extend.length !== 1 || extend[0].startMin !== 420 || extend[0].endMin !== 1560) {
   console.error("extend mismatch", JSON.stringify(extend)); process.exit(1)
 }
 const focus = await page.evaluate(() => window.__focus)
 if (focus.length !== 1 || focus[0] !== 0) { console.error("focus mismatch", JSON.stringify(focus)); process.exit(1) }
+const editingNow = await page.evaluate(() => window.__editing)
+if (editingNow !== 0) { console.error("click did not enter edit mode", editingNow); process.exit(1) }
 const hidden = await page.evaluate(() => window.__hidden)
 const shown = await page.evaluate(() => window.__shown)
 if (hidden.length !== 1 || hidden[0] !== "math") { console.error("hide mismatch", JSON.stringify(hidden)); process.exit(1) }
