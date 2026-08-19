@@ -433,9 +433,13 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
 
   svg.addEventListener("dblclick", (e: MouseEvent) => {
     const target = (e.target as Element | null)?.closest("rect.oneday-block")
-    if (!target) return
-    const line = Number((target as HTMLElement).dataset.line)
-    if (!Number.isInteger(line)) return
+    // pointer capture 会把 dblclick 的 target 重定向到 svg——回退到编辑态色块
+    let line = target ? Number((target as HTMLElement).dataset.line) : NaN
+    if (!Number.isInteger(line)) {
+      const cur = deps.getEditingLine()
+      if (cur === null) return
+      line = cur
+    }
     e.preventDefault()
     e.stopPropagation()
     // 双击 = 选中并进编辑态 + 直接改备注（不要求先单击选中——单击 toggle 会吃掉预选）
