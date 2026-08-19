@@ -10,11 +10,11 @@ function svgOf(source: string, colors = COLORS, width?: number): string {
 
 describe("renderTimelineSvg", () => {
   it("renders a block at the right y/height with color and centered duration", () => {
-    // range default 7-23, hourHeight 48: 09:00 -> y = 8 + 2*48 = 104; 3h -> 144px
+    // range 7-23, hourHeight 48: 09:00 -> y=104；统一留白 x=2：y+1, 高度-2（yyt 间距规范）
     const svg = svgOf("09:00-12:00 math")
     expect(svg).toContain(`fill="#7fd4c1"`)
-    expect(svg).toContain(`y="104"`)
-    expect(svg).toContain(`height="144"`)
+    expect(svg).toContain(`y="105"`)
+    expect(svg).toContain(`height="142"`)
     expect(svg).toContain(`>3h</text>`)
   })
 

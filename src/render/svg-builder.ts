@@ -28,6 +28,8 @@ const PAD_TOP = AXIS_PAD_TOP
 const PAD_BOTTOM = AXIS_PAD_BOTTOM
 const PLAN_OPACITY = 0.12
 const BLOCK_OPACITY = 0.95 // 盖住底部 plan 层，文字不糊（yyt 2026-08-17）
+/** 统一留白 x（yyt 2026-08-19 定稿）：色块间/贴边/并列列间距全部一致 */
+const GAP_X = 2
 /** Below this height (px) the duration label moves to the right of the block. */
 const MIN_INLINE_LABEL_H = 30
 /** Below this width (px) the duration label moves to the right (并列分列后列宽变窄). */
@@ -109,13 +111,11 @@ function placeActual(actual: Entry[], trackX: number, trackW: number): Placed[] 
     }
     const n = colEnds.length
     // 贴边布局（yyt 2026-08-19）：首列贴左缘、末列贴右缘，列间固定 gap
-    const GAP = 2
-    const inset = 1 // 描边宽：贴线不越线（yyt：上一版超界）
-    const usable = trackW - inset * 2
-    const colW = (usable - GAP * (n - 1)) / n
+    // 统一间距：贴边 x、列间 x（yyt 规范：n 列有 n-1 个列间 + 左右各 1 个贴边）
+    const colW = (trackW - GAP_X * (n + 1)) / n
     for (const e of cluster) {
       const col = assignment.get(e.line) ?? 0
-      placed.push({ entry: e, x: trackX + inset + col * (colW + GAP), w: colW })
+      placed.push({ entry: e, x: trackX + GAP_X + col * (colW + GAP_X), w: colW })
     }
     cluster = []
   }
@@ -202,12 +202,12 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
     const yy = y(e.startMin)
     const hh = Math.max(2, y(e.endMin) - yy)
     parts.push(
-      `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + 1}" y="${yy}" width="${trackW - 2}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}" stroke="${escapeXml(color)}" stroke-opacity="0.7" stroke-width="1"></rect>` +
-        `<rect pointer-events="none" class="oneday-plan-hatch" x="${trackX + 1}" y="${yy}" width="${trackW - 2}" height="${hh}" rx="3" fill="url(#${hatchId})"/>`
+      `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + GAP_X}" y="${yy + GAP_X / 2}" width="${trackW - GAP_X * 2}" height="${hh - GAP_X}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}" stroke="${escapeXml(color)}" stroke-opacity="0.7" stroke-width="1"></rect>` +
+        `<rect pointer-events="none" class="oneday-plan-hatch" x="${trackX + GAP_X}" y="${yy + GAP_X / 2}" width="${trackW - GAP_X * 2}" height="${hh - GAP_X}" rx="3" fill="url(#${hatchId})"/>`
     )
     // plan 块也显示时长/备注（yyt 2026-08-17），样式淡一档
     const label = formatHours(durationMinutes(e.startMin, e.endMin))
-    const fs = inlineFontSize(trackW - 2, hh, label)
+    const fs = inlineFontSize(trackW - GAP_X * 2, hh - GAP_X, label)
     if (fs > 0) {
       const showNote = hh >= MIN_NOTE_H && e.note
       parts.push(
@@ -226,8 +226,9 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
   for (const p of placeActual(entries.filter((e) => !e.plan), trackX, trackW)) {
     const e = p.entry
     const color = opts.typeColors[e.type] ?? hashTypeColor(e.type)
-    const yy = y(e.startMin)
-    const hh = Math.max(2, y(e.endMin) - yy)
+    // 纵向每块自身内缩 x/2（yyt 规范：相邻块间隙=x，不挤压不累计）
+    const yy = y(e.startMin) + GAP_X / 2
+    const hh = Math.max(2, y(e.endMin) - y(e.startMin) - GAP_X)
     parts.push(
       `<rect class="oneday-block" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${p.x}" y="${yy}" width="${p.w}" height="${hh}" rx="3" fill="${escapeXml(color)}" fill-opacity="${BLOCK_OPACITY}"></rect>`
     )
