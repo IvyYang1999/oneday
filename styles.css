@@ -511,12 +511,12 @@
   border-radius: 6px;
   cursor: grab;
   box-shadow: none;
-  width: 18px;
-  height: 20px; /* 竖版：3 行点上下留白更从容（yyt：顶部底部留白不足） */
+  width: 16px;
+  height: 16px;
   padding: 0;
   display: grid;
   place-content: center;
-  gap: 4px 5px;
+  gap: 2px 3px;
   grid-auto-flow: row;
   grid-template-columns: repeat(2, 1.5px);
 }
