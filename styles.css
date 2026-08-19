@@ -717,8 +717,9 @@
 /* 计划模式：色板圆点变斜线（双线、方向与 plan 块一致） */
 
 .oneday-toolbar.is-plan .oneday-swatch-dot {
-  background: repeating-linear-gradient(-45deg, var(--c, #bdbdbd) 0 2px, transparent 2px 5px);
-  border: 1px solid var(--c, #bdbdbd);
+  /* 两条均匀斜线（yyt：不要禁止符号感）——去边框，周期对齐圆径 */
+  background: repeating-linear-gradient(-45deg, var(--c, #bdbdbd) 0 1.2px, transparent 1.2px 4.5px);
+  border: none;
 }
 
 /* 手柄层级高于内容/滚动条 */
