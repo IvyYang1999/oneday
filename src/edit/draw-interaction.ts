@@ -135,9 +135,12 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
         const entry = doc.entries.find((it) => it.line === line)
         if (entry) {
           const top = Number(editing.getAttribute("y"))
-          const bottom = top + Number(editing.getAttribute("height"))
-          const nearTop = Math.abs(localY0 - top) <= 8
-          const nearBottom = Math.abs(localY0 - bottom) <= 8
+          const h = Number(editing.getAttribute("height"))
+          const bottom = top + h
+          // 小块（<24px）禁用边缘判定：8px 热区会覆盖整块，双击会误触 resize（yyt 2026-08-19）
+          const edgeZone = h >= 24 ? 8 : 0
+          const nearTop = edgeZone > 0 && Math.abs(localY0 - top) <= edgeZone
+          const nearBottom = edgeZone > 0 && Math.abs(localY0 - bottom) <= edgeZone
           const mode = nearTop ? "top" : nearBottom ? "bottom" : "move"
           editing.style.cursor = mode === "move" ? "grabbing" : "ns-resize" // 拖拽中保持
           editDrag = {
@@ -264,9 +267,11 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
           const rect0 = svg.getBoundingClientRect()
           const ly = (e.clientY - rect0.top) * (svgWidth / rect0.width)
           const top = Number(editing.getAttribute("y"))
-          const bottom = top + Number(editing.getAttribute("height"))
+          const h = Number(editing.getAttribute("height"))
+          const bottom = top + h
+          const edgeZone = h >= 24 ? 8 : 0
           // 光标必须设在色块自己身上（元素的 cursor 盖过 svg 的，yyt：悬停出不来）
-          editing.style.cursor = Math.abs(ly - top) <= 8 || Math.abs(ly - bottom) <= 8 ? "ns-resize" : "grab"
+          editing.style.cursor = edgeZone > 0 && (Math.abs(ly - top) <= edgeZone || Math.abs(ly - bottom) <= edgeZone) ? "ns-resize" : "grab"
         } else {
           editing.style.cursor = ""
         }

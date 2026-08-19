@@ -166,10 +166,13 @@ export default class OnedayPlugin extends Plugin {
       }
 
       const editNote = (ln: number): void => {
-        const rect = container.querySelector(`rect.oneday-block[data-line="${ln}"]`)
+        // 写回触发的重渲染可能已替换 container（detached DOM 上挂浮窗不可见，yyt 2026-08-19）
+        const live = container.isConnected ? container : (document.querySelector(".oneday-container") as HTMLElement | null)
+        if (!live) return
+        const rect = live.querySelector(`rect.oneday-block[data-line="${ln}"]`)
         const e0 = doc.entries.find((it) => it.line === ln)
         if (!rect || !e0) return
-        openNotePopover(container, rect.getBoundingClientRect(), e0.note ?? "", (note) => {
+        openNotePopover(live, rect.getBoundingClientRect(), e0.note ?? "", (note) => {
           void this.applyBlockTransform(el, ctx, source, (s) => {
             const e = this.parse(s).entries.find((it) => it.line === ln)
             if (!e) return s
