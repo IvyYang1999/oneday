@@ -521,7 +521,14 @@ export default class OnedayPlugin extends Plugin {
       body.style.height = `${gridRows(items) * GRID_ROW_H}px`
     }
     run()
-    window.setTimeout(run, 300) // markdown 异步渲染完再量一次
+    // 二次量高去重：渲染频繁时定时器堆积会造成重排风暴（性能审计 2026-08-19）
+    if (!container.dataset.onedayFitPending) {
+      container.dataset.onedayFitPending = "1"
+      window.setTimeout(() => {
+        delete container.dataset.onedayFitPending
+        run()
+      }, 300)
+    }
   }
 
   /** Sole write path into markdown (D7/D3 共用): transform block source, splice back. */

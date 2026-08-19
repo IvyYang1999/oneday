@@ -420,13 +420,25 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     container.querySelectorAll(".is-focus").forEach((el) => el.classList.remove("is-focus"))
   }
 
+  // Esc 退出编辑：document 级监听只挂一份（每次渲染重复挂会泄漏+重复触发，性能审计 2026-08-19）
   const onEditKey = (e: KeyboardEvent): void => {
     if (e.key === "Escape" && deps.getEditingLine() !== null) {
       e.preventDefault()
       exitEdit()
     }
   }
-  document.addEventListener("keydown", onEditKey)
+  if (!document.body.dataset.onedayEscArmed) {
+    document.body.dataset.onedayEscArmed = "1"
+    document.addEventListener("keydown", (e: KeyboardEvent) => {
+      // 委托：所有实例共用一个监听，行为由当前 DOM 状态决定
+      const editingSvg = document.querySelector(".oneday-svg.is-editing-block")
+      if (e.key === "Escape" && editingSvg) {
+        e.preventDefault()
+        editingSvg.dispatchEvent(new CustomEvent("oneday-esc"))
+      }
+    })
+  }
+  svg.addEventListener("oneday-esc", onEditKey as EventListener)
 
   // 进入编辑态的视觉同步（挂载时若已在编辑态则恢复）
   syncEditVisual()
