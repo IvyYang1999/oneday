@@ -496,6 +496,8 @@ export default class OnedayPlugin extends Plugin {
       const slots = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot"))
       let grew = false
       for (const slot of slots) {
+        // 文字槽不自动撑高：保持用户拖的尺寸，内部滚动（yyt 2026-08-19）
+        if (slot.dataset.slot && /^text\d*$/.test(slot.dataset.slot)) continue
         const need = Math.ceil(slot.scrollHeight / GRID_ROW_H)
         const cur = Number(slot.dataset.h)
         if (need > cur) {
