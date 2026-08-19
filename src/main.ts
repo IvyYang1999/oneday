@@ -405,6 +405,18 @@ export default class OnedayPlugin extends Plugin {
       })
       container.appendChild(addComp)
 
+      // 块内撤销/重做转发（yyt 2026-08-19：焦点在 block 内时 CM6 收不到 Ctrl+Z）
+      container.addEventListener("keydown", (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+          const view = this.findMarkdownView(ctx.sourcePath)
+          if (!view) return
+          e.preventDefault()
+          e.stopPropagation()
+          if (e.shiftKey) view.editor.redo()
+          else view.editor.undo()
+        }
+      })
+
       const menuSurface = (el.closest(".cm-embed-block") as HTMLElement | null) ?? container
       menuSurface.addEventListener("contextmenu", (e: MouseEvent) => {
         const t = e.target as Element | null
