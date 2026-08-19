@@ -1104,3 +1104,12 @@
   margin-left: 5px;
   padding-right: 0;
 }
+
+.oneday-stat-bar {
+  overflow: visible; /* 标签实测外置前不被裁 */
+}
+
+.oneday-stat-hours-out {
+  color: var(--text-normal) !important;
+  margin-left: 5px;
+}

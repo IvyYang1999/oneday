@@ -139,13 +139,16 @@ export function renderTimelineInto(
       const bar = barWrap.createDiv({ cls: "oneday-stat-bar" })
       bar.style.background = color
       bar.style.width = `${pct}%`
-      // 短柱子标签放柱外右侧（否则被裁切，yyt 2026-08-19）
-      if (pct < 15) {
-        barWrap.createEl("span", { cls: "oneday-stat-hours oneday-stat-hours-out", text: formatHours(st.minutes) })
-      } else {
-        const label = bar.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
-        label.style.color = relatedTextColor(color) // 柱上标签派生反色
-      }
+      // 先放柱内，挂载后实测：装不下就挪柱外（百分比阈值对不上像素，yyt 2026-08-19）
+      const label = bar.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
+      label.style.color = relatedTextColor(color)
+      window.requestAnimationFrame(() => {
+        if (label.offsetWidth + 10 > bar.clientWidth) {
+          label.classList.add("oneday-stat-hours-out")
+          label.style.color = ""
+          barWrap.appendChild(label)
+        }
+      })
     }
   }
 
