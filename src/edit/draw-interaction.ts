@@ -401,6 +401,12 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       r.classList.toggle("is-edit-target", rect !== null && r === rect)
       r.classList.toggle("is-frozen", rect !== null && r !== rect)
     })
+    // 文字也跟随冻结（yyt：只灰色块文字没变，看着懵）
+    const editLine = deps.getEditingLine()
+    svg.querySelectorAll("text[data-line]").forEach((t) => {
+      const mine = Number((t as HTMLElement).dataset.line) === editLine
+      t.classList.toggle("is-frozen", editLine !== null && !mine)
+    })
   }
 
   const exitEdit = (): void => {

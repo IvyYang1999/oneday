@@ -1113,3 +1113,25 @@
   color: var(--text-normal) !important;
   margin-left: 5px;
 }
+
+/* 冻结态：文字也置灰 */
+
+.oneday-svg text.is-frozen {
+  opacity: 0.3;
+}
+
+/* 文字区跳变：渲染态首段抹平上边距（与编辑态 textarea 对齐） */
+
+.oneday-text-host > *:first-child {
+  margin-top: 0 !important;
+}
+
+/* 手柄常驻淡显，hover 全亮（不然找不到） */
+
+.oneday-slot-grip {
+  opacity: 0.25;
+}
+
+.oneday-slot:hover .oneday-slot-grip {
+  opacity: 1;
+}
