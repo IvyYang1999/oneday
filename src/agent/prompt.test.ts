@@ -22,3 +22,13 @@ describe("buildSystemPrompt", () => {
     expect(p).toContain("还没有实际色块")
   })
 })
+
+describe("起床语义 + 时间轴起点", () => {
+  it("system prompt carries the range start and the 起床 rule", () => {
+    const doc = parseTimeline("range: 7-23\n---\n")
+    const p = buildSystemPrompt({ typeColors: { sleep: "#ccc" }, now: new Date(), doc })
+    expect(p).toContain("07:00")
+    expect(p).toContain("起床")
+    expect(p).toContain("多轮")
+  })
+})

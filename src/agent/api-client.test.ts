@@ -51,3 +51,15 @@ describe("parseChatResponse", () => {
     expect(parseChatResponse("openai-compatible", 200, null).ok).toBe(false)
   })
 })
+
+describe("multi-turn history", () => {
+  it("appends history between system and the new user message", () => {
+    const r = buildChatRequest(OAI, "SYS", "昨晚大概1点睡的", [
+      { role: "user", content: "我11点起床" },
+      { role: "assistant", content: '{"error":"几点睡？"}' },
+    ])
+    const body = JSON.parse(r.body)
+    expect(body.messages.map((m: { role: string }) => m.role)).toEqual(["system", "user", "assistant", "user"])
+    expect(body.messages[2].content).toContain("几点睡")
+  })
+})

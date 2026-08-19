@@ -17,7 +17,8 @@ export async function runEntryAgentApi(
   userText: string,
   systemPrompt: string,
   cfg: ApiConfig,
-  http: HttpTransport
+  http: HttpTransport,
+  history: Array<{ role: "user" | "assistant"; content: string }> = []
 ): Promise<ApiRunResult> {
   if (!cfg.apiKey.trim()) {
     return { ok: false, reason: "请先在 Oneday 设置里填 API Key" }
@@ -25,7 +26,7 @@ export async function runEntryAgentApi(
   if (!cfg.baseUrl.trim() || !cfg.model.trim()) {
     return { ok: false, reason: "请先在 Oneday 设置里填 Base URL 和模型名" }
   }
-  const req = buildChatRequest(cfg, systemPrompt, userText)
+  const req = buildChatRequest(cfg, systemPrompt, userText, history)
   let res
   try {
     res = await http(req)

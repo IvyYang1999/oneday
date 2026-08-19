@@ -27,7 +27,12 @@ function stripTrailingSlash(s: string): string {
   return s.replace(/\/+$/, "")
 }
 
-export function buildChatRequest(cfg: ApiConfig, systemPrompt: string, userText: string): BuiltRequest {
+export interface ChatMessage {
+  role: "system" | "user" | "assistant"
+  content: string
+}
+
+export function buildChatRequest(cfg: ApiConfig, systemPrompt: string, userText: string, history: ChatMessage[] = []): BuiltRequest {
   if (cfg.provider === "anthropic") {
     return {
       url: `${stripTrailingSlash(cfg.baseUrl)}/v1/messages`,
@@ -41,7 +46,7 @@ export function buildChatRequest(cfg: ApiConfig, systemPrompt: string, userText:
         model: cfg.model,
         max_tokens: 300,
         system: systemPrompt,
-        messages: [{ role: "user", content: userText }],
+        messages: [...history.map((h) => ({ role: h.role, content: h.content })), { role: "user", content: userText }],
       }),
     }
   }
@@ -58,6 +63,7 @@ export function buildChatRequest(cfg: ApiConfig, systemPrompt: string, userText:
       temperature: 0,
       messages: [
         { role: "system", content: systemPrompt },
+        ...history.map((h) => ({ role: h.role as string, content: h.content })),
         { role: "user", content: userText },
       ],
     }),

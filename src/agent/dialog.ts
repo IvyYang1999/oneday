@@ -41,6 +41,8 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
   loading.style.display = "none"
   const status = box.createDiv({ cls: "oneday-dialog-status" })
 
+  // 多轮会话历史：追问的回答带着上文（yyt 2026-08-19）
+  const history: Array<{ role: "user" | "assistant"; content: string }> = []
   let busy = false
   const submit = async (): Promise<void> => {
     const text = input.value.trim()
@@ -56,6 +58,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       now: new Date(),
       doc,
     })
+    history.push({ role: "user", content: text })
     const run = deps.settings.dialogBackend === "claude-cli"
       ? await runEntryAgent(text, systemPrompt)
       : await runEntryAgentApi(
@@ -67,7 +70,8 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
             baseUrl: deps.settings.baseUrl,
             model: deps.settings.model,
           },
-          obsidianTransport
+          obsidianTransport,
+          history.slice(0, -1)
         )
 
     if (!run.ok) {
@@ -82,12 +86,18 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     const result = interpretResponse(run.text, doc)
     if (!result.ok) {
       loading.style.display = "none"
+      history.push({ role: "assistant", content: run.text }) // 追问留在历史里
       status.setText(result.reason)
       status.addClass("oneday-dialog-error")
       busy = false
       input.disabled = false
+      input.value = ""
+      input.placeholder = "补充回答它的问题…"
       return
     }
+    // 成功：本轮任务完成，重置会话
+    history.length = 0
+    input.placeholder = "✦ 快速记录：刚健身半小时…"
 
     loading.style.display = "none"
     try {
