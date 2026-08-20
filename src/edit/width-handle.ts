@@ -11,18 +11,20 @@ export function attachWidthHandle(
   baseWidth: number,
   onCommit: (baseWidth: number) => void
 ): void {
+  const dom = container.ownerDocument
   const slot = container.querySelector<HTMLElement>(".oneday-slot-timeline")
   if (!slot) return
   slot.querySelector(".oneday-width-handle")?.remove()
   // 清掉上次中断拖拽的预览残影（yyt：两条线之谜）
-  document.querySelectorAll(".oneday-width-preview").forEach((c) => c.remove())
+  dom.querySelectorAll(".oneday-width-preview").forEach((c) => c.remove())
 
   // 实测 svg 在槽位内的水平偏移（slot padding 等），否则手柄系统性偏内
   const svgEl = slot.querySelector("svg.oneday-svg")
   const svgOffset = svgEl ? svgEl.getBoundingClientRect().left - slot.getBoundingClientRect().left : 0
   const trackRight = svgOffset + LABEL_W + (baseWidth - LABEL_W - TRACK_PAD) // 轨道竖线位置
-  const handle = document.createElement("div")
+  const handle = dom.createElement("div")
   handle.className = "oneday-width-handle"
+  handle.setAttribute("aria-hidden", "true")
   handle.style.left = `${trackRight}px` // CSS 3px + translateX(-50%) 骑线
   slot.appendChild(handle)
 
@@ -35,7 +37,7 @@ export function attachWidthHandle(
     handle.classList.add("is-active")
 
     // 竖线预览（不动 svg，listener 安全）
-    const preview = document.createElement("div")
+    const preview = dom.createElement("div")
     preview.className = "oneday-width-preview"
     slot.appendChild(preview)
     const place = (w: number): void => {
@@ -51,9 +53,9 @@ export function attachWidthHandle(
       place(w)
     }
     const onUp = (ev: PointerEvent | null): void => {
-      document.removeEventListener("pointermove", onMove)
-      document.removeEventListener("pointerup", onUpNow)
-      document.removeEventListener("pointercancel", onCancel)
+      dom.removeEventListener("pointermove", onMove)
+      dom.removeEventListener("pointerup", onUpNow)
+      dom.removeEventListener("pointercancel", onCancel)
       handle.classList.remove("is-active")
       preview.remove()
       if (ev) {
@@ -63,8 +65,8 @@ export function attachWidthHandle(
     }
     const onUpNow = (ev: PointerEvent): void => onUp(ev)
     const onCancel = (): void => onUp(null)
-    document.addEventListener("pointermove", onMove)
-    document.addEventListener("pointerup", onUpNow)
-    document.addEventListener("pointercancel", onCancel)
+    dom.addEventListener("pointermove", onMove)
+    dom.addEventListener("pointerup", onUpNow)
+    dom.addEventListener("pointercancel", onCancel)
   })
 }

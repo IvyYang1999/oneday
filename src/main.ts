@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext, MarkdownRenderer, MarkdownView, Menu, Platform, Plugin, TFile } from "obsidian"
+import { MarkdownPostProcessorContext, MarkdownRenderer, MarkdownView, Menu, Platform, Plugin, setIcon, TFile } from "obsidian"
 import { normalizeSpan, parseTimeline } from "./core/parser"
 import { formatClockPlain, formatEntryLine, weekdayZh } from "./core/format"
 import { FALLBACK_COLOR } from "./render/svg-builder"
@@ -7,7 +7,7 @@ import { renderTimelineInto } from "./render/timeline-view"
 import { DEFAULT_SETTINGS, OnedaySettings, OnedaySettingTab } from "./settings"
 import { attachDialog } from "./agent/dialog"
 import { addHiddenType, addOffSlot, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeOffSlot, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./edit/source-rewriter"
-import { buildLayerToggles, buildToolbar, LayerView, ViewMode } from "./edit/toolbar"
+import { buildLayerToggles, buildToolbar, LayerView } from "./edit/toolbar"
 import { attachDrawInteraction } from "./edit/draw-interaction"
 import { showBlockMenu } from "./edit/block-menu"
 import { attachHoverInfo, toggleBlockFocus } from "./edit/hover-info"
@@ -63,19 +63,28 @@ export default class OnedayPlugin extends Plugin {
         insertTimelineBlock(editor, this.app.workspace.getActiveFile()?.basename ?? null, this.insertTemplate())
       },
     })
-    // 撤销/重做全局兜底（yyt 2026-08-19）：指针操作后焦点常在 body/组件上，
-    // CM6 收不到 Cmd/Ctrl+Z；目标不在 .cm-editor 内时转发给活跃视图的撤销栈
-    this.registerDomEvent(document, "keydown", (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return
-      const target = e.target as HTMLElement | null
-      if (target?.closest(".cm-editor")) return // 焦点本来就在编辑器里，走原生路径
-      const view = this.app.workspace.getActiveViewOfType(MarkdownView)
-      if (!view) return
-      e.preventDefault()
-      e.stopPropagation()
-      if (e.shiftKey) view.editor.redo()
-      else view.editor.undo()
-    }, { capture: true })
+    // 撤销/重做兜底按窗口注册：弹出窗口拥有独立 Document。
+    const undoDocs = new WeakSet<Document>()
+    const registerUndo = (dom: Document): void => {
+      if (undoDocs.has(dom)) return
+      undoDocs.add(dom)
+      this.registerDomEvent(dom, "keydown", (e: KeyboardEvent) => {
+        if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return
+        const target = e.target as HTMLElement | null
+        if (target?.closest(".cm-editor")) return // 焦点本来就在编辑器里，走原生路径
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+        if (!view) return
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.shiftKey) view.editor.redo()
+        else view.editor.undo()
+      }, { capture: true })
+    }
+    registerUndo(document)
+    this.app.workspace.iterateAllLeaves((leaf) => registerUndo(leaf.view.containerEl.ownerDocument))
+    this.registerEvent(this.app.workspace.on("window-open", (_workspaceWindow, popoutWindow) => {
+      registerUndo(popoutWindow.document)
+    }))
 
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu, editor) => {
@@ -91,6 +100,8 @@ export default class OnedayPlugin extends Plugin {
     )
 
     this.registerMarkdownCodeBlockProcessor("timeline", (source, el, ctx) => {
+      const dom = el.ownerDocument
+      const domWindow = dom.defaultView
       const doc = this.parse(source)
       // 渲染色号：全局优先，退休板兜底（删除/改名的类型在旧块里保色）
       const paletteForRender = { ...this.settings.retiredTypeColors, ...this.settings.typeColors }
@@ -132,7 +143,7 @@ export default class OnedayPlugin extends Plugin {
             void this.applyBlockTransform(el, ctx, source, (s) => {
               const newId = doc.texts.length === 0 ? "text" : `text${doc.texts.length + 1}`
               let out = setTextSection(s, "", doc.texts.length) // 追加空文本区
-              if (body instanceof HTMLElement) {
+              if (body) {
                 const bodyRect = body.getBoundingClientRect()
                 if (bodyRect.width > 100) {
                   const cellW = bodyRect.width / 12
@@ -160,7 +171,7 @@ export default class OnedayPlugin extends Plugin {
         }
         menu.addItem((item) =>
           item.setTitle("设为默认布局（新块照此摆放）").setIcon("bookmark").onClick(() => {
-            if (body instanceof HTMLElement) {
+            if (body) {
               const items = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot")).map((sl) => ({
                 id: sl.dataset.slot as GridItem["id"],
                 x: Number(sl.dataset.x), y: Number(sl.dataset.y), w: Number(sl.dataset.w), h: Number(sl.dataset.h),
@@ -182,7 +193,7 @@ export default class OnedayPlugin extends Plugin {
 
       const editNote = (ln: number): void => {
         // 写回触发的重渲染可能已替换 container（detached DOM 上挂浮窗不可见，yyt 2026-08-19）
-        const live = container.isConnected ? container : (document.querySelector(".oneday-container") as HTMLElement | null)
+        const live = container.isConnected ? container : dom.querySelector<HTMLElement>(".oneday-container")
         if (!live) return
         const rect = live.querySelector(`rect.oneday-block[data-line="${ln}"]`)
         const e0 = doc.entries.find((it) => it.line === ln)
@@ -213,10 +224,12 @@ export default class OnedayPlugin extends Plugin {
         onShow: (type) => {
           void this.applyBlockTransform(el, ctx, source, (s) => removeHiddenType(s, type))
         },
+        domDocument: dom,
       })
       // 色板在设置里变更后：提示刷新（yyt 2026-08-17，可忽略）
       if (this.paletteDirty) {
-        const badge = document.createElement("button")
+        const badge = dom.createElement("button")
+        badge.type = "button"
         badge.className = "oneday-palette-refresh"
         badge.textContent = "↻ 荧光笔有更新，点击刷新"
         badge.addEventListener("click", () => {
@@ -228,20 +241,20 @@ export default class OnedayPlugin extends Plugin {
       }
 
       // 填槽：工具栏/状态行/对话框各就各位（插槽位置由 layout 决定）
-      const toolbarSlot = container.querySelector(".oneday-slot-toolbar")
+      const toolbarSlot = container.querySelector<HTMLElement>(".oneday-slot-toolbar")
       if (toolbarSlot) toolbarSlot.appendChild(toolbar.el)
-      const timelineSlot = container.querySelector(".oneday-slot-timeline")
-      if (timelineSlot instanceof HTMLElement) {
+      const timelineSlot = container.querySelector<HTMLElement>(".oneday-slot-timeline")
+      if (timelineSlot) {
         timelineSlot.appendChild(toolbar.statusEl)
         // 顶栏：日期+星期（跨期统计锚点）在左，记录/计划开关在右
-        const topbar = document.createElement("div")
+        const topbar = dom.createElement("div")
         topbar.className = "oneday-timeline-topbar" // 宽度跟随元素块（槽位），非时间轴矩形
         const dateStr = doc.date ?? (() => {
           const base = this.app.workspace.getActiveFile()?.basename ?? ""
           return /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/.test(base) ? inferDate(base) : null
         })()
         if (dateStr) {
-          const dateEl = document.createElement("span")
+          const dateEl = dom.createElement("span")
           dateEl.className = "oneday-date-row"
           const wd = weekdayZh(dateStr)
           dateEl.textContent = `${dateStr}${wd ? " " + wd : ""}`
@@ -254,19 +267,19 @@ export default class OnedayPlugin extends Plugin {
           if (view.actual && !view.plan) this.drawMode = "actual"
           else if (view.plan && !view.actual) this.drawMode = "plan"
           toolbar.setBrushMode(this.drawMode)
-        }))
+        }, dom))
         timelineSlot.prepend(topbar)
       }
       const col = container.querySelector(".oneday-timeline-col")
-      const body = container.querySelector(".oneday-body")
+      const body = container.querySelector<HTMLElement>(".oneday-body")
       // 自动量高：内容比格子高的槽位撑开格子（修新建块截断），只改显示不自动写源码
       this.fitSlotHeights(container)
       this.restoreScroll(ctx.sourcePath, container)
       // 初始调整全部完成后开启动画（is-settling 期间槽位不过渡，杀创建闪缩）
-      window.setTimeout(() => body?.classList.remove("is-settling"), 350)
+      domWindow?.setTimeout(() => body?.classList.remove("is-settling"), 350)
 
       // 网格组件交互：拖拽移动 + 八向缩放，写回 layout 头——所有块可用
-      if (body instanceof HTMLElement) {
+      if (body) {
         attachGridInteract(body, (items) => {
           void this.applyBlockTransform(el, ctx, source, (s) =>
             setHeaderValue(s, "layout", serializeLayoutHeader(items))
@@ -317,7 +330,7 @@ export default class OnedayPlugin extends Plugin {
           showBlockMenu(this.app, entry, paletteTypes, x, y, {
             editNote,
             editTimes: (ln) => {
-              const live = container.isConnected ? container : (document.querySelector(".oneday-container") as HTMLElement | null)
+              const live = container.isConnected ? container : dom.querySelector<HTMLElement>(".oneday-container")
               if (!live) return
               const rect = live.querySelector(`rect.oneday-block[data-line="${ln}"]`)
               const e0 = doc.entries.find((it) => it.line === ln)
@@ -375,10 +388,10 @@ export default class OnedayPlugin extends Plugin {
       this.applyViewClass(container, this.layerView)
 
       // 初始宽度自适应内容：无 layout 头时，时间轴槽位收到内容自然宽（yyt 2026-08-17）
-      if (doc.layout === undefined && body instanceof HTMLElement) {
+      if (doc.layout === undefined && body) {
         const slotEl = container.querySelector<HTMLElement>(".oneday-slot-timeline")
         if (slotEl) {
-          window.requestAnimationFrame(() => {
+          domWindow?.requestAnimationFrame(() => {
             const bodyW = body.getBoundingClientRect().width
             const natural = (doc.width ?? this.settings.width) + SIDE_LANE_W + 8
             if (bodyW > 200 && natural < bodyW * 0.9) {
@@ -398,10 +411,12 @@ export default class OnedayPlugin extends Plugin {
       })
 
       // 右下角：设置快捷入口（yyt 2026-08-17）
-      const gear = document.createElement("button")
+      const gear = dom.createElement("button")
+      gear.type = "button"
       gear.className = "oneday-open-settings"
-      gear.textContent = "⚙"
+      setIcon(gear, "settings")
       gear.title = "打开 Oneday 设置"
+      gear.setAttribute("aria-label", "打开 Oneday 设置")
       gear.addEventListener("click", (e) => {
         e.stopPropagation()
         // @ts-expect-error setting 是内部 API
@@ -412,16 +427,43 @@ export default class OnedayPlugin extends Plugin {
       container.appendChild(gear)
 
       // 显式「＋组件」入口：block 右下角（与荧光笔的＋无关，yyt 2026-08-17）
-      const addComp = document.createElement("button")
+      const addComp = dom.createElement("button")
+      addComp.type = "button"
       addComp.className = "oneday-add-component"
-      addComp.textContent = "＋"
+      setIcon(addComp, "plus")
       addComp.title = "添加组件（文字区…）"
+      addComp.setAttribute("aria-label", "添加组件")
+      addComp.setAttribute("aria-haspopup", "menu")
       addComp.addEventListener("click", (e) => {
         e.stopPropagation()
         const r = addComp.getBoundingClientRect()
         showAddMenu(r.left, r.top)
       })
       container.appendChild(addComp)
+
+      // 触控端不直接暴露细小手柄：先进入显式布局编辑态，再显示放大的命中区。
+      const layoutEdit = dom.createElement("button")
+      layoutEdit.type = "button"
+      layoutEdit.className = "oneday-layout-edit-toggle"
+      layoutEdit.setAttribute("aria-pressed", "false")
+      const layoutEditIcon = dom.createElement("span")
+      layoutEditIcon.className = "oneday-layout-edit-icon"
+      layoutEditIcon.setAttribute("aria-hidden", "true")
+      const layoutEditLabel = dom.createElement("span")
+      const syncLayoutEdit = (active: boolean): void => {
+        container.classList.toggle("is-layout-editing", active)
+        layoutEdit.setAttribute("aria-pressed", String(active))
+        layoutEdit.setAttribute("aria-label", active ? "完成布局编辑" : "编辑布局")
+        layoutEditLabel.textContent = active ? "完成布局" : "编辑布局"
+        setIcon(layoutEditIcon, active ? "check" : "pencil-ruler")
+      }
+      layoutEdit.append(layoutEditIcon, layoutEditLabel)
+      layoutEdit.addEventListener("click", (e) => {
+        e.stopPropagation()
+        syncLayoutEdit(layoutEdit.getAttribute("aria-pressed") !== "true")
+      })
+      syncLayoutEdit(false)
+      container.appendChild(layoutEdit)
 
       const menuSurface = (el.closest(".cm-embed-block") as HTMLElement | null) ?? container
       menuSurface.addEventListener("contextmenu", (e: MouseEvent) => {
@@ -464,8 +506,8 @@ export default class OnedayPlugin extends Plugin {
         showAddMenu(e.clientX, e.clientY)
       })
 
-      const dialogSlot = container.querySelector(".oneday-slot-dialog")
-      if ((Platform.isDesktopApp || this.settings.dialogBackend === "api") && dialogSlot instanceof HTMLElement) {
+      const dialogSlot = container.querySelector<HTMLElement>(".oneday-slot-dialog")
+      if ((Platform.isDesktopApp || this.settings.dialogBackend === "api") && dialogSlot) {
         attachDialog(dialogSlot, doc, {
           settings: this.settings,
           openSettings: () => {
@@ -513,8 +555,8 @@ export default class OnedayPlugin extends Plugin {
   /** 无 layout 头的块在首次写入时持久化当前槽位布局（避免每次重渲染重新拟合 -> 闪缩） */
   private persistLayoutOnce(source: string, doc: { layout?: unknown }, container: HTMLElement): string {
     if (doc.layout !== undefined) return source
-    const body = container.querySelector(".oneday-body")
-    if (!(body instanceof HTMLElement)) return source
+    const body = container.querySelector<HTMLElement>(".oneday-body")
+    if (!body) return source
     const items = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot")).map((sl) => ({
       id: sl.dataset.slot as GridItem["id"],
       x: Number(sl.dataset.x), y: Number(sl.dataset.y), w: Number(sl.dataset.w), h: Number(sl.dataset.h),
@@ -534,8 +576,8 @@ export default class OnedayPlugin extends Plugin {
   /** Grow slots whose content exceeds their grid height, then re-compact (display-only). */
   private fitSlotHeights(container: HTMLElement): void {
     const run = (): void => {
-      const body = container.querySelector(".oneday-body")
-      if (!(body instanceof HTMLElement)) return
+      const body = container.querySelector<HTMLElement>(".oneday-body")
+      if (!body) return
       const slots = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot"))
       let grew = false
       for (const slot of slots) {
@@ -567,7 +609,7 @@ export default class OnedayPlugin extends Plugin {
     // 二次量高去重：渲染频繁时定时器堆积会造成重排风暴（性能审计 2026-08-19）
     if (!container.dataset.onedayFitPending) {
       container.dataset.onedayFitPending = "1"
-      window.setTimeout(() => {
+      container.ownerDocument.defaultView?.setTimeout(() => {
         delete container.dataset.onedayFitPending
         run()
       }, 300)
@@ -609,11 +651,12 @@ export default class OnedayPlugin extends Plugin {
     // 等真实的异步渲染落定（MarkdownRenderer.render 的 Promise），不盲猜时长（专家方案）
     const asyncRenders = container.querySelectorAll<HTMLElement>(".oneday-text-host")
     const settle = Array.from(asyncRenders).map((h) => new Promise<void>((resolve) => {
-      const mo = new MutationObserver(() => {
+      const MutationObserverCtor = container.ownerDocument.defaultView?.MutationObserver ?? MutationObserver
+      const mo = new MutationObserverCtor(() => {
         if (h.childElementCount > 0) { mo.disconnect(); resolve() }
       })
       mo.observe(h, { childList: true })
-      window.setTimeout(() => { mo.disconnect(); resolve() }, 2000) // 兜底上限
+      container.ownerDocument.defaultView?.setTimeout(() => { mo.disconnect(); resolve() }, 2000) // 兜底上限
     }))
     void Promise.all(settle).then(apply)
   }

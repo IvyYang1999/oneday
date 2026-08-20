@@ -18,10 +18,13 @@ export function toggleBlockFocus(container: HTMLElement, line: number): void {
 export function attachHoverInfo(container: HTMLElement, doc: TimelineDoc): void {
   const svg = container.querySelector<SVGSVGElement>("svg.oneday-svg")
   if (!svg) return
+  const dom = container.ownerDocument
 
   container.querySelector(".oneday-tooltip")?.remove() // 幂等：响应式重渲染会重复 attach
-  const tooltip = document.createElement("div")
+  const tooltip = dom.createElement("div")
   tooltip.className = "oneday-tooltip"
+  tooltip.setAttribute("role", "tooltip")
+  tooltip.setAttribute("aria-hidden", "true")
   tooltip.style.display = "none"
   container.appendChild(tooltip)
 
@@ -30,8 +33,8 @@ export function attachHoverInfo(container: HTMLElement, doc: TimelineDoc): void 
   }
 
   svg.addEventListener("pointerover", (e: PointerEvent) => {
-    const target = (e.target as Element | null)?.closest("rect.oneday-block")
-    if (!(target instanceof SVGRectElement)) return
+    const target = (e.target as Element | null)?.closest("rect.oneday-block") as SVGRectElement | null
+    if (!target) return
     const line = Number(target.dataset.line)
     const entry = doc.entries.find((it) => it.line === line)
     if (!entry) return
@@ -44,20 +47,21 @@ export function attachHoverInfo(container: HTMLElement, doc: TimelineDoc): void 
 
     const time = `${formatClock(entry.startMin)} – ${formatClock(entry.endMin)} · ${formatHours(durationMinutes(entry.startMin, entry.endMin))}`
     tooltip.replaceChildren()
-    const l1 = document.createElement("div")
+    const l1 = dom.createElement("div")
     l1.className = "oneday-tooltip-time"
     l1.textContent = time
-    const l2 = document.createElement("div")
+    const l2 = dom.createElement("div")
     l2.className = "oneday-tooltip-type"
     l2.textContent = (entry.plan ? "规划 · " : "") + entry.type
     tooltip.append(l1, l2)
     if (entry.note) {
-      const l3 = document.createElement("div")
+      const l3 = dom.createElement("div")
       l3.className = "oneday-tooltip-note"
       l3.textContent = entry.note
       tooltip.appendChild(l3)
     }
     tooltip.style.display = "block"
+    tooltip.setAttribute("aria-hidden", "false")
   })
 
   svg.addEventListener("pointermove", (e: PointerEvent) => {
@@ -70,6 +74,7 @@ export function attachHoverInfo(container: HTMLElement, doc: TimelineDoc): void 
   svg.addEventListener("pointerout", (e: PointerEvent) => {
     if ((e.target as Element | null)?.closest("rect.oneday-block")) {
       tooltip.style.display = "none"
+      tooltip.setAttribute("aria-hidden", "true")
       clearPairing()
     }
   })

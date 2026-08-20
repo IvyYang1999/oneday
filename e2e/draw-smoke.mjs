@@ -78,7 +78,7 @@ await esbuild.build({
   outfile: path.join(out, "bundle.js"),
 })
 const css = fs.readFileSync(path.join(here, "../styles.css"), "utf8")
-const html = `<!doctype html><html><head><style>${css}</style></head><body style="margin:0"><div id="app" style="width:200px;position:relative"></div><script>${fs.readFileSync(path.join(out, "bundle.js"), "utf8")}</script></body></html>`
+const html = `<!doctype html><html><head><style>${css}</style></head><body style="margin:0"><div id="app" class="oneday-container" style="width:200px;position:relative"></div><script>${fs.readFileSync(path.join(out, "bundle.js"), "utf8")}</script></body></html>`
 fs.writeFileSync(path.join(out, "index.html"), html)
 
 const browser = await chromium.launch()

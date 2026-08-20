@@ -6,8 +6,6 @@
 
 export type DrawMode = "actual" | "plan"
 
-export type ViewMode = "all" | "actual" | "plan"
-
 export interface ToolbarDeps {
   /** Global palette (all configured types -> color). */
   typeColors: Record<string, string>
@@ -22,6 +20,8 @@ export interface ToolbarDeps {
   onHide: (type: string) => void
   /** "+" menu picks a hidden type to show again. */
   onShow: (type: string) => void
+  /** DOM realm that owns this toolbar (Obsidian pop-out safe). */
+  domDocument?: Document
 }
 
 export interface ToolbarHandle {
@@ -33,13 +33,18 @@ export interface ToolbarHandle {
 
 /** Right-click menu on a swatch (pure DOM, same pattern as the + menu). */
 function showSwatchMenu(root: HTMLElement, x: number, y: number, type: string, deps: ToolbarDeps): void {
+  const dom = root.ownerDocument
   root.querySelectorAll(".oneday-ctx-menu").forEach((m) => m.remove())
-  const menu = document.createElement("div")
+  const menu = dom.createElement("div")
   menu.className = "oneday-ctx-menu"
+  menu.setAttribute("role", "menu")
+  menu.setAttribute("aria-label", `${type} 荧光笔操作`)
   menu.style.left = `${x}px`
   menu.style.top = `${y}px`
-  const hide = document.createElement("button")
+  const hide = dom.createElement("button")
+  hide.type = "button"
   hide.className = "oneday-add-item"
+  hide.setAttribute("role", "menuitem")
   hide.textContent = "在本块隐藏"
   hide.addEventListener("click", () => {
     menu.remove()
@@ -47,31 +52,39 @@ function showSwatchMenu(root: HTMLElement, x: number, y: number, type: string, d
   })
   menu.appendChild(hide)
   root.appendChild(menu)
-  document.addEventListener("click", () => menu.remove(), { once: true })
+  dom.addEventListener("click", () => menu.remove(), { once: true })
 }
 
 export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
-  const el = document.createElement("div")
+  const dom = deps.domDocument ?? document
+  const el = dom.createElement("div")
   el.className = "oneday-toolbar"
+  el.setAttribute("role", "toolbar")
+  el.setAttribute("aria-label", "Oneday 荧光笔")
 
   // 荧光笔模式小开关（新增为 记录/计划，回到荧光笔区）
-  const brushLabel = document.createElement("span")
+  const brushLabel = dom.createElement("span")
   brushLabel.className = "oneday-toggle-label"
   brushLabel.textContent = "新增为"
   el.appendChild(brushLabel)
-  const brushWrap = document.createElement("span")
+  const brushWrap = dom.createElement("span")
   brushWrap.className = "oneday-mode oneday-brush-toggle" + (deps.brushMode === "plan" ? " is-plan" : "")
+  brushWrap.setAttribute("role", "group")
+  brushWrap.setAttribute("aria-label", "新增色块类型")
   for (const [m, label] of [["actual", "记录"], ["plan", "计划"]] as Array<[DrawMode, string]>) {
-    const btn = document.createElement("button")
+    const btn = dom.createElement("button")
+    btn.type = "button"
     btn.className = "oneday-mode-btn oneday-brush-btn" + (m === deps.brushMode ? " is-active" : "")
     btn.dataset.mode = m
-    const sym = document.createElement("span")
-    sym.className = m === "actual" ? "oneday-sym oneday-sym-dot" : "oneday-sym oneday-sym-hatch"
-    btn.appendChild(sym)
-    btn.appendChild(document.createTextNode(label))
+    btn.setAttribute("aria-label", `新增为${label}`)
+    btn.setAttribute("aria-pressed", String(m === deps.brushMode))
+    btn.textContent = label
     btn.addEventListener("click", () => {
-      brushWrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
-      btn.classList.add("is-active")
+      brushWrap.querySelectorAll<HTMLButtonElement>(".oneday-mode-btn").forEach((b) => {
+        const active = b === btn
+        b.classList.toggle("is-active", active)
+        b.setAttribute("aria-pressed", String(active))
+      })
       brushWrap.classList.toggle("is-plan", m === "plan")
       el.classList.toggle("is-plan", m === "plan")
       deps.onBrushModeChange(m)
@@ -84,18 +97,25 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   // Visible swatches = global palette minus hidden
   const visible = Object.keys(deps.typeColors).filter((t) => !deps.hiddenTypes.includes(t))
   for (const type of visible) {
-    const btn = document.createElement("button")
+    const btn = dom.createElement("button")
+    btn.type = "button"
     btn.className = "oneday-swatch" + (type === deps.activeType ? " is-active" : "")
     btn.dataset.type = type
     btn.title = "左键选中 · 右键隐藏（本块）"
-    const dot = document.createElement("span")
+    btn.setAttribute("aria-label", `选择${type}荧光笔`)
+    btn.setAttribute("aria-pressed", String(type === deps.activeType))
+    const dot = dom.createElement("span")
+    dot.setAttribute("aria-hidden", "true")
     dot.className = "oneday-swatch-dot"
     dot.style.setProperty("--c", deps.typeColors[type])
     btn.appendChild(dot)
-    btn.appendChild(document.createTextNode(type))
+    btn.appendChild(dom.createTextNode(type))
     btn.addEventListener("click", () => {
-      el.querySelectorAll(".oneday-swatch").forEach((b) => b.classList.remove("is-active"))
-      btn.classList.add("is-active")
+      el.querySelectorAll<HTMLButtonElement>(".oneday-swatch[data-type]").forEach((b) => {
+        const active = b === btn
+        b.classList.toggle("is-active", active)
+        b.setAttribute("aria-pressed", String(active))
+      })
       deps.onSelect(type)
     })
     btn.addEventListener("contextmenu", (e) => {
@@ -109,70 +129,70 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   // "+" add-back menu (only types already configured globally)
   const hidden = deps.hiddenTypes.filter((t) => t in deps.typeColors)
   if (hidden.length > 0) {
-    const addBtn = document.createElement("button")
+    const addBtn = dom.createElement("button")
+    addBtn.type = "button"
     addBtn.className = "oneday-swatch oneday-add"
     addBtn.textContent = "+"
     addBtn.title = "加回隐藏的荧光笔（新色号请去设置页）"
-    const menu = document.createElement("div")
+    addBtn.setAttribute("aria-haspopup", "menu")
+    addBtn.setAttribute("aria-expanded", "false")
+    addBtn.setAttribute("aria-label", "加回隐藏的荧光笔")
+    const menu = dom.createElement("div")
     menu.className = "oneday-add-menu"
+    menu.setAttribute("role", "menu")
+    menu.setAttribute("aria-label", "隐藏的荧光笔")
     menu.style.display = "none"
     for (const type of hidden) {
-      const item = document.createElement("button")
+      const item = dom.createElement("button")
+      item.type = "button"
       item.className = "oneday-add-item"
-      const dot = document.createElement("span")
+      item.setAttribute("role", "menuitem")
+      const dot = dom.createElement("span")
+      dot.setAttribute("aria-hidden", "true")
       dot.className = "oneday-swatch-dot"
       dot.style.background = deps.typeColors[type]
       item.appendChild(dot)
-      item.appendChild(document.createTextNode(type))
+      item.appendChild(dom.createTextNode(type))
       item.addEventListener("click", () => {
         menu.style.display = "none"
+        addBtn.setAttribute("aria-expanded", "false")
         deps.onShow(type)
       })
       menu.appendChild(item)
     }
     addBtn.addEventListener("click", (e) => {
       e.stopPropagation()
-      menu.style.display = menu.style.display === "none" ? "block" : "none"
+      const open = menu.style.display === "none"
+      menu.style.display = open ? "block" : "none"
+      addBtn.setAttribute("aria-expanded", String(open))
+      if (open) {
+        dom.addEventListener("click", () => {
+          menu.style.display = "none"
+          addBtn.setAttribute("aria-expanded", "false")
+        }, { once: true })
+      }
     })
-    document.addEventListener("click", () => (menu.style.display = "none"))
-    const wrap = document.createElement("span")
+    const wrap = dom.createElement("span")
     wrap.className = "oneday-add-wrap"
     wrap.append(addBtn, menu)
     el.appendChild(wrap)
   }
 
   const setBrushMode = (mode: DrawMode): void => {
-    brushWrap.querySelectorAll(".oneday-mode-btn").forEach((b) => {
-      b.classList.toggle("is-active", (b as HTMLElement).dataset.mode === mode)
+    brushWrap.querySelectorAll<HTMLButtonElement>(".oneday-mode-btn").forEach((b) => {
+      const active = b.dataset.mode === mode
+      b.classList.toggle("is-active", active)
+      b.setAttribute("aria-pressed", String(active))
     })
     brushWrap.classList.toggle("is-plan", mode === "plan")
     el.classList.toggle("is-plan", mode === "plan")
   }
 
-  const statusEl = document.createElement("div")
+  const statusEl = dom.createElement("div")
   statusEl.className = "oneday-draw-status"
+  statusEl.setAttribute("role", "status")
+  statusEl.setAttribute("aria-live", "polite")
   return { el, statusEl, setBrushMode }
-}
-
-/** 记录/计划分段开关（独立组件，贴时间轴槽位顶部右侧，yyt 2026-08-17） */
-export function buildModeToggle(mode: DrawMode, onChange: (mode: DrawMode) => void): HTMLElement {
-  const wrap = document.createElement("div")
-  wrap.className = "oneday-mode oneday-mode-docked" + (mode === "plan" ? " is-plan" : "")
-  const modes: Array<[DrawMode, string]> = [["actual", "记录"], ["plan", "计划"]]
-  for (const [m, label] of modes) {
-    const btn = document.createElement("button")
-    btn.className = "oneday-mode-btn" + (m === mode ? " is-active" : "")
-    btn.dataset.mode = m
-    btn.textContent = label
-    btn.addEventListener("click", () => {
-      wrap.querySelectorAll(".oneday-mode-btn").forEach((b) => b.classList.remove("is-active"))
-      btn.classList.add("is-active")
-      wrap.classList.toggle("is-plan", m === "plan")
-      onChange(m)
-    })
-    wrap.appendChild(btn)
-  }
-  return wrap
 }
 
 const EYE_OPEN_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'
@@ -183,23 +203,23 @@ export interface LayerView {
   plan: boolean
 }
 
-/** 图层开关：记录/计划各自独立点亮，都亮=全部（yyt 2026-08-17 拍板：三态多余）。
- *  最后亮着的那个不允许再灭（防止全空）。 */
-export function buildLayerToggles(view: LayerView, onChange: (view: LayerView) => void): HTMLElement {
-  const wrap = document.createElement("div")
+/** 图层开关：记录/计划各自独立点亮，都亮=全部；允许全灭。 */
+export function buildLayerToggles(view: LayerView, onChange: (view: LayerView) => void, dom: Document = document): HTMLElement {
+  const wrap = dom.createElement("div")
   wrap.className = "oneday-mode oneday-view-toggle"
   wrap.setAttribute("role", "group")
   wrap.setAttribute("aria-label", "显示图层")
   const state = { ...view }
   for (const [key, label] of [["actual", "记录"], ["plan", "计划"]] as Array<["actual" | "plan", string]>) {
-    const btn = document.createElement("button")
+    const btn = dom.createElement("button")
     btn.type = "button"
     btn.className = "oneday-mode-btn oneday-layer-btn" + (state[key] ? " is-active" : "")
     btn.dataset.layer = key
     // 文字 + Lucide eye/eye-off 图标（yyt 2026-08-19：不要 emoji）
-    const text = document.createElement("span")
+    const text = dom.createElement("span")
     text.textContent = label
-    const eye = document.createElement("span")
+    const eye = dom.createElement("span")
+    eye.setAttribute("aria-hidden", "true")
     eye.className = "oneday-eye"
     btn.append(text, eye)
     const syncAria = (on: boolean): void => {

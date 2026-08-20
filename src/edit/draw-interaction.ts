@@ -36,9 +36,6 @@ export interface DrawDeps {
   onDeleteEntry: (line: number) => void
 }
 
-/** 轴端热区（px，svg 坐标） */
-const AXIS_EDGE_PX = 4 // 热区收窄（yyt：±10px 抢画块手势）
-
 const SVGNS = "http://www.w3.org/2000/svg"
 
 /** 延展预览层：拖动轴端时实时画出延伸区域和新小时刻度（窗口拖拽式实时反馈） */
@@ -54,12 +51,13 @@ function updateExtendPreview(
   trackX: number,
   trackW: number
 ): void {
+  const dom = g.ownerDocument
   while (g.firstChild) g.removeChild(g.firstChild)
   if (toMin === fromMin) return
   const y = (m: number): number => AXIS_PAD_TOP_LOCAL + ((m - rangeStart) / 60) * hourHeight
   const y1 = y(Math.min(fromMin, toMin))
   const y2 = y(Math.max(fromMin, toMin))
-  const zone = document.createElementNS(SVGNS, "rect")
+  const zone = dom.createElementNS(SVGNS, "rect")
   zone.setAttribute("class", "oneday-extend-zone")
   zone.setAttribute("x", String(trackX))
   zone.setAttribute("y", String(y1))
@@ -71,14 +69,14 @@ function updateExtendPreview(
   for (let h = startHour; h <= endHour; h++) {
     const yy = y(h * 60)
     if (yy < y1 - 1 || yy > y2 + 1) continue
-    const line = document.createElementNS(SVGNS, "line")
+    const line = dom.createElementNS(SVGNS, "line")
     line.setAttribute("class", "oneday-grid oneday-extend-tick")
     line.setAttribute("x1", String(trackX))
     line.setAttribute("y1", String(yy))
     line.setAttribute("x2", String(trackX + trackW))
     line.setAttribute("y2", String(yy))
     g.appendChild(line)
-    const label = document.createElementNS(SVGNS, "text")
+    const label = dom.createElementNS(SVGNS, "text")
     label.setAttribute("class", "oneday-hour")
     label.setAttribute("x", String(trackX - 6))
     label.setAttribute("y", String(yy + 4))
@@ -93,6 +91,8 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   const track = container.querySelector<SVGRectElement>("rect.oneday-track")
   const statusEl = container.querySelector<HTMLElement>(".oneday-draw-status")
   if (!svg || !track) return
+  const dom = svg.ownerDocument
+  const domWindow = dom.defaultView
 
   const trackX = Number(track.getAttribute("x"))
   const trackW = Number(track.getAttribute("width"))
@@ -183,7 +183,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
         dragOriginTop = rect0.top
         dragScale = svgWidth / rect0.width
         svg.setPointerCapture(e.pointerId)
-        extendPreview = document.createElementNS(SVGNS, "g")
+        extendPreview = dom.createElementNS(SVGNS, "g")
         extendPreview.setAttribute("class", "oneday-extend-preview")
         svg.appendChild(extendPreview)
         return
@@ -197,7 +197,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     dragStartMin = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     svg.setPointerCapture(e.pointerId)
 
-    ghost = document.createElementNS(SVGNS, "rect")
+    ghost = dom.createElementNS(SVGNS, "rect")
     ghost.setAttribute("class", "oneday-ghost")
     ghost.setAttribute("x", String(trackX + 2))
     ghost.setAttribute("width", String(trackW - 4))
@@ -448,14 +448,15 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       exitEdit()
     }
   }
-  if (!document.body.dataset.onedayEscArmed) {
-    document.body.dataset.onedayEscArmed = "1"
-    document.addEventListener("keydown", (e: KeyboardEvent) => {
+  if (!dom.body.dataset.onedayEscArmed) {
+    dom.body.dataset.onedayEscArmed = "1"
+    dom.addEventListener("keydown", (e: KeyboardEvent) => {
       // 委托：所有实例共用一个监听，行为由当前 DOM 状态决定
-      const editingSvg = document.querySelector(".oneday-svg.is-editing-block")
+      const editingSvg = dom.querySelector(".oneday-svg.is-editing-block")
       if (editingSvg && (e.key === "Escape" || e.key === "Delete" || e.key === "Backspace")) {
         e.preventDefault()
-        editingSvg.dispatchEvent(new CustomEvent("oneday-esc", { detail: { key: e.key } }))
+        const CustomEventCtor = domWindow?.CustomEvent ?? CustomEvent
+        editingSvg.dispatchEvent(new CustomEventCtor("oneday-esc", { detail: { key: e.key } }))
       }
     })
   }
@@ -468,7 +469,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     // dblclick 的 target 取自 pointerup——capture 期间被重定向成 svg；
     // 且第二击 pointerup 的 no-move 分支已退出编辑态。所以一律用 elementFromPoint 找真实色块
     const hit = (e.target as Element | null)?.closest("rect.oneday-block")
-      ?? (document.elementFromPoint(e.clientX, e.clientY)?.closest("rect.oneday-block") as Element | null)
+      ?? (dom.elementFromPoint(e.clientX, e.clientY)?.closest("rect.oneday-block") as Element | null)
     if (!hit) return
     const line = Number((hit as HTMLElement).dataset.line)
     if (!Number.isInteger(line)) return

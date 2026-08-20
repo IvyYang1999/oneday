@@ -22,6 +22,8 @@ interface InlineEditorDeps {
 
 /** 文字区原地编辑：点击渲染区 -> textarea；失焦/⌘Enter 保存，Esc 取消（yyt：不要弹窗）。 */
 function attachInlineTextEditor(pane: HTMLElement, text: string, deps: InlineEditorDeps): void {
+  const dom = pane.ownerDocument
+  const domWindow = dom.defaultView
   const show = (): void => {
     pane.closest(".oneday-slot")?.classList.remove("is-editing")
     pane.empty()
@@ -54,8 +56,8 @@ function attachInlineTextEditor(pane: HTMLElement, text: string, deps: InlineEdi
     }
     // 容器级 focusout（专家方案）：焦点离开整个文字区才提交
     pane.addEventListener("focusout", () => {
-      window.setTimeout(() => {
-        if (pane.querySelector("textarea") && !pane.contains(document.activeElement)) commit()
+      domWindow?.setTimeout(() => {
+        if (pane.querySelector("textarea") && !pane.contains(dom.activeElement)) commit()
       }, 0)
     })
     let esc = false
@@ -82,6 +84,7 @@ export function renderTimelineInto(
   textPane?: TextPaneDeps
 ): HTMLElement {
   const container = el.createDiv({ cls: "oneday-container" })
+  const domWindow = container.ownerDocument.defaultView
 
   const baseWidth = doc.width ?? opts.width ?? 200
   const texts = doc.texts ?? []
@@ -150,7 +153,7 @@ export function renderTimelineInto(
       // 先放柱内，挂载后实测：装不下就挪柱外（百分比阈值对不上像素，yyt 2026-08-19）
       const label = bar.createEl("span", { cls: "oneday-stat-hours", text: formatHours(st.minutes) })
       label.style.color = relatedTextColor(color)
-      window.requestAnimationFrame(() => {
+      domWindow?.requestAnimationFrame(() => {
         if (label.offsetWidth + 10 > bar.clientWidth) {
           label.classList.add("oneday-stat-hours-out")
           label.style.color = ""

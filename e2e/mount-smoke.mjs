@@ -19,6 +19,7 @@ fs.writeFileSync(path.join(out, "entry.ts"), `
 import { parseTimeline } from "${path.join(here, "../src/core/parser")}"
 import { renderTimelineInto } from "${path.join(here, "../src/render/timeline-view")}"
 import { attachGridInteract } from "${path.join(here, "../src/edit/grid-interact")}"
+import { attachWidthHandle } from "${path.join(here, "../src/edit/width-handle")}"
 
 // minimal Obsidian DOM helper polyfills
 HTMLElement.prototype.createDiv = function (opts = {}) {
@@ -56,6 +57,7 @@ try {
     onSave: () => {},
   })
   attachGridInteract(el.querySelector(".oneday-body"), () => {})
+  attachWidthHandle(el.querySelector(".oneday-container"), doc.width ?? 200, () => {})
   window.__ok = true
 } catch (err) {
   window.__error = String(err && err.stack || err)
@@ -91,9 +93,31 @@ const state = await page.evaluate(() => ({
   })),
   bodyH: document.querySelector(".oneday-body")?.style.height,
 }))
+
+await page.evaluate(() => document.body.classList.add("is-mobile"))
+const mobileDefault = await page.evaluate(() => ({
+  grip: getComputedStyle(document.querySelector(".oneday-slot-grip")).display,
+  handle: getComputedStyle(document.querySelector(".oneday-handle-e")).display,
+  width: getComputedStyle(document.querySelector(".oneday-width-handle")).display,
+}))
+await page.evaluate(() => document.querySelector(".oneday-container")?.classList.add("is-layout-editing"))
+const mobileEditing = await page.evaluate(() => {
+  const grip = document.querySelector(".oneday-slot-grip").getBoundingClientRect()
+  const handle = document.querySelector(".oneday-handle-e").getBoundingClientRect()
+  const width = document.querySelector(".oneday-width-handle").getBoundingClientRect()
+  return {
+    grip: { display: getComputedStyle(document.querySelector(".oneday-slot-grip")).display, w: grip.width, h: grip.height },
+    handle: { display: getComputedStyle(document.querySelector(".oneday-handle-e")).display, w: handle.width },
+    width: { display: getComputedStyle(document.querySelector(".oneday-width-handle")).display, w: width.width },
+  }
+})
 await browser.close()
 console.log(JSON.stringify(state, null, 2))
 if (!state.ok) { console.error("MOUNT THREW"); process.exit(1) }
 if (state.slots.length === 0 || state.slots.some((s) => s.html === 0)) { console.error("EMPTY SLOT"); process.exit(1) }
 if (state.slots.some((s) => s.w === 0 || s.h === 0)) { console.error("COLLAPSED SLOT (zero size)"); process.exit(1) }
+if (Object.values(mobileDefault).some((display) => display !== "none")) { console.error("MOBILE HANDLES LEAKED", mobileDefault); process.exit(1) }
+if (mobileEditing.grip.display === "none" || mobileEditing.grip.w < 44 || mobileEditing.grip.h < 44) { console.error("MOBILE GRIP TOO SMALL", mobileEditing); process.exit(1) }
+if (mobileEditing.handle.display === "none" || mobileEditing.handle.w < 20) { console.error("MOBILE RESIZE HANDLE TOO SMALL", mobileEditing); process.exit(1) }
+if (mobileEditing.width.display === "none" || mobileEditing.width.w < 20) { console.error("MOBILE WIDTH HANDLE TOO SMALL", mobileEditing); process.exit(1) }
 console.log("OK mount smoke passed")

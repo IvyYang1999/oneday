@@ -38,8 +38,9 @@ function setItemOnSlot(slot: HTMLElement, it: GridItem): void {
 const DIRS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const
 
 export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem[]) => void): void {
+  const dom = body.ownerDocument
   // 清理可能残留的拖拽克隆（pointer capture 中断时没删掉）
-  document.querySelectorAll(".oneday-drag-clone").forEach((c) => c.remove())
+  dom.querySelectorAll(".oneday-drag-clone").forEach((c) => c.remove())
   const slots = Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot"))
 
   const finish = (priorityId?: SlotId): void => {
@@ -53,11 +54,17 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
     if (slot.querySelector(".oneday-slot-grip")) continue
 
     // ---- move grip ----
-    const grip = document.createElement("button")
+    const grip = dom.createElement("button")
+    grip.type = "button"
     grip.className = "oneday-slot-grip"
     grip.title = "拖拽移动此组件"
+    grip.setAttribute("aria-label", `移动${slot.dataset.slot ?? "组件"}`)
     // 六个真实点元素（伪元素在 button+grid 下不可靠，真机曾变形，yyt 2026-08-19）
-    for (let i = 0; i < 6; i++) grip.appendChild(document.createElement("span"))
+    for (let i = 0; i < 6; i++) {
+      const dot = dom.createElement("span")
+      dot.setAttribute("aria-hidden", "true")
+      grip.appendChild(dot)
+    }
     slot.appendChild(grip)
 
     grip.addEventListener("pointerdown", (e: PointerEvent) => {
@@ -76,7 +83,7 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
       clone.style.height = `${slotRect.height}px`
       clone.style.left = `${slotRect.left}px`
       clone.style.top = `${slotRect.top}px`
-      document.body.appendChild(clone)
+      dom.body.appendChild(clone)
       slot.classList.add("is-placeholder")
 
       const item = itemFromSlot(slot)
@@ -99,22 +106,23 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
         body.style.height = `${gridRows(items) * GRID_ROW_H}px`
       }
       const onUp = (): void => {
-        document.removeEventListener("pointermove", onMove)
-        document.removeEventListener("pointerup", onUp)
-        document.removeEventListener("pointercancel", onUp)
+        dom.removeEventListener("pointermove", onMove)
+        dom.removeEventListener("pointerup", onUp)
+        dom.removeEventListener("pointercancel", onUp)
         clone.remove()
         slot.classList.remove("is-placeholder")
         finish(slot.dataset.slot as SlotId)
       }
-      document.addEventListener("pointermove", onMove)
-      document.addEventListener("pointerup", onUp)
-      document.addEventListener("pointercancel", onUp)
+      dom.addEventListener("pointermove", onMove)
+      dom.addEventListener("pointerup", onUp)
+      dom.addEventListener("pointercancel", onUp)
     })
 
     // ---- 8 resize handles ----
     for (const dir of DIRS) {
-      const h = document.createElement("div")
+      const h = dom.createElement("div")
       h.className = `oneday-handle oneday-handle-${dir}`
+      h.setAttribute("aria-hidden", "true")
       slot.appendChild(h)
 
       h.addEventListener("pointerdown", (e: PointerEvent) => {
@@ -154,13 +162,15 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
           body.style.height = `${gridRows(items) * GRID_ROW_H}px`
         }
         const onUp = (): void => {
-          document.removeEventListener("pointermove", onMove)
-          document.removeEventListener("pointerup", onUp)
+          dom.removeEventListener("pointermove", onMove)
+          dom.removeEventListener("pointerup", onUp)
+          dom.removeEventListener("pointercancel", onUp)
           slot.classList.remove("is-resizing")
           finish(slot.dataset.slot as SlotId)
         }
-        document.addEventListener("pointermove", onMove)
-        document.addEventListener("pointerup", onUp)
+        dom.addEventListener("pointermove", onMove)
+        dom.addEventListener("pointerup", onUp)
+        dom.addEventListener("pointercancel", onUp)
       })
     }
   }

@@ -8,9 +8,11 @@ export function trackAnchor(
   anchor: Element,
   place: (anchorRect: DOMRect) => void
 ): () => void {
+  const domWindow = pop.ownerDocument.defaultView
+  if (!domWindow) return () => {}
   const cleanup = (): void => {
-    window.removeEventListener("scroll", onScroll, true)
-    window.removeEventListener("resize", onScroll)
+    domWindow.removeEventListener("scroll", onScroll, true)
+    domWindow.removeEventListener("resize", onScroll)
   }
   const update = (): void => {
     if (!anchor.isConnected || !pop.isConnected) {
@@ -21,9 +23,9 @@ export function trackAnchor(
     place(anchor.getBoundingClientRect())
   }
   const onScroll = (): void => {
-    void requestAnimationFrame(update)
+    void domWindow.requestAnimationFrame(update)
   }
-  window.addEventListener("scroll", onScroll, true)
-  window.addEventListener("resize", onScroll)
+  domWindow.addEventListener("scroll", onScroll, true)
+  domWindow.addEventListener("resize", onScroll)
   return cleanup
 }

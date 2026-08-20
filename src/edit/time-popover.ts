@@ -11,18 +11,26 @@ export function openTimePopover(
   initial: { start: string; end: string },
   onSave: (start: string, end: string) => void
 ): void {
-  container.querySelector(".oneday-time-popover")?.remove()
+  const dom = container.ownerDocument
+  const domWindow = dom.defaultView
+  if (!domWindow) return
+  dom.querySelectorAll(".oneday-time-popover").forEach((el) => el.remove())
 
-  const pop = document.createElement("div")
+  const pop = dom.createElement("div")
   pop.className = "oneday-time-popover"
-  const start = document.createElement("input")
+  pop.setAttribute("role", "dialog")
+  pop.setAttribute("aria-label", "编辑时间块起止时间")
+  const start = dom.createElement("input")
   start.type = "text"
+  start.setAttribute("aria-label", "开始时间")
   start.value = initial.start
   start.placeholder = "HH:MM"
-  const dash = document.createElement("span")
+  const dash = dom.createElement("span")
+  dash.setAttribute("aria-hidden", "true")
   dash.textContent = "–"
-  const end = document.createElement("input")
+  const end = dom.createElement("input")
   end.type = "text"
+  end.setAttribute("aria-label", "结束时间")
   end.value = initial.end
   end.placeholder = "HH:MM"
   pop.append(start, dash, end)
@@ -31,13 +39,13 @@ export function openTimePopover(
   const place = (r: { x: number; width: number; y: number; height: number }): void => {
     pop.style.left = `${r.x + r.width + 6}px`
     pop.style.top = `${r.y + r.height / 2 - 14}px`
-    const vw = window.innerWidth
+    const vw = domWindow.innerWidth
     const pw = pop.offsetWidth
     if (pop.offsetLeft + pw > vw - 8) pop.style.left = `${Math.max(8, r.x - pw - 6)}px`
   }
   place(anchorRect)
-  document.body.appendChild(pop)
-  trackAnchor(pop, anchorEl, place)
+  dom.body.appendChild(pop)
+  const stopTracking = trackAnchor(pop, anchorEl, place)
 
   const valid = (v: string): boolean => /^\d{1,2}:\d{2}$/.test(v.trim())
   let done = false
@@ -45,10 +53,12 @@ export function openTimePopover(
     if (done) return
     if (save && valid(start.value) && valid(end.value)) {
       done = true
+      stopTracking()
       pop.remove()
       onSave(start.value.trim(), end.value.trim())
     } else if (!save) {
       done = true
+      stopTracking()
       pop.remove()
     }
   }
@@ -71,5 +81,5 @@ export function openTimePopover(
     })
     input.addEventListener("blur", () => finish(true))
   }
-  window.setTimeout(() => start.focus(), 0)
+  domWindow.setTimeout(() => start.focus(), 0)
 }

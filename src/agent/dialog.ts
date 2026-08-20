@@ -21,13 +21,15 @@ export interface DialogDeps {
 
 export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: DialogDeps): void {
   const box = container.createDiv({ cls: "oneday-dialog" })
+  box.setAttrs({ role: "region", "aria-label": "快速记录", "aria-busy": "false" })
+  const domWindow = box.ownerDocument.defaultView
 
   // 未配置 API：禁用输入框 + 配置引导（yyt 2026-08-17）
   const needsKey = deps.settings.dialogBackend === "api" && deps.settings.apiKey.trim() === ""
   if (needsKey) {
     const hint = box.createDiv({ cls: "oneday-dialog-needskey" })
     hint.createEl("span", { text: "✦ 快速记录需要先配置模型 API：" })
-    const btn = hint.createEl("button", { text: "去设置填 API Key" })
+    const btn = hint.createEl("button", { text: "去设置填 API Key", attr: { type: "button" } })
     btn.addEventListener("click", () => deps.openSettings())
     return
   }
@@ -35,7 +37,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
   // 自动增高的多行输入（yyt：多事件时内容长）
   const input = box.createEl("textarea", {
     cls: "oneday-dialog-input",
-    attr: { placeholder: "✦ 快速记录：刚健身半小时…", rows: "1" },
+    attr: { placeholder: "✦ 快速记录：刚健身半小时…", rows: "1", "aria-label": "快速记录" },
   }) as unknown as HTMLInputElement
   const ta = input as unknown as HTMLTextAreaElement
   const fitInput = (): void => {
@@ -43,11 +45,13 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     ta.style.height = `${Math.max(32, ta.scrollHeight)}px` // 最小高度兜底（yyt：输入框扁了）
   }
   ta.addEventListener("input", fitInput)
-  window.setTimeout(fitInput, 0)
+  domWindow?.setTimeout(fitInput, 0)
   // loading 内联在输入行右侧（yyt：不占单独一行）
   const loading = box.createEl("span", { cls: "oneday-dialog-loading", text: "生成中…" })
+  loading.setAttr("aria-hidden", "true")
   loading.style.display = "none"
   const status = box.createDiv({ cls: "oneday-dialog-status" })
+  status.setAttrs({ role: "status", "aria-live": "polite" })
 
   // 多轮会话历史：追问的回答带着上文（yyt 2026-08-19）
   const history: Array<{ role: "user" | "assistant"; content: string }> = []
@@ -56,8 +60,10 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     const text = ta.value.trim()
     if (text === "" || busy) return
     busy = true
+    box.setAttr("aria-busy", "true")
     ta.disabled = true
     loading.style.display = ""
+    loading.setAttr("aria-hidden", "false")
     status.setText("")
     status.removeClass("oneday-dialog-error")
 
@@ -84,9 +90,11 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
 
     if (!run.ok) {
       loading.style.display = "none"
+      loading.setAttr("aria-hidden", "true")
       status.setText(run.reason)
       status.addClass("oneday-dialog-error")
       busy = false
+      box.setAttr("aria-busy", "false")
       ta.disabled = false
       return
     }
@@ -94,10 +102,12 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     const result = interpretActions(run.text, doc)
     if (!result.ok) {
       loading.style.display = "none"
+      loading.setAttr("aria-hidden", "true")
       history.push({ role: "assistant", content: run.text }) // 追问留在历史里
       status.setText(result.reason)
       status.addClass("oneday-dialog-error")
       busy = false
+      box.setAttr("aria-busy", "false")
       ta.disabled = false
       ta.value = ""
       fitInput()
@@ -109,6 +119,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     ta.placeholder = "✦ 快速记录：刚健身半小时…"
 
     loading.style.display = "none"
+    loading.setAttr("aria-hidden", "true")
     try {
       await deps.writeActions(result.actions)
       ta.value = ""
@@ -124,6 +135,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       status.addClass("oneday-dialog-error")
     }
     busy = false
+    box.setAttr("aria-busy", "false")
     ta.disabled = false
   }
 

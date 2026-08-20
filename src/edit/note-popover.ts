@@ -11,12 +11,18 @@ export function openNotePopover(
   initial: string,
   onSave: (note: string) => void
 ): void {
-  container.querySelector(".oneday-note-popover")?.remove()
+  const dom = container.ownerDocument
+  const domWindow = dom.defaultView
+  if (!domWindow) return
+  dom.querySelectorAll(".oneday-note-popover").forEach((el) => el.remove())
 
-  const pop = document.createElement("div")
+  const pop = dom.createElement("div")
   pop.className = "oneday-note-popover"
-  const input = document.createElement("input")
+  pop.setAttribute("role", "dialog")
+  pop.setAttribute("aria-label", "编辑时间块备注")
+  const input = dom.createElement("input")
   input.type = "text"
+  input.setAttribute("aria-label", "备注")
   input.value = initial
   input.placeholder = "这段时间干了什么？"
   pop.appendChild(input)
@@ -25,13 +31,13 @@ export function openNotePopover(
   const place = (r: { x: number; width: number; y: number; height: number }): void => {
     pop.style.left = `${r.x + r.width + 6}px`
     pop.style.top = `${r.y + r.height / 2 - 14}px`
-    const vw = window.innerWidth
+    const vw = domWindow.innerWidth
     const pw = pop.offsetWidth
     if (pop.offsetLeft + pw > vw - 8) pop.style.left = `${Math.max(8, r.x - pw - 6)}px`
   }
   place(anchorRect)
-  document.body.appendChild(pop)
-  trackAnchor(pop, anchorEl, place)
+  dom.body.appendChild(pop)
+  const stopTracking = trackAnchor(pop, anchorEl, place)
 
   pop.addEventListener("mousedown", (e) => {
     if (e.target !== input) e.preventDefault() // 输入框本身要能点
@@ -40,6 +46,7 @@ export function openNotePopover(
   const finish = (save: boolean): void => {
     if (done) return
     done = true
+    stopTracking()
     pop.remove()
     if (save) onSave(input.value.trim())
   }
@@ -55,9 +62,9 @@ export function openNotePopover(
   })
   pop.addEventListener("focusout", () => {
     if (done) return
-    window.setTimeout(() => {
-      if (!pop.contains(document.activeElement)) finish(true)
+    domWindow.setTimeout(() => {
+      if (!pop.contains(dom.activeElement)) finish(true)
     }, 0)
   })
-  window.setTimeout(() => input.focus(), 0)
+  domWindow.setTimeout(() => input.focus(), 0)
 }
