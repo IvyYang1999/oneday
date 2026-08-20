@@ -50,6 +50,6 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     "示例（时间轴起点 07:00）：",
     `输入「我刚健身半小时」（当前时间 21:35）→ {"start":"21:05","end":"21:35","type":"${fitName}"}`,
     `输入「9：15醒来，然后浪费了35分钟刷手机」→ [{"start":"07:00","end":"09:15","type":"${sleepName}","note":"睡觉"},{"start":"09:15","end":"09:50","type":"${miscName}","note":"刷手机"}]`,
-    "注意：type 必须严格取自上面的类型表原词（如「${sleepName}」），不要自己翻译成英文或其他写法。",
+    `注意：type 必须严格取自上面的类型表原词（如「${sleepName}」），不要自己翻译成英文或其他写法。`,
   ].join("\n")
 }
