@@ -32,3 +32,11 @@ describe("起床语义 + 时间轴起点", () => {
     expect(p).toContain("多轮")
   })
 })
+
+describe("醒来句式（yyt 2026-08-19）", () => {
+  it("prompt covers 醒来 phrasing + fullwidth colon rule", () => {
+    const p = buildSystemPrompt({ typeColors: { sleep: "#ccc" }, now: new Date(), doc: parseTimeline("") })
+    expect(p).toContain("醒来")
+    expect(p).toContain("全角")
+  })
+})

@@ -103,7 +103,8 @@ export type ActionsResult =
 export function interpretResponses(text: string, doc: TimelineDoc): ResponsesResult {
   const json = extractJson(text)
   if (json === null) {
-    return { ok: false, reason: "返回中没有 JSON" }
+    const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0)
+    return { ok: false, reason: firstLine ? `模型没按 JSON 格式回答：${firstLine.slice(0, 60)}` : "返回中没有 JSON" }
   }
   const list = Array.isArray(json) ? json : [json]
   const entries: ValidatedEntry[] = []
@@ -119,7 +120,8 @@ export function interpretResponses(text: string, doc: TimelineDoc): ResponsesRes
 export function interpretActions(text: string, doc: TimelineDoc): ActionsResult {
   const json = extractJson(text)
   if (json === null) {
-    return { ok: false, reason: "返回中没有 JSON" }
+    const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0)
+    return { ok: false, reason: firstLine ? `模型没按 JSON 格式回答：${firstLine.slice(0, 60)}` : "返回中没有 JSON" }
   }
   const list = Array.isArray(json) ? json : [json]
   const actions: AgentAction[] = []
