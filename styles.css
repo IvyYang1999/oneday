@@ -1,17 +1,9 @@
 .oneday-container {
-  --oneday-control-radius: var(--button-radius, 5px);
-  --oneday-surface-radius: var(--radius-s, 6px);
-  --oneday-control-gap: var(--size-4-1, 4px);
-  --oneday-control-padding-x: var(--size-4-2, 8px);
-  --oneday-icon-button-size: 28px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--oneday-control-gap);
+  gap: 4px;
   padding: 4px 0;
-  position: relative;
-  width: 100%;
-  overflow-x: auto; /* 页面太窄时块内横向滚动，不裁切 */
 }
 
 .oneday-svg-holder {
@@ -58,17 +50,24 @@
   fill: var(--text-accent);
 }
 
+.oneday-svg .oneday-anno-line {
+  stroke: var(--text-accent);
+  stroke-width: 1;
+}
+
 .oneday-block {
   cursor: default;
 }
 
 .oneday-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: var(--font-text);
-  font-size: 13px;
-  color: var(--text-normal);
+  font-size: 12px;
+  color: var(--color-red);
+  font-family: var(--font-monospace);
+}
+
+.oneday-warning {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .oneday-errors {
@@ -81,16 +80,12 @@
 .oneday-dialog {
   margin-top: 6px;
   width: 100%;
-  position: relative;
 }
 
 .oneday-dialog-input {
   width: 100%;
   font-size: 12px;
-  padding: 6px 10px;
-  resize: none;
-  overflow: hidden;
-  line-height: 1.5;
+  padding: 4px 8px;
 }
 
 .oneday-dialog-status {
@@ -112,7 +107,7 @@
 .oneday-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--oneday-control-gap);
+  gap: 4px;
   align-items: center;
   margin-bottom: 2px;
 }
@@ -120,19 +115,19 @@
 .oneday-swatch {
   display: inline-flex;
   align-items: center;
-  gap: var(--oneday-control-gap);
+  gap: 4px;
   font-size: 11px;
-  padding: 1px var(--oneday-control-padding-x);
-  border-radius: var(--oneday-control-radius);
+  padding: 1px 8px;
+  border-radius: 10px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
   cursor: pointer;
-  box-shadow: var(--input-shadow);
+  box-shadow: none;
 }
 
 .oneday-swatch.is-active {
   border-color: var(--text-accent);
-  box-shadow: var(--input-shadow-hover);
+  box-shadow: 0 0 0 1px var(--text-accent);
 }
 
 .oneday-swatch-dot {
@@ -140,7 +135,6 @@
   height: 10px;
   border-radius: 50%;
   display: inline-block;
-  background: var(--c, #bdbdbd);
 }
 
 .oneday-draw-status {
@@ -190,15 +184,19 @@
 
 /* M4b hover 信息浮窗 + 联动高亮 */
 
+.oneday-container {
+  position: relative;
+}
+
 .oneday-tooltip {
   position: absolute;
   z-index: 20;
   pointer-events: none;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--oneday-surface-radius);
+  border-radius: 6px;
   padding: 6px 10px;
-  box-shadow: var(--shadow-s);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   font-size: 12px;
   max-width: 240px;
 }
@@ -254,19 +252,19 @@
 .oneday-mode {
   display: inline-flex;
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--oneday-control-radius);
+  border-radius: 10px;
   overflow: hidden;
   margin-left: auto; /* 钉到工具栏最右侧，与荧光笔视觉分离 */
 }
 
 .oneday-mode-btn {
   font-size: 11px;
-  padding: 1px var(--oneday-control-padding-x);
+  padding: 1px 10px;
   border: none;
   background: var(--background-secondary);
   cursor: pointer;
   box-shadow: none;
-  border-radius: var(--oneday-control-radius);
+  border-radius: 0;
   color: var(--text-muted);
 }
 
@@ -287,24 +285,23 @@
   z-index: 30;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--oneday-surface-radius);
-  box-shadow: var(--shadow-s);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   min-width: 110px;
 }
 
 .oneday-add-item {
   display: flex;
   align-items: center;
-  gap: var(--oneday-control-gap);
+  gap: 6px;
   width: 100%;
-  padding: 4px var(--oneday-control-padding-x);
+  padding: 4px 10px;
   border: none;
   background: none;
   font-size: 12px;
   cursor: pointer;
   box-shadow: none;
   text-align: left;
-  border-radius: var(--oneday-control-radius);
 }
 
 .oneday-add-item:hover {
@@ -313,6 +310,10 @@
 
 /* 计划模式：色板点变斜线纹，与 plan 色块视觉一致 */
 
+.oneday-swatch-dot {
+  background: var(--c, #bdbdbd);
+}
+
 /* 计划模式提示：dock 在时间轴上的开关本身高亮即可，色板不再变样 */
 
 .oneday-ctx-menu {
@@ -320,8 +321,8 @@
   z-index: 30;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--oneday-surface-radius);
-  box-shadow: var(--shadow-s);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   min-width: 110px;
 }
 
@@ -339,6 +340,31 @@
   float: right;
   margin: 0 0 12px 16px;
   clear: right;
+}
+
+.oneday-container {
+  width: 100%;
+}
+
+.oneday-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px; /* 加宽 + 骑跨边缘，不再只是 block 内部一条 */
+  cursor: col-resize;
+  z-index: 15;
+}
+
+.oneday-resize-handle.is-left {
+  left: -7px;
+}
+
+.oneday-resize-handle.is-right {
+  right: -7px;
+}
+
+.oneday-resize-handle:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
 .oneday-container.is-resizing {
@@ -366,7 +392,6 @@
 
 .oneday-body {
   position: relative; /* 网格容器：槽位绝对定位 */
-  width: 100%; /* 绝对定位子元素不能反向撑开 flex 子项 */
 }
 
 .oneday-text-pane {
@@ -375,6 +400,47 @@
   position: relative;
   font-size: 14px;
   padding-top: 20px; /* 顶部永远留一行给手柄（yyt：编辑/渲染都从第二行起，不跳变） */
+}
+
+.oneday-text-edit {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 5;
+  opacity: 0;
+  border: none;
+  background: var(--background-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: none;
+  padding: 2px 8px;
+}
+
+.oneday-text-pane:hover .oneday-text-edit {
+  opacity: 1;
+}
+
+.oneday-text-modal-input {
+  width: 100%;
+  font-family: var(--font-monospace);
+  font-size: 13px;
+}
+
+
+
+.oneday-grip {
+  border: none;
+  background: none;
+  cursor: grab;
+  color: var(--text-muted);
+  box-shadow: none;
+  padding: 1px 4px;
+  font-size: 11px;
+  letter-spacing: -2px;
+}
+
+.oneday-grip:active {
+  cursor: grabbing;
 }
 
 .oneday-text-placeholder {
@@ -398,12 +464,26 @@
   overflow: hidden; /* 高度由 JS 按内容撑开，编辑时不跳版 */
 }
 
+.oneday-modal-error {
+  color: var(--text-error);
+  font-size: 12px;
+  min-height: 14px;
+}
+
 /* 插槽化布局 + 组件拖动手柄 + 窄屏横向滚动 */
+
+.oneday-container {
+  overflow-x: auto; /* 页面太窄时块内横向滚动，不裁切 */
+}
+
+.oneday-body {
+  width: 100%; /* 容器是 flex column + align-items:flex-start，不写死宽度会被绝对定位子元素塌成 0 */
+}
 
 .oneday-slot {
   position: absolute;
   overflow: auto;
-  border-radius: var(--oneday-surface-radius);
+  border-radius: 6px;
   padding: 5px; /* 组件间 gutter（yyt：挨着没空隙难看） */
   box-sizing: border-box;
   outline: 1px solid transparent; /* 边缘线平时隐藏 */
@@ -418,8 +498,6 @@
 .oneday-slot.is-resizing {
   transition: none;
   outline: 2px dashed var(--text-accent);
-  outline-offset: 1px;
-  border-radius: var(--oneday-surface-radius);
 }
 
 .oneday-slot-grip {
@@ -430,9 +508,9 @@
   opacity: 0;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
-  border-radius: var(--oneday-control-radius);
+  border-radius: 6px;
   cursor: grab;
-  box-shadow: var(--input-shadow);
+  box-shadow: none;
   width: 20px;
   height: 22px;
   padding: 0;
@@ -455,6 +533,11 @@
   opacity: 1;
 }
 
+.oneday-slot.is-dragging {
+  outline: 1px dashed var(--text-accent);
+  opacity: 0.75;
+}
+
 /* 拖拽换位：浮动克隆 + 虚线占位（rbd/SortableJS 模式） */
 
 .oneday-drag-clone {
@@ -464,8 +547,14 @@
   opacity: 0.92;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--oneday-surface-radius, var(--radius-s, 6px));
-  box-shadow: var(--shadow-s);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.oneday-slot.is-placeholder {
+  outline: 2px dashed var(--text-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .oneday-slot.is-placeholder > * {
@@ -476,7 +565,7 @@
 
 .oneday-handle {
   position: absolute;
-  z-index: 13;
+  z-index: 8;
   opacity: 0;
   background: transparent;
   transition: opacity 0.1s;
@@ -490,72 +579,53 @@
   background: color-mix(in srgb, var(--interactive-accent) 35%, transparent);
 }
 
-.oneday-handle-n { top: 0; left: 28px; right: 8px; height: 8px; cursor: ns-resize; } /* 顶边左端避开 grip */
-.oneday-handle-s { bottom: 0; left: 10px; right: 8px; height: 8px; cursor: ns-resize; }
-.oneday-handle-w { top: 28px; bottom: 8px; left: 0; width: 8px; cursor: ew-resize; }
-.oneday-handle-e { top: 10px; bottom: 8px; right: 0; width: 8px; cursor: ew-resize; }
+.oneday-handle-n { left: 28px; right: 8px; height: 8px; cursor: ns-resize; } /* 顶边左端避开 grip */
+.oneday-handle-s { left: 10px; right: 8px; height: 8px; cursor: ns-resize; } /* 底边无 grip，贴住 sw 角 */
+.oneday-handle-n { top: 0; }
+.oneday-handle-s { bottom: 0; }
+.oneday-handle-w { top: 28px; bottom: 8px; width: 8px; cursor: ew-resize; } /* 上端避开 grip */
+.oneday-handle-e { top: 10px; bottom: 8px; width: 8px; cursor: ew-resize; } /* 右侧无 grip，贴住 ne 角 */
+.oneday-handle-e { right: 0; }
+.oneday-handle-w { left: 0; }
 .oneday-handle-ne, .oneday-handle-nw, .oneday-handle-se, .oneday-handle-sw { width: 10px; height: 10px; }
 .oneday-handle-ne { top: 0; right: 0; cursor: nesw-resize; }
 .oneday-handle-sw { bottom: 0; left: 0; cursor: nesw-resize; }
 .oneday-handle-se { bottom: 0; right: 0; cursor: nwse-resize; }
 .oneday-handle-nw { top: 0; left: 0; cursor: nwse-resize; }
 
-/* 块级快捷入口（右下角，hover 淡入） */
+.oneday-slot.is-placeholder {
+  outline: 2px dashed var(--text-accent);
+  outline-offset: 1px;
+}
 
-.oneday-add-component,
-.oneday-open-settings {
+/* 块级「＋组件」入口（右下角，hover 淡入） */
+
+.oneday-add-component {
   position: absolute;
+  right: 4px;
   bottom: 4px;
   z-index: 14;
-  width: var(--oneday-icon-button-size);
-  height: var(--oneday-icon-button-size);
-  border-radius: var(--oneday-control-radius);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
   color: var(--text-muted);
   cursor: pointer;
-  box-shadow: var(--input-shadow);
+  box-shadow: none;
   opacity: 0.35;
   padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  line-height: 20px;
 }
 
-.oneday-add-component {
-  right: 4px;
-}
-
-.oneday-open-settings {
-  right: calc(4px + var(--oneday-icon-button-size) + var(--oneday-control-gap));
-}
-
-.oneday-add-component:hover,
-.oneday-open-settings:hover {
-  box-shadow: var(--input-shadow-hover);
-}
-
-.oneday-container:hover .oneday-add-component,
-.oneday-container:hover .oneday-open-settings {
+.oneday-container:hover .oneday-add-component {
   opacity: 1;
-}
-
-.oneday-add-component svg,
-.oneday-open-settings svg {
-  width: 15px;
-  height: 15px;
-}
-
-.oneday-layout-edit-toggle {
-  display: none;
 }
 
 /* 轨道宽度手柄：只让时间轴本体的右边线成为命中区 */
 
 .oneday-width-handle {
   position: absolute;
-  top: 0;
-  bottom: 0;
   width: 3px;
   /* JS 读取实际轨道边线；3px 热区以该线为中心。 */
   transform: translateX(-50%);
@@ -574,6 +644,36 @@
 }
 
 /* 统计列表：每行一个类型 + 色点 */
+
+.oneday-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-text); /* 和正文一致（yyt 2026-08-17） */
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
+.oneday-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.oneday-stat-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.oneday-stat-type {
+  flex: 1;
+}
+
+.oneday-stat-hours {
+  font-weight: 600;
+}
 
 /* 轴向延展预览 */
 
@@ -597,12 +697,22 @@
   background: none !important;
   box-shadow: none !important;
   outline: none !important;
-  border: none !important;
 }
 
 .oneday-slot.is-editing .oneday-slot-grip,
 .oneday-slot.is-editing .oneday-handle {
   display: none;
+}
+
+/* 模式开关 dock 在时间轴顶部右侧 */
+
+.oneday-mode.oneday-mode-docked {
+  display: flex;
+  width: fit-content;
+  margin-left: auto; /* 右对齐 */
+  margin-bottom: 2px;
+  padding-left: 0;
+  font-size: 11px;
 }
 
 /* 计划模式：色板圆点变斜线（双线、方向与 plan 块一致） */
@@ -614,11 +724,21 @@
   background: repeating-linear-gradient(-45deg, var(--c, #bdbdbd) 0 1.2px, transparent 1.2px 4px);
 }
 
+/* 手柄层级高于内容/滚动条 */
+
+.oneday-handle {
+  z-index: 13;
+}
+
 .oneday-body.is-settling .oneday-slot {
   transition: none !important; /* 初始量体/拟合不动画，否则创建色块时块会缩一下 */
 }
 
 /* 对话框 loading 内联 */
+
+.oneday-dialog {
+  position: relative;
+}
 
 .oneday-dialog-loading {
   position: absolute;
@@ -676,8 +796,8 @@
   z-index: 1000;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--oneday-surface-radius, var(--radius-s, 6px));
-  box-shadow: var(--shadow-s);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   padding: 4px;
 }
 
@@ -694,15 +814,38 @@
   box-shadow: none;
 }
 
-/* 色板刷新提示 */
+/* 右下角设置齿轮 + 色板刷新提示 */
+
+.oneday-open-settings {
+  position: absolute;
+  right: 30px;
+  bottom: 4px;
+  z-index: 14;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  opacity: 0.35;
+  padding: 0;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.oneday-container:hover .oneday-open-settings {
+  opacity: 1;
+}
 
 .oneday-palette-refresh {
   font-size: 11px;
   border: 1px dashed var(--text-accent);
   background: transparent;
   color: var(--text-accent);
-  border-radius: var(--oneday-control-radius);
-  padding: 1px var(--oneday-control-padding-x);
+  border-radius: 10px;
+  padding: 1px 8px;
   cursor: pointer;
   box-shadow: none;
 }
@@ -716,76 +859,8 @@
 /* 荧光笔模式小开关（色板前） */
 
 .oneday-brush-toggle {
-  margin-right: var(--size-4-2, 8px);
+  margin-right: 8px;
   display: inline-flex;
-}
-
-/* 两组记录/计划控件共用同一套 segmented-control 外观与交互状态。 */
-
-.oneday-brush-toggle,
-.oneday-view-toggle.oneday-mode {
-  align-items: stretch;
-  padding: 0;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--background-secondary) 70%, var(--background-primary));
-  border: 1px solid var(--background-modifier-border);
-  border-radius: calc(var(--oneday-control-radius) + 4px);
-}
-
-.oneday-brush-toggle .oneday-mode-btn,
-.oneday-view-toggle .oneday-mode-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--oneday-control-gap);
-  min-height: 26px;
-  padding: 3px 12px;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  color: var(--text-muted);
-  font-size: 11.5px;
-  font-weight: var(--font-medium);
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: none;
-  transition: color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 80ms ease-out;
-}
-
-.oneday-brush-toggle .oneday-mode-btn:hover:not(.is-active),
-.oneday-view-toggle .oneday-mode-btn:hover:not(.is-active) {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.oneday-brush-toggle .oneday-mode-btn.is-active,
-.oneday-view-toggle .oneday-mode-btn.is-active {
-  background: var(--background-primary);
-  color: var(--text-normal);
-  font-weight: 500;
-  box-shadow: inset 0 1px 0 var(--background-modifier-border), inset 0 -1px 0 var(--background-modifier-border);
-}
-.oneday-brush-toggle .oneday-mode-btn.is-active + .oneday-mode-btn.is-active,
-.oneday-view-toggle .oneday-mode-btn.is-active + .oneday-mode-btn.is-active {
-  box-shadow: inset 1px 1px 0 var(--background-modifier-border), inset 0 -1px 0 var(--background-modifier-border);
-}
-
-.oneday-brush-toggle .oneday-mode-btn:active,
-.oneday-view-toggle .oneday-mode-btn:active {
-  transform: scale(0.97);
-}
-
-.oneday-brush-toggle .oneday-mode-btn:focus-visible,
-.oneday-view-toggle .oneday-mode-btn:focus-visible {
-  outline: 2px solid var(--text-accent);
-  outline-offset: 1px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .oneday-brush-toggle .oneday-mode-btn,
-  .oneday-view-toggle .oneday-mode-btn {
-    transition: none;
-  }
 }
 
 /* 视图三态开关（时间轴顶栏右侧） */
@@ -803,7 +878,7 @@
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: var(--size-4-2, 8px);
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -811,7 +886,6 @@
   font-size: 12px;
   padding: 2px 10px;
   cursor: pointer;
-  border-radius: var(--oneday-control-radius);
 }
 
 
@@ -831,18 +905,69 @@
 
 .oneday-view-toggle.oneday-mode {
   display: inline-flex;
+  align-items: center;
+  gap: 2px;
   width: fit-content;
   margin-left: auto;
+  padding: 3px;
+  overflow: visible;
+  background: color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  border-radius: 11px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background-primary) 72%, transparent);
   position: relative;
   z-index: 6;
+}
+
+.oneday-view-toggle .oneday-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 560;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+  transition: color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 80ms ease-out;
+}
+
+.oneday-view-toggle .oneday-mode-btn:hover:not(.is-active) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.oneday-view-toggle .oneday-mode-btn.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-primary));
+  color: var(--text-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 34%, transparent), 0 1px 2px color-mix(in srgb, var(--text-normal) 8%, transparent);
+}
+
+.oneday-view-toggle .oneday-mode-btn:active {
+  transform: scale(0.97);
+}
+
+.oneday-view-toggle .oneday-mode-btn:focus-visible {
+  outline: 2px solid var(--text-accent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oneday-view-toggle .oneday-mode-btn {
+    transition: none;
+  }
 }
 
 /* 预览线只在拖动时出现；位置和高度由实际轨道矩形决定。 */
 
 .oneday-width-preview {
   position: absolute;
-  top: 0;
-  bottom: 0;
   width: 0;
   border-left: 2px dashed var(--text-accent);
   z-index: 12;
@@ -870,15 +995,41 @@
   white-space: nowrap;
 }
 
+/* 图层/画笔符号体系（V2 图标派，yyt 2026-08-18 拍板） */
+
+.oneday-sym {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+}
+
+.oneday-sym-dot {
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.oneday-sym-hatch {
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: repeating-linear-gradient(-45deg, currentColor 0 1.5px, transparent 1.5px 3.5px);
+}
+
 .oneday-layer-btn {
   gap: 5px;
   display: inline-flex;
   align-items: center;
 }
 
+.oneday-eye.is-off {
+  opacity: 0.3;
+  text-decoration: line-through;
+}
+
 .oneday-brush-btn {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
 }
 
 /* 统计柱状图 */
@@ -898,8 +1049,6 @@
 
 .oneday-stat-bar-wrap {
   flex: 1;
-  display: flex;
-  align-items: center;
   background: var(--background-secondary);
   border-radius: 4px;
   height: 16px;
@@ -914,13 +1063,25 @@
   justify-content: flex-end;
   padding-right: 4px;
   min-width: 24px;
-  overflow: visible; /* 标签实测外置前不被裁 */
 }
 
 .oneday-stat-hours {
   font-size: 10px;
   font-weight: 600;
   /* 颜色由 JS 派生（relatedTextColor），不需要 blend hack */
+}
+
+/* 快速记录多行输入 */
+
+.oneday-dialog-input {
+  resize: none;
+  overflow: hidden;
+  line-height: 1.5;
+  padding: 6px 10px;
+}
+
+.oneday-dialog {
+  position: relative;
 }
 
 /* 全灭视图：什么都不显示 */
@@ -933,10 +1094,26 @@
   display: none;
 }
 
+/* 短柱标签放柱外 */
+
+.oneday-stat-bar-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.oneday-stat-hours-out {
+  color: var(--text-normal);
+  margin-left: 5px;
+  padding-right: 0;
+}
+
+.oneday-stat-bar {
+  overflow: visible; /* 标签实测外置前不被裁 */
+}
+
 .oneday-stat-hours-out {
   color: var(--text-normal) !important;
   margin-left: 5px;
-  padding-right: 0;
 }
 
 /* 冻结态：文字也置灰 */
@@ -949,6 +1126,14 @@
 
 .oneday-text-host > *:first-child {
   margin-top: 0 !important;
+}
+
+.oneday-slot-grip {
+  opacity: 0; /* hover 才显示（yyt 撤回常驻淡显） */
+}
+
+.oneday-slot:hover .oneday-slot-grip {
+  opacity: 1;
 }
 
 /* 文字区：编辑/渲染两态行距一致（yyt 2026-08-19） */
@@ -973,6 +1158,24 @@
   display: none;
 }
 
+/* 快速记录输入框：无系统 focus 阴影/轮廓（yyt：选中态阴影奇怪） */
+
+/* 快速记录输入框：无 focus 阴影，统一细边框 */
+.oneday-dialog-input,
+.oneday-dialog-input:focus {
+  box-shadow: none !important;
+  outline: none !important;
+  border: 1px solid var(--background-modifier-border) !important;
+}
+
+/* 文字区编辑框：完全无框（有框=内框观感，yyt 2026-08-19） */
+.oneday-text-inline,
+.oneday-text-inline:focus {
+  box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
+}
+
 /* 精确起止小浮窗 */
 
 .oneday-time-popover {
@@ -980,8 +1183,8 @@
   z-index: 1000;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--oneday-surface-radius, var(--radius-s, 6px));
-  box-shadow: var(--shadow-s);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   padding: 4px;
   display: flex;
   align-items: center;
@@ -1001,118 +1204,4 @@
 
 .oneday-time-popover span {
   color: var(--text-muted);
-}
-
-/* 统一键盘焦点，不依赖主题是否给自定义按钮补样式。 */
-.oneday-container button:focus-visible {
-  outline: 2px solid var(--background-modifier-border-focus);
-  outline-offset: 2px;
-}
-
-/* Obsidian 移动端：布局手柄只在显式编辑态出现。 */
-body.is-mobile .oneday-layout-edit-toggle,
-body.is-tablet .oneday-layout-edit-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  align-self: flex-end;
-  min-height: 44px;
-  gap: var(--oneday-control-gap);
-  padding: 0 var(--size-4-3, 12px);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--oneday-control-radius);
-  background: var(--interactive-normal);
-  color: var(--text-normal);
-  box-shadow: var(--input-shadow);
-}
-
-body.is-mobile .oneday-layout-edit-toggle[aria-pressed="true"],
-body.is-tablet .oneday-layout-edit-toggle[aria-pressed="true"] {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  box-shadow: var(--input-shadow-hover);
-}
-
-body.is-mobile .oneday-layout-edit-icon,
-body.is-tablet .oneday-layout-edit-icon {
-  display: inline-flex;
-}
-
-body.is-mobile .oneday-layout-edit-icon svg,
-body.is-tablet .oneday-layout-edit-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-body.is-mobile .oneday-container:not(.is-layout-editing) .oneday-slot-grip,
-body.is-mobile .oneday-container:not(.is-layout-editing) .oneday-handle,
-body.is-mobile .oneday-container:not(.is-layout-editing) .oneday-width-handle,
-body.is-tablet .oneday-container:not(.is-layout-editing) .oneday-slot-grip,
-body.is-tablet .oneday-container:not(.is-layout-editing) .oneday-handle,
-body.is-tablet .oneday-container:not(.is-layout-editing) .oneday-width-handle {
-  display: none;
-}
-
-body.is-mobile .oneday-container.is-layout-editing .oneday-slot,
-body.is-tablet .oneday-container.is-layout-editing .oneday-slot {
-  outline-color: var(--background-modifier-border-hover);
-}
-
-body.is-mobile .oneday-container.is-layout-editing .oneday-slot-grip,
-body.is-tablet .oneday-container.is-layout-editing .oneday-slot-grip {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  opacity: 1;
-  touch-action: none;
-}
-
-body.is-mobile .oneday-container.is-layout-editing .oneday-handle,
-body.is-tablet .oneday-container.is-layout-editing .oneday-handle {
-  display: block;
-  opacity: 1;
-  touch-action: none;
-}
-
-body.is-mobile .oneday-container.is-layout-editing .oneday-handle-n,
-body.is-tablet .oneday-container.is-layout-editing .oneday-handle-n {
-  left: 48px;
-  right: 32px;
-  height: 20px;
-}
-
-body.is-mobile .oneday-container.is-layout-editing .oneday-handle-s,
-body.is-tablet .oneday-container.is-layout-editing .oneday-handle-s {
-  left: 32px;
-  right: 32px;
-  height: 20px;
-}
-
-body.is-mobile .oneday-container.is-layout-editing .oneday-handle-w,
-body.is-tablet .oneday-container.is-layout-editing .oneday-handle-w {
-  top: 48px;
-  bottom: 32px;
-  width: 20px;
-}
-
-body.is-mobile .oneday-container.is-layout-editing .oneday-handle-e,
-body.is-tablet .oneday-container.is-layout-editing .oneday-handle-e {
-  top: 32px;
-  bottom: 32px;
-  width: 20px;
-}
-
-body.is-mobile .oneday-container.is-layout-editing :is(.oneday-handle-ne, .oneday-handle-nw, .oneday-handle-se, .oneday-handle-sw),
-body.is-tablet .oneday-container.is-layout-editing :is(.oneday-handle-ne, .oneday-handle-nw, .oneday-handle-se, .oneday-handle-sw) {
-  width: 32px;
-  height: 32px;
-}
-
-body.is-mobile .oneday-container.is-layout-editing .oneday-width-handle,
-body.is-tablet .oneday-container.is-layout-editing .oneday-width-handle {
-  display: block;
-  width: 20px;
-  opacity: 1;
-  background: linear-gradient(to right, transparent 9px, var(--interactive-accent) 9px 11px, transparent 11px);
-  touch-action: none;
 }
