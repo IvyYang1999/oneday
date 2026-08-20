@@ -40,3 +40,12 @@ describe("醒来句式（yyt 2026-08-19）", () => {
     expect(p).toContain("全角")
   })
 })
+
+describe("few-shot（yyt 2026-08-19）", () => {
+  it("prompt carries the 醒来 compound example + array guidance", () => {
+    const p = buildSystemPrompt({ typeColors: { sleep: "#ccc" }, now: new Date(2026, 7, 19, 10, 0), doc: parseTimeline("") })
+    expect(p).toContain("9：15醒来，然后浪费了35分钟刷手机")
+    expect(p).toContain("JSON 数组")
+    expect(p).toContain("21:05")
+  })
+})
