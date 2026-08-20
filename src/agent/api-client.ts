@@ -44,7 +44,7 @@ export function buildChatRequest(cfg: ApiConfig, systemPrompt: string, userText:
       },
       body: JSON.stringify({
         model: cfg.model,
-        max_tokens: 2048 // 推理模型 thinking 占预算，300 会截断正文（yyt 2026-08-20 实证 finish_reason=length）,
+        max_tokens: 2048, // 推理模型 thinking 占预算，300 会截断正文
         system: systemPrompt,
         messages: [...history.map((h) => ({ role: h.role, content: h.content })), { role: "user", content: userText }],
       }),
@@ -59,7 +59,7 @@ export function buildChatRequest(cfg: ApiConfig, systemPrompt: string, userText:
     },
     body: JSON.stringify({
       model: cfg.model,
-      max_tokens: 2048 // 推理模型 thinking 占预算，300 会截断正文（yyt 2026-08-20 实证 finish_reason=length）,
+      max_tokens: 2048, // 推理模型 thinking 占预算，300 会截断正文
       temperature: 0,
       messages: [
         { role: "system", content: systemPrompt },
