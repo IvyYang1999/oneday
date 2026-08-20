@@ -724,12 +724,11 @@
 
 .oneday-brush-toggle,
 .oneday-view-toggle.oneday-mode {
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  overflow: visible;
-  background: transparent;
-  border: none;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
   border-radius: calc(var(--oneday-control-radius) + 4px);
 }
 
@@ -743,7 +742,7 @@
   padding: 3px 12px;
   background: transparent;
   border: 0;
-  border-radius: calc(var(--oneday-control-radius) + 3px);
+  border-radius: 0;
   color: var(--text-muted);
   font-size: 11.5px;
   font-weight: var(--font-medium);
@@ -761,8 +760,8 @@
 
 .oneday-brush-toggle .oneday-mode-btn.is-active,
 .oneday-view-toggle .oneday-mode-btn.is-active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
+  background: var(--background-primary);
+  color: var(--text-normal);
   box-shadow: none;
 }
 
