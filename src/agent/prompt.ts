@@ -28,8 +28,14 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     .map((e, i) => `  ${i + 1}) ${formatClock(e.startMin)}-${formatClock(e.endMin)} ${e.type}${e.note ? " " + e.note : ""}`)
     .join("\n")
 
+  // few-shot 用类型表里的真实名字（yyt：示例写死 sleep 但用户类型表是中文「睡觉」，模型照抄出哈希色）
+  const typeNames = Object.keys(ctx.typeColors)
+  const sleepName = typeNames.find((t) => /睡|sleep/i.test(t)) ?? typeNames[0] ?? "misc"
+  const miscName = typeNames.find((t) => /杂|misc/i.test(t)) ?? typeNames[0] ?? "misc"
+  const fitName = typeNames.find((t) => /健身|运动|fit/i.test(t)) ?? miscName
+
   return [
-    "你是 oneday 时间轴助手的条目生成器。用户会用自然语言描述刚做/在做/计划做的事，你把它转成一条时间轴色块。",
+    "你是 oneday 时间轴助手的条目生成器。用户会用自然语言描述刚做/在做/计划做的事，你把它转成时间轴色块（可能多个）。",
     GRAMMAR,
     `当前时间：${hh}:${mm}。时间轴起点：${formatClock(ctx.doc.rangeStart)}（「起床」类表述从这里开始算睡觉时段）。已登记的任务类型（type 必须从这里选，拿不准用 misc）：${types}。`,
     existing ? `当天已有实际色块（编号供修改/删除引用；可与之并列重叠）：\n${existing}` : "当天还没有实际色块。",
@@ -42,7 +48,8 @@ export function buildSystemPrompt(ctx: PromptContext): string {
     "5. 你处于多轮对话：每条用户消息都结合上文理解。",
     "",
     "示例（时间轴起点 07:00）：",
-    '输入「我刚健身半小时」（当前时间 21:35）→ {"start":"21:05","end":"21:35","type":"fitness"}',
-    '输入「9：15醒来，然后浪费了35分钟刷手机」→ [{"start":"07:00","end":"09:15","type":"sleep","note":"睡觉"},{"start":"09:15","end":"09:50","type":"misc","note":"刷手机"}]',
+    `输入「我刚健身半小时」（当前时间 21:35）→ {"start":"21:05","end":"21:35","type":"${fitName}"}`,
+    `输入「9：15醒来，然后浪费了35分钟刷手机」→ [{"start":"07:00","end":"09:15","type":"${sleepName}","note":"睡觉"},{"start":"09:15","end":"09:50","type":"${miscName}","note":"刷手机"}]`,
+    "注意：type 必须严格取自上面的类型表原词（如「${sleepName}」），不要自己翻译成英文或其他写法。",
   ].join("\n")
 }
