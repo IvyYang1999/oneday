@@ -125,6 +125,48 @@ export function replaceBlockInContent(
   return lines.join("\n")
 }
 
+/**
+ * Read the current body of a fenced timeline block from whole-note content.
+ * This is the inverse of replaceBlockInContent and deliberately reads from the
+ * live editor/file instead of a render-time source snapshot.
+ */
+export function extractBlockSourceFromContent(
+  content: string,
+  section: { lineStart: number; lineEnd: number }
+): string | null {
+  const lines = content.split("\n")
+  if (
+    section.lineStart < 0
+    || section.lineEnd <= section.lineStart
+    || section.lineEnd >= lines.length
+  ) return null
+
+  const openFence = lines[section.lineStart] ?? ""
+  const prefix = /^(\s*(?:>\s*)*)/.exec(openFence)?.[1] ?? ""
+  const opening = /^(`{3,}|~{3,})\s*timeline(?:\s.*)?$/i.exec(openFence.slice(prefix.length).trim())
+  if (!opening) return null
+  const closeFence = (lines[section.lineEnd] ?? "").slice(prefix.length).trim()
+  if (closeFence !== opening[1]) return null
+
+  const emptyQuotedLine = prefix.trimEnd()
+  return lines
+    .slice(section.lineStart + 1, section.lineEnd)
+    .map((line) => {
+      if (prefix === "") return line
+      if (line.startsWith(prefix)) return line.slice(prefix.length)
+      if (line === emptyQuotedLine) return ""
+      // A mismatched quote/callout prefix means the section no longer describes
+      // one coherent fenced block. Refuse the write instead of corrupting it.
+      return null
+    })
+    .reduce<string[] | null>((body, line) => {
+      if (body === null || line === null) return null
+      body.push(line)
+      return body
+    }, [])
+    ?.join("\n") ?? null
+}
+
 /** Set/replace the Nth free-text section (`===` 分隔，可多个). Empty text keeps a placeholder. */
 export function setTextSection(source: string, text: string, index = 0): string {
   const lines = source.split("\n")

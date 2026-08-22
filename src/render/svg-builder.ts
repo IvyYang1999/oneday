@@ -203,7 +203,7 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
     const hh = Math.max(2, y(e.endMin) - yy)
     parts.push(
       `<rect class="oneday-block oneday-plan" data-line="${e.line}" data-type="${escapeXml(e.type)}" x="${trackX + GAP_X}" y="${yy + GAP_X / 2}" width="${trackW - GAP_X * 2}" height="${hh - GAP_X}" rx="3" fill="${escapeXml(color)}" fill-opacity="${PLAN_OPACITY}" stroke="${escapeXml(color)}" stroke-opacity="0.7" stroke-width="1"></rect>` +
-        `<rect pointer-events="none" class="oneday-plan-hatch" x="${trackX + GAP_X}" y="${yy + GAP_X / 2}" width="${trackW - GAP_X * 2}" height="${hh - GAP_X}" rx="3" fill="url(#${hatchId})"/>`
+        `<rect pointer-events="none" class="oneday-plan-hatch" data-line="${e.line}" x="${trackX + GAP_X}" y="${yy + GAP_X / 2}" width="${trackW - GAP_X * 2}" height="${hh - GAP_X}" rx="3" fill="url(#${hatchId})"/>`
     )
     // plan 块也显示时长/备注（yyt 2026-08-17），样式淡一档
     const label = formatHours(durationMinutes(e.startMin, e.endMin))

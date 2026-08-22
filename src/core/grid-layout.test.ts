@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
-  clampItem, compactGrid, defaultGrid, gridRows, overlaps, parseLayoutHeader, resolveGrid, resolveOverlaps, serializeLayoutHeader,
+  clampItem, compactGrid, defaultGrid, gridColumns, gridRows, overlaps, parseLayoutHeader, resolveGrid,
+  resolveHorizontalOverlaps, resolveOverlaps, serializeLayoutHeader,
 } from "./grid-layout"
 
 describe("parse/serialize layout header", () => {
@@ -18,10 +19,10 @@ describe("parse/serialize layout header", () => {
     expect(parseLayoutHeader("text | toolbar,timeline")).toBeNull()
   })
 
-  it("clamps out-of-grid items and dedupes", () => {
+  it("preserves scroll-canvas columns and dedupes", () => {
     const items = parseLayoutHeader("text@10,0,6,3 text@0,0,6,3")
     expect(items).toHaveLength(1)
-    expect(items![0].x).toBe(6) // 12-6
+    expect(items![0].x).toBe(10)
   })
 })
 
@@ -44,6 +45,18 @@ describe("resolveOverlaps (push down)", () => {
 })
 
 describe("resolveGrid", () => {
+  it("gives a completely blank block a stable full-width default layout", () => {
+    const grid = resolveGrid(null, 0, undefined, 40, [], 2, true)
+    const byId = Object.fromEntries(grid.map((item) => [item.id, item]))
+    expect(byId.dialog).toMatchObject({ x: 0, y: 0, w: 7, h: 4 })
+    expect(byId.toolbar).toMatchObject({ x: 0, y: 4, w: 7, h: 3 })
+    expect(byId.stats).toMatchObject({ x: 0, y: 7, w: 7, h: 2 })
+    expect(byId.timeline).toMatchObject({ x: 7, y: 0, w: 5, h: 40 })
+    for (let i = 0; i < grid.length; i++) {
+      for (let j = i + 1; j < grid.length; j++) expect(overlaps(grid[i], grid[j])).toBe(false)
+    }
+  })
+
   it("default with text: two halves, rail stacked", () => {
     const grid = resolveGrid(null, 1, undefined, 40)
     expect(grid.find((i) => i.id === "text")).toMatchObject({ x: 0, w: 6 })
@@ -67,8 +80,24 @@ describe("resolveGrid", () => {
 describe("grid helpers", () => {
   it("overlaps / clampItem / gridRows", () => {
     expect(overlaps({ id: "text", x: 0, y: 0, w: 2, h: 2 }, { id: "stats", x: 1, y: 1, w: 2, h: 2 })).toBe(true)
-    expect(clampItem({ id: "text", x: -1, y: -1, w: 99, h: 0 })).toMatchObject({ x: 0, y: 0, w: 12, h: 1 })
+    expect(clampItem({ id: "text", x: -1, y: -1, w: 99, h: 0 })).toMatchObject({ x: 0, y: 0, w: 99, h: 1 })
     expect(gridRows(defaultGrid(1, undefined, 40))).toBeGreaterThan(40)
+  })
+
+  it("derives a wider canvas from items beyond the base 12 columns", () => {
+    expect(gridColumns([
+      { id: "toolbar", x: 0, y: 0, w: 8, h: 3 },
+      { id: "timeline", x: 8, y: 0, w: 6, h: 20 },
+    ])).toBe(14)
+  })
+
+  it("keeps side-by-side items on the same row when one grows", () => {
+    const out = resolveHorizontalOverlaps([
+      { id: "toolbar", x: 0, y: 0, w: 8, h: 3 },
+      { id: "timeline", x: 6, y: 0, w: 6, h: 20 },
+    ], "toolbar")
+    expect(out.find((i) => i.id === "toolbar")).toMatchObject({ x: 0, y: 0, w: 8 })
+    expect(out.find((i) => i.id === "timeline")).toMatchObject({ x: 8, y: 0, w: 6 })
   })
 })
 

@@ -17,6 +17,10 @@ export interface TimelineDoc {
   hiddenTypes: string[]
   /** Per-block width override in px (`width:` header, base width without the label lane). */
   width?: number
+  /** Outer Oneday viewport size; internal components keep their own geometry and scroll behind it. */
+  blockSize?: import("./block-size").BlockSize
+  /** Pixel width occupied by the first 12 logical grid columns after the viewport is resized. */
+  canvasWidth?: number
   /** Float the block right so text wraps on the left (`float: right` header). */
   floatRight?: boolean
   /** Free markdown text sections (=== 分隔，可多个) — 块内图文混排的文。 */
@@ -27,7 +31,7 @@ export interface TimelineDoc {
   side?: "left" | "right"
   /** 组件网格布局（`layout:` 头，id\@x,y,w,h）；缺省按 side/text 推导。 */
   layout?: import("./grid-layout").GridItem[]
-  /** 隐藏的组件（`off:` 头，如 off: stats dialog）；＋菜单可加回 */
+  /** 隐藏的组件（`off:` 头，如 off: stats dialog）；更多菜单可重新显示 */
   hiddenSlots: import("./grid-layout").SlotId[]
 }
 

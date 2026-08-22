@@ -11,6 +11,7 @@
  * calendar morning but the same logical day -> shifted +24h internally.
  */
 import { parseLayoutHeader } from "./grid-layout"
+import { parseBlockSize, parseCanvasWidth } from "./block-size"
 import {
   Annotation,
   DAY_MINUTES,
@@ -189,6 +190,24 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
         return
       }
       doc.width = Math.round(n)
+      return
+    }
+    case "block-size": {
+      const size = parseBlockSize(value)
+      if (!size) {
+        doc.errors.push({ line, text: raw, reason: "block-size 应为 240-4096 x 160-4096" })
+        return
+      }
+      doc.blockSize = size
+      return
+    }
+    case "canvas-width": {
+      const width = parseCanvasWidth(value)
+      if (width === null) {
+        doc.errors.push({ line, text: raw, reason: "canvas-width 应为 240-8192 的数字" })
+        return
+      }
+      doc.canvasWidth = width
       return
     }
     case "float": {

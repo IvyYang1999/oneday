@@ -26,6 +26,15 @@ describe("renderTimelineSvg", () => {
     expect(svg).toContain("oneday-plan-hatch") // 斜线纹理区分
     expect(planIdx).toBeGreaterThan(-1)
     expect(planIdx).toBeLessThan(actualIdx) // plan drawn first = behind
+    expect(svg).toMatch(/oneday-plan-hatch" data-line="0"/) // edit state can freeze the hatch with its plan
+  })
+
+  it("keeps plans behind records even when the source lists the record first", () => {
+    const svg = svgOf("09:00-10:00 math\nplan 08:00-11:00 math")
+    const planIdx = svg.indexOf('class="oneday-block oneday-plan"')
+    const actualIdx = svg.indexOf('class="oneday-block" data-line="0"')
+    expect(planIdx).toBeGreaterThan(-1)
+    expect(planIdx).toBeLessThan(actualIdx)
   })
 
   it("keeps the duration centered with adaptive font even for thin blocks (yyt 2026-08-17)", () => {

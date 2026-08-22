@@ -7,13 +7,41 @@
  * - drop: overlaps push down, layout persists via the `layout:` header
  * Pure DOM.
  */
-import { GRID_COLS, GRID_ROW_H, GridItem, SlotId, clampItem, compactGrid, gridRows, resolveOverlaps } from "../core/grid-layout"
+import {
+  GRID_COLS, GRID_ROW_H, GridItem, SlotId, clampItem, compactGrid, gridColumns, gridRows,
+  resolveHorizontalOverlaps, resolveOverlaps,
+} from "../core/grid-layout"
 
-export function applyItemToSlot(slot: HTMLElement, it: GridItem): void {
-  slot.style.left = `${(it.x / GRID_COLS) * 100}%`
-  slot.style.width = `${(it.w / GRID_COLS) * 100}%`
+export function applyItemToSlot(slot: HTMLElement, it: GridItem, columns = GRID_COLS): void {
+  slot.style.left = `${(it.x / columns) * 100}%`
+  slot.style.width = `${(it.w / columns) * 100}%`
   slot.style.top = `${it.y * GRID_ROW_H}px`
   slot.style.height = `${it.h * GRID_ROW_H}px`
+}
+
+/** Expand the internal canvas while keeping one logical column physically stable. */
+export function applyGridToBody(body: HTMLElement, items: GridItem[]): void {
+  const normalized = items.map(clampItem)
+  const columns = gridColumns(normalized)
+  body.dataset.gridCols = String(columns)
+  const fixedBaseWidth = Number(body.dataset.gridBaseWidth)
+  if (Number.isFinite(fixedBaseWidth) && fixedBaseWidth > 0) {
+    const canvasWidth = fixedBaseWidth * (columns / GRID_COLS)
+    body.style.width = `${canvasWidth}px`
+    body.style.minWidth = `${canvasWidth}px`
+  } else {
+    body.style.width = `${(columns / GRID_COLS) * 100}%`
+    body.style.minWidth = "100%"
+  }
+  for (const slot of Array.from(body.querySelectorAll<HTMLElement>(".oneday-slot"))) {
+    const item = normalized.find((it) => it.id === slot.dataset.slot)
+    if (!item) continue
+    slot.dataset.x = String(item.x)
+    slot.dataset.y = String(item.y)
+    slot.dataset.w = String(item.w)
+    slot.dataset.h = String(item.h)
+    applyItemToSlot(slot, item, columns)
+  }
 }
 
 function itemFromSlot(slot: HTMLElement): GridItem {
@@ -26,15 +54,6 @@ function itemFromSlot(slot: HTMLElement): GridItem {
   }
 }
 
-function setItemOnSlot(slot: HTMLElement, it: GridItem): void {
-  const c = clampItem(it)
-  slot.dataset.x = String(c.x)
-  slot.dataset.y = String(c.y)
-  slot.dataset.w = String(c.w)
-  slot.dataset.h = String(c.h)
-  applyItemToSlot(slot, c)
-}
-
 const DIRS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const
 
 export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem[]) => void): void {
@@ -45,7 +64,7 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
 
   const finish = (priorityId?: SlotId): void => {
     const items = compactGrid(resolveOverlaps(slots.map(itemFromSlot), priorityId), priorityId)
-    for (const slot of slots) setItemOnSlot(slot, items.find((it) => it.id === slot.dataset.slot)!)
+    applyGridToBody(body, items)
     body.style.height = `${gridRows(items) * GRID_ROW_H}px`
     onCommit(items)
   }
@@ -54,18 +73,25 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
     if (slot.querySelector(".oneday-slot-grip")) continue
 
     // ---- move grip ----
+    const gripAnchor = dom.createElement("div")
+    gripAnchor.className = "oneday-slot-grip-anchor"
     const grip = dom.createElement("button")
     grip.type = "button"
     grip.className = "oneday-slot-grip"
-    grip.title = "拖拽移动此组件"
-    grip.setAttribute("aria-label", `移动${slot.dataset.slot ?? "组件"}`)
+    // Obsidian uses aria-label for its black tooltip. Do not also set title,
+    // otherwise Electron shows a second native tooltip for the same control.
+    grip.setAttribute("aria-label", "拖拽移动此组件")
     // 六个真实点元素（伪元素在 button+grid 下不可靠，真机曾变形，yyt 2026-08-19）
     for (let i = 0; i < 6; i++) {
       const dot = dom.createElement("span")
       dot.setAttribute("aria-hidden", "true")
       grip.appendChild(dot)
     }
-    slot.appendChild(grip)
+    gripAnchor.appendChild(grip)
+    // The sticky zero-size anchor stays at the slot viewport's top-left while
+    // the slot content scrolls. It must precede ordinary content so its static
+    // position starts at the scroll origin rather than after the content.
+    slot.prepend(gripAnchor)
 
     grip.addEventListener("pointerdown", (e: PointerEvent) => {
       if (e.button !== 0) return
@@ -73,7 +99,8 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
       e.stopPropagation()
       const bodyRect = body.getBoundingClientRect()
       const slotRect = slot.getBoundingClientRect()
-      const cellW = bodyRect.width / GRID_COLS
+      const columns = Number(body.dataset.gridCols) || gridColumns(slots.map(itemFromSlot))
+      const cellW = bodyRect.width / columns
       const grabDX = e.clientX - slotRect.left
       const grabDY = e.clientY - slotRect.top
 
@@ -96,13 +123,10 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
         if (next.x === item.x && next.y === item.y) return
         item.x = next.x
         item.y = next.y
-        setItemOnSlot(slot, next)
         // iOS 式实时重排：被拖组件优先，其余组件立刻让位+重力压实（带 CSS 过渡）
-        const items = compactGrid(resolveOverlaps(slots.map(itemFromSlot), slot.dataset.slot as SlotId), slot.dataset.slot as SlotId)
-        for (const other of slots) {
-          if (other === slot) continue
-          setItemOnSlot(other, items.find((it) => it.id === other.dataset.slot)!)
-        }
+        const current = slots.map((other) => other === slot ? next : itemFromSlot(other))
+        const items = compactGrid(resolveOverlaps(current, slot.dataset.slot as SlotId), slot.dataset.slot as SlotId)
+        applyGridToBody(body, items)
         body.style.height = `${gridRows(items) * GRID_ROW_H}px`
       }
       const onUp = (): void => {
@@ -131,7 +155,8 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
         e.stopPropagation()
         slot.classList.add("is-resizing")
         const bodyRect = body.getBoundingClientRect()
-        const cellW = bodyRect.width / GRID_COLS
+        const columns = Number(body.dataset.gridCols) || gridColumns(slots.map(itemFromSlot))
+        const cellW = bodyRect.width / columns
 
         const onMove = (ev: PointerEvent): void => {
           const it = itemFromSlot(slot)
@@ -152,13 +177,14 @@ export function attachGridInteract(body: HTMLElement, onCommit: (items: GridItem
           }
           const resized = clampItem({ ...it, x, y, w, h: hh })
           if (resized.x === it.x && resized.y === it.y && resized.w === it.w && resized.h === it.h) return
-          setItemOnSlot(slot, resized)
-          // 缩放同样实时压实
-          const items = compactGrid(resolveOverlaps(slots.map(itemFromSlot), slot.dataset.slot as SlotId), slot.dataset.slot as SlotId)
-          for (const other of slots) {
-            if (other === slot) continue
-            setItemOnSlot(other, items.find((o) => o.id === other.dataset.slot)!)
-          }
+          const current = slots.map((other) => other === slot ? resized : itemFromSlot(other))
+          const priorityId = slot.dataset.slot as SlotId
+          // 宽度变化优先在水平方向腾位；只有达到十屏安全上限才降级向下。
+          const resolved = resized.x !== it.x || resized.w !== it.w
+            ? resolveHorizontalOverlaps(current, priorityId)
+            : resolveOverlaps(current, priorityId)
+          const items = compactGrid(resolved, priorityId)
+          applyGridToBody(body, items)
           body.style.height = `${gridRows(items) * GRID_ROW_H}px`
         }
         const onUp = (): void => {

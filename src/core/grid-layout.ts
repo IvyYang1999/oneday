@@ -6,6 +6,8 @@
  */
 
 export const GRID_COLS = 12
+/** Safety ceiling for the horizontally scrollable canvas (10 viewport widths). */
+export const MAX_GRID_COLS = 120
 export const GRID_ROW_H = 20
 
 export type SlotId = string // 核心: toolbar|timeline|stats|dialog；文本框: text, text2, text3…
@@ -45,15 +47,20 @@ export function serializeLayoutHeader(items: GridItem[]): string {
 }
 
 export function clampItem(it: GridItem): GridItem {
-  const w = Math.min(GRID_COLS, Math.max(1, it.w))
+  const w = Math.min(MAX_GRID_COLS, Math.max(1, it.w))
   const h = Math.max(1, it.h)
   return {
     ...it,
     w,
     h,
-    x: Math.min(GRID_COLS - w, Math.max(0, it.x)),
+    x: Math.min(MAX_GRID_COLS - w, Math.max(0, it.x)),
     y: Math.max(0, it.y),
   }
+}
+
+/** Logical canvas width. Twelve columns fill the viewport; extra columns scroll. */
+export function gridColumns(items: GridItem[]): number {
+  return Math.min(MAX_GRID_COLS, Math.max(GRID_COLS, ...items.map((it) => it.x + it.w)))
 }
 
 export function overlaps(a: GridItem, b: GridItem): boolean {
@@ -90,15 +97,67 @@ export function resolveOverlaps(items: GridItem[], priorityId?: SlotId): GridIte
   return out
 }
 
+/**
+ * Horizontal collision resolution for width changes. The resized item keeps
+ * its position; colliding neighbours move right (and cascade) instead of
+ * dropping to another row. Only the safety ceiling can force a vertical
+ * fallback.
+ */
+export function resolveHorizontalOverlaps(items: GridItem[], priorityId: SlotId): GridItem[] {
+  const anchor = items.find((it) => it.id === priorityId)
+  if (!anchor) return items.map(clampItem)
+
+  const placed: GridItem[] = [clampItem({ ...anchor })]
+  const rest = items
+    .filter((it) => it.id !== priorityId)
+    .map((it) => clampItem({ ...it }))
+    .sort((a, b) => a.x - b.x || a.y - b.y)
+
+  for (const item of rest) {
+    for (;;) {
+      const blockers = placed.filter((other) => overlaps(item, other))
+      if (blockers.length === 0) break
+      const nextX = Math.max(...blockers.map((other) => other.x + other.w))
+      if (nextX + item.w <= MAX_GRID_COLS) {
+        item.x = nextX
+      } else {
+        // Bounded fail-safe for pathological layouts at the 10-screen limit.
+        item.y = Math.max(...blockers.map((other) => other.y + other.h))
+      }
+    }
+    placed.push(item)
+  }
+
+  const byId = new Map(placed.map((it) => [it.id, it]))
+  return items.map((it) => byId.get(it.id) ?? clampItem(it))
+}
+
 /** Default arrangement (px heights converted to rows by caller-supplied estimates). */
-export function defaultGrid(textCount: number, side: "left" | "right" | undefined, timelineRows: number): GridItem[] {
+export function defaultGrid(
+  textCount: number,
+  side: "left" | "right" | undefined,
+  timelineRows: number,
+  statsRows = 1,
+  pristine = false
+): GridItem[] {
   const rail: GridItem[] = [
     { id: "toolbar", x: 0, y: 0, w: 0, h: 3 },
     { id: "timeline", x: 0, y: 0, w: 0, h: Math.max(4, timelineRows) },
-    { id: "stats", x: 0, y: 0, w: 0, h: 1 },
+    { id: "stats", x: 0, y: 0, w: 0, h: Math.max(1, statsRows) },
     { id: "dialog", x: 0, y: 0, w: 0, h: 4 },
   ]
   if (textCount === 0) {
+    if (pristine) {
+      // First-use composition: controls and feedback form one compact rail;
+      // the timeline is the primary work surface rather than a narrow strip
+      // followed by a full viewport of unused whitespace.
+      return [
+        { id: "dialog", x: 0, y: 0, w: 7, h: 4 },
+        { id: "toolbar", x: 0, y: 4, w: 7, h: 3 },
+        { id: "stats", x: 0, y: 7, w: 7, h: Math.max(1, statsRows) },
+        { id: "timeline", x: 7, y: 0, w: 5, h: Math.max(4, timelineRows) },
+      ]
+    }
     let y = 0
     return rail.map((it) => {
       const r = { ...it, x: 0, y, w: GRID_COLS }
@@ -129,10 +188,12 @@ export function resolveGrid(
   textCount: number,
   side: "left" | "right" | undefined,
   timelineRows: number,
-  hiddenSlots: SlotId[] = []
+  hiddenSlots: SlotId[] = [],
+  statsRows = 1,
+  pristine = false
 ): GridItem[] {
   const wantTextIds = Array.from({ length: textCount }, (_, i) => (i === 0 ? "text" : `text${i + 1}`))
-  const base = parsed ?? defaultGrid(textCount, side, timelineRows)
+  const base = parsed ?? defaultGrid(textCount, side, timelineRows, statsRows, pristine)
   // 隐藏槽位剔除；文本槽位数量与文本区数量对齐
   let items = base.filter((it) => !hiddenSlots.includes(it.id) && (!isTextSlot(it.id) || wantTextIds.includes(it.id)))
   const present = new Set(items.map((it) => it.id))
@@ -140,7 +201,7 @@ export function resolveGrid(
   let maxY = items.reduce((m, it) => Math.max(m, it.y + it.h), 0)
   for (const id of required) {
     if (present.has(id)) continue
-    const d = defaultGrid(textCount, side, timelineRows).find((it) => it.id === id)!
+    const d = defaultGrid(textCount, side, timelineRows, statsRows, pristine).find((it) => it.id === id)!
     items.push({ ...d, y: maxY })
     maxY += d.h
     present.add(id)
@@ -155,6 +216,7 @@ export function resolveGrid(
  * 其他组件绕着它压实。
  */
 export function compactGrid(items: GridItem[], anchorId?: SlotId): GridItem[] {
+  const columns = gridColumns(items)
   const anchor = anchorId ? items.find((i) => i.id === anchorId) : undefined
   const placed: GridItem[] = anchor ? [{ ...anchor }] : []
   const rest = items.filter((i) => i.id !== anchorId)
@@ -180,7 +242,7 @@ export function compactGrid(items: GridItem[], anchorId?: SlotId): GridItem[] {
       const blockers = others.filter((p) => overlaps(it, p))
       if (blockers.length === 0) break
       const nx = Math.min(...blockers.map((b) => b.x + b.w))
-      if (nx > GRID_COLS - it.w) break // 右边界，滑不动就停
+      if (nx > columns - it.w) break // 当前画布右边界，滑不动就停
       it.x = nx
     }
   }

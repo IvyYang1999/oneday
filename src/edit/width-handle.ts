@@ -1,10 +1,9 @@
 /**
  * Track width handle: a tiny hot zone hugging the track's own right edge
- * (the vertical line at LABEL_W + trackW, yyt: 不是 svg 外缘).
+ * (the track rect's visible right border, yyt: 不是 svg 外缘).
  * Drag shows a live vertical preview line; free width (no snap); release
  * commits the `width:` header. Pure DOM.
  */
-import { LABEL_W, TRACK_PAD } from "../core/geometry"
 
 export function attachWidthHandle(
   container: HTMLElement,
@@ -14,22 +13,63 @@ export function attachWidthHandle(
   const dom = container.ownerDocument
   const slot = container.querySelector<HTMLElement>(".oneday-slot-timeline")
   if (!slot) return
-  slot.querySelector(".oneday-width-handle")?.remove()
+  const scrollPane = slot.querySelector<HTMLElement>(".oneday-svg-holder")
+  if (!scrollPane) return
+  const previous = slot.querySelector<WidthHandleElement>(".oneday-width-handle")
+  previous?.onedayCleanup?.()
+  previous?.remove()
   // 清掉上次中断拖拽的预览残影（yyt：两条线之谜）
   dom.querySelectorAll(".oneday-width-preview").forEach((c) => c.remove())
 
-  // 实测 svg 在槽位内的水平偏移（slot padding 等），否则手柄系统性偏内
-  const svgEl = slot.querySelector("svg.oneday-svg")
-  const svgOffset = svgEl ? svgEl.getBoundingClientRect().left - slot.getBoundingClientRect().left : 0
-  const trackRight = svgOffset + LABEL_W + (baseWidth - LABEL_W - TRACK_PAD) // 轨道竖线位置
-  const handle = dom.createElement("div")
+  // The rendered track is the source of truth. Formula-based coordinates drift
+  // when the slot is padded, scrolled, zoomed, or laid out differently.
+  const track = slot.querySelector<SVGRectElement>("rect.oneday-track")
+  if (!track) return
+  let trackRight = 0
+  let trackTop = 0
+  let trackHeight = 0
+  const handle = dom.createElement("div") as WidthHandleElement
   handle.className = "oneday-width-handle"
   handle.setAttribute("aria-hidden", "true")
-  handle.style.left = `${trackRight}px` // CSS 3px + translateX(-50%) 骑线
-  slot.appendChild(handle)
+  scrollPane.appendChild(handle)
+
+  const syncGeometry = (): boolean => {
+    if (!handle.isConnected || !track.isConnected) return false
+    const paneRect = scrollPane.getBoundingClientRect()
+    const trackRect = track.getBoundingClientRect()
+    if (trackRect.width <= 0 || trackRect.height <= 0) return false
+    trackRight = trackRect.right - paneRect.left + scrollPane.scrollLeft
+    trackTop = trackRect.top - paneRect.top + scrollPane.scrollTop
+    trackHeight = trackRect.height
+    handle.style.left = `${trackRight}px` // CSS 3px + translateX(-50%) 骑线
+    handle.style.top = `${trackTop}px`
+    handle.style.height = `${trackHeight}px`
+    return true
+  }
+
+  // Obsidian can mount the block before its preview pane has a measurable box.
+  // ResizeObserver catches that 0 → rendered transition and later layout changes.
+  const ResizeObserverCtor = dom.defaultView?.ResizeObserver
+  const observer = ResizeObserverCtor ? new ResizeObserverCtor(() => {
+    if (!handle.isConnected) {
+      observer?.disconnect()
+      return
+    }
+    syncGeometry()
+  }) : null
+  observer?.observe(slot)
+  observer?.observe(scrollPane)
+  observer?.observe(track)
+  const frame = dom.defaultView?.requestAnimationFrame(syncGeometry)
+  handle.onedayCleanup = (): void => {
+    observer?.disconnect()
+    if (frame !== undefined) dom.defaultView?.cancelAnimationFrame(frame)
+  }
+  syncGeometry()
 
   handle.addEventListener("pointerdown", (e: PointerEvent) => {
     if (e.button !== 0) return
+    if (!syncGeometry()) return
     e.preventDefault()
     e.stopPropagation()
     const startX = e.clientX
@@ -39,9 +79,11 @@ export function attachWidthHandle(
     // 竖线预览（不动 svg，listener 安全）
     const preview = dom.createElement("div")
     preview.className = "oneday-width-preview"
-    slot.appendChild(preview)
+    preview.style.top = `${trackTop}px`
+    preview.style.height = `${trackHeight}px`
+    scrollPane.appendChild(preview)
     const place = (w: number): void => {
-      const x = svgOffset + LABEL_W + (w - LABEL_W - TRACK_PAD)
+      const x = trackRight + (w - startW)
       preview.style.left = `${x}px`
       preview.textContent = `${Math.round(w)}px`
     }
@@ -49,7 +91,6 @@ export function attachWidthHandle(
 
     const onMove = (ev: PointerEvent): void => {
       const w = Math.min(640, Math.max(140, startW + (ev.clientX - startX)))
-      handle.style.left = `${svgOffset + LABEL_W + (w - LABEL_W - TRACK_PAD)}px`
       place(w)
     }
     const onUp = (ev: PointerEvent | null): void => {
@@ -69,4 +110,8 @@ export function attachWidthHandle(
     dom.addEventListener("pointerup", onUpNow)
     dom.addEventListener("pointercancel", onCancel)
   })
+}
+
+interface WidthHandleElement extends HTMLDivElement {
+  onedayCleanup?: () => void
 }

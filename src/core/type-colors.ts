@@ -36,3 +36,8 @@ export function hashTypeColor(type: string): string {
   }
   return `hsl(${h % 360} 62% 62%)`
 }
+
+/** Resolve a block-local brush without inventing a fallback outside its visible palette. */
+export function pickVisibleType(preferred: string, visibleTypes: string[]): string {
+  return visibleTypes.includes(preferred) ? preferred : visibleTypes[0] ?? ""
+}

@@ -4,6 +4,8 @@
  */
 import { App, Menu } from "obsidian"
 import { Entry } from "../core/types"
+import { buildTypeMenuOptions } from "./block-menu-model"
+import { attachCascadeMenu, CascadeMenuController } from "./cascade-menu"
 
 export interface BlockMenuActions {
   /** 打开备注小浮窗（色块右侧临时编辑框） */
@@ -24,9 +26,11 @@ export function showBlockMenu(
   types: string[],
   x: number,
   y: number,
-  actions: BlockMenuActions
+  actions: BlockMenuActions,
+  domDocument: Document = document
 ): void {
-  const menu = new Menu()
+  const menu = new Menu().setUseNativeMenu(false)
+  let cascade: CascadeMenuController | null = null
 
   menu.addItem((item) =>
     item.setTitle(entry.plan ? "转为实际记录" : "转为规划（plan）")
@@ -53,17 +57,42 @@ export function showBlockMenu(
   )
 
   menu.addSeparator()
-  for (const type of types) {
-    if (type === entry.type) continue
-    menu.addItem((item) =>
-      item.setTitle(`改为 ${type}`).onClick(() => actions.setType(entry.line, type))
-    )
-  }
+  menu.addItem((item) => {
+    const title = domDocument.createDocumentFragment()
+    const content = domDocument.createElement("span")
+    content.className = "oneday-type-trigger-content"
+    const label = domDocument.createElement("span")
+    label.textContent = "更改类型…"
+    const caret = domDocument.createElement("span")
+    caret.className = "oneday-submenu-caret"
+    caret.setAttribute("aria-hidden", "true")
+    caret.textContent = "›"
+    content.append(label, caret)
+    title.appendChild(content)
+    item.setTitle(title).setIcon("tags")
+  })
 
   menu.addSeparator()
   menu.addItem((item) =>
     item.setTitle("删除色块").setIcon("trash").onClick(() => actions.remove(entry.line))
   )
 
-  menu.showAtPosition({ x, y })
+  const existingMenus = new Set(Array.from(domDocument.querySelectorAll(".menu")))
+  menu.onHide(() => {
+    cascade?.destroy()
+    cascade = null
+  })
+  menu.showAtPosition({ x, y }, domDocument)
+
+  const primaryMenu = Array.from(domDocument.querySelectorAll<HTMLElement>(".menu"))
+    .find((candidate) => !existingMenus.has(candidate) && candidate.querySelector(".oneday-type-trigger-content"))
+  const trigger = primaryMenu?.querySelector<HTMLElement>(".oneday-type-trigger-content")?.closest<HTMLElement>(".menu-item")
+  if (!primaryMenu || !trigger) return
+  const options = buildTypeMenuOptions(types, entry.type)
+  cascade = attachCascadeMenu(primaryMenu, trigger, options, "选择色块类型", (index) => {
+    const option = options[index]
+    if (!option || option.checked) return
+    menu.hide()
+    actions.setType(entry.line, option.type)
+  })
 }

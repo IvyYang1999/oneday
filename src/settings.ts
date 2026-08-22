@@ -27,6 +27,8 @@ export interface OnedaySettings {
   templateLayout?: string
   templateWidth?: number
   templateHasText?: boolean
+  /** 新用户时间轴拖拽引导是否已经展示过（全局一次） */
+  timelineOnboardingSeen: boolean
 }
 
 export const DEFAULT_SETTINGS: OnedaySettings = {
@@ -41,6 +43,7 @@ export const DEFAULT_SETTINGS: OnedaySettings = {
   apiKey: "",
   baseUrl: "https://open.bigmodel.cn/api/paas/v4",
   model: "glm-4.5-air",
+  timelineOnboardingSeen: false,
 }
 
 export class OnedaySettingTab extends PluginSettingTab {
@@ -70,7 +73,7 @@ export class OnedaySettingTab extends PluginSettingTab {
           .addColorPicker((cp) =>
             cp.setValue(color).onChange(async (v) => {
               this.plugin.settings.typeColors[type] = v
-              await this.plugin.saveSettings()
+              await this.plugin.saveSettings({ rerender: true })
             })
           )
           .addText((t) => {
@@ -88,7 +91,7 @@ export class OnedaySettingTab extends PluginSettingTab {
               )
               this.plugin.settings.typeColors = Object.fromEntries(entries)
               this.plugin.settings.retiredTypeColors[type] ??= color // 旧名进退休板，旧块保色
-              await this.plugin.saveSettings()
+              await this.plugin.saveSettings({ rerender: true })
               renderPalette()
             }
             t.inputEl.addEventListener("blur", () => void commit())
@@ -103,7 +106,7 @@ export class OnedaySettingTab extends PluginSettingTab {
             b.setIcon("trash").setTooltip("删除").onClick(async () => {
               this.plugin.settings.retiredTypeColors[type] ??= this.plugin.settings.typeColors[type] // 退休板保色
               delete this.plugin.settings.typeColors[type]
-              await this.plugin.saveSettings()
+              await this.plugin.saveSettings({ rerender: true })
               renderPalette()
             })
           )
@@ -113,7 +116,7 @@ export class OnedaySettingTab extends PluginSettingTab {
           let n = 1
           while (`type${n}` in this.plugin.settings.typeColors) n++
           this.plugin.settings.typeColors[`type${n}`] = "#bdbdbd"
-          await this.plugin.saveSettings()
+          await this.plugin.saveSettings({ rerender: true })
           renderPalette()
         })
       )
@@ -128,7 +131,7 @@ export class OnedaySettingTab extends PluginSettingTab {
           const n = Number(v)
           if (Number.isInteger(n) && n >= 0 && n <= 23 && n < this.plugin.settings.rangeEndHour) {
             this.plugin.settings.rangeStartHour = n
-            await this.plugin.saveSettings()
+            await this.plugin.saveSettings({ rerender: true })
           }
         })
       )
@@ -137,7 +140,7 @@ export class OnedaySettingTab extends PluginSettingTab {
           const n = Number(v)
           if (Number.isInteger(n) && n >= 1 && n <= 24 && n > this.plugin.settings.rangeStartHour) {
             this.plugin.settings.rangeEndHour = n
-            await this.plugin.saveSettings()
+            await this.plugin.saveSettings({ rerender: true })
           }
         })
       )
@@ -149,7 +152,7 @@ export class OnedaySettingTab extends PluginSettingTab {
           const n = Number(v)
           if (Number.isFinite(n) && n >= 24 && n <= 200) {
             this.plugin.settings.hourHeight = n
-            await this.plugin.saveSettings()
+            await this.plugin.saveSettings({ rerender: true })
           }
         })
       )

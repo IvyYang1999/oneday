@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { addHiddenType, deleteEntryLine, insertEntryLine, removeHeaderValue, removeHiddenType, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./source-rewriter"
+import { addHiddenType, deleteEntryLine, extractBlockSourceFromContent, insertEntryLine, removeHeaderValue, removeHiddenType, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./source-rewriter"
 import { parseTimeline } from "../core/parser"
 
 describe("insertEntryLine", () => {
@@ -134,6 +134,42 @@ describe("replaceBlockInContent (callout 前缀保留)", () => {
     const content = "```timeline\n09:00-10:00 math\n```"
     const out = replaceBlockInContent(content, { lineStart: 0, lineEnd: 2 }, "10:00-11:00 math")
     expect(out).toBe("```timeline\n10:00-11:00 math\n```")
+  })
+})
+
+describe("extractBlockSourceFromContent (从最新笔记读取)", () => {
+  it("extracts a nested-callout body including quoted blank lines", () => {
+    const content = [
+      "> > ```timeline",
+      "> > date: 2026-08-21",
+      "> > ---",
+      "> >",
+      "> > ===",
+      "> > 第五句",
+      "> > ```",
+    ].join("\n")
+    expect(extractBlockSourceFromContent(content, { lineStart: 0, lineEnd: 6 }))
+      .toBe("date: 2026-08-21\n---\n\n===\n第五句")
+  })
+
+  it("keeps a just-saved fifth sentence across a following transform", () => {
+    let content = "```timeline\n09:00-10:00 math\n===\n第一句。\n第二句。\n第三句。\n第四句。\n```"
+    const firstSection = { lineStart: 0, lineEnd: 7 }
+    const liveBeforeTextSave = extractBlockSourceFromContent(content, firstSection)
+    expect(liveBeforeTextSave).not.toBeNull()
+    content = replaceBlockInContent(
+      content,
+      firstSection,
+      setTextSection(liveBeforeTextSave!, "第一句。\n第二句。\n第三句。\n第四句。\n第五句。")
+    )
+
+    const secondSection = { lineStart: 0, lineEnd: 8 }
+    const liveBeforeLayoutSave = extractBlockSourceFromContent(content, secondSection)
+    expect(liveBeforeLayoutSave).not.toBeNull()
+    content = replaceBlockInContent(content, secondSection, setHeaderValue(liveBeforeLayoutSave!, "width", "300"))
+
+    expect(content).toContain("第五句。")
+    expect(content).toContain("width: 300")
   })
 })
 

@@ -79,7 +79,16 @@ export function openTimePopover(
       }
       e.stopPropagation()
     })
-    input.addEventListener("blur", () => finish(true))
   }
+  // 两个输入框属于同一个编辑会话：左框 blur 到右框时不能提交。
+  // 只有焦点真正离开整个浮窗时才保存；延后一帧读取 activeElement，
+  // 兼容 relatedTarget 为空的 Electron/鼠标点击路径。
+  pop.addEventListener("focusout", (e: FocusEvent) => {
+    const next = e.relatedTarget as Node | null
+    if (next && pop.contains(next)) return
+    domWindow.setTimeout(() => {
+      if (!pop.contains(dom.activeElement)) finish(true)
+    }, 0)
+  })
   domWindow.setTimeout(() => start.focus(), 0)
 }

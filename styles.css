@@ -1,12 +1,69 @@
 .oneday-container {
+  /*
+   * Oneday micro design system.
+   *
+   * Radius roles are semantic, not component-specific.  In particular, a
+   * theme may make --radius-s and --button-radius visibly different, so the
+   * block and its slots deliberately share the already-approved compact
+   * control radius instead of mixing those two Obsidian scales.
+   */
+  --oneday-radius-control: var(--button-radius, 5px);
+  --oneday-radius-surface: var(--oneday-radius-control);
+  --oneday-radius-group: calc(var(--oneday-radius-control) + 2px);
+  --oneday-radius-data: 4px;
+  /*
+   * 中性控件只用这一种不透明灰。不能直接采用常见主题里带 alpha 的
+   * --background-modifier-hover，否则手柄会透出下方文字，且同一灰色在
+   * 不同底色上看起来不一致。10% text-normal 是当前手柄灰的实色近似。
+   */
+  --oneday-surface-neutral-control: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary));
+  --oneday-surface-control: var(--oneday-surface-neutral-control);
+  --oneday-surface-handle: var(--oneday-surface-neutral-control);
+  --oneday-surface-group: var(--background-secondary);
+  --oneday-surface-data-track: var(--background-secondary);
+  --oneday-layer-block-action: 200;
+  --oneday-control-gap: var(--size-4-1, 4px);
+  --oneday-control-padding-x: var(--size-4-2, 8px);
+  --oneday-grip-width: 20px;
+  --oneday-grip-inline-overhang: 2px;
+  /* 内容起始线由手柄的真实占位推导：统一，同时避免 hover 时盖住文字。 */
+  --oneday-content-inset: calc(var(--oneday-grip-width) + var(--oneday-grip-inline-overhang));
+  --oneday-icon-button-size: 28px;
+  --oneday-toolbar-control-height: var(--input-height, 30px);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  padding: 4px 0;
+  gap: var(--oneday-control-gap);
+  padding: var(--size-4-1, 4px);
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--oneday-radius-surface);
+  /* 产品可缩放边界属于 Oneday viewport，而不是占满编辑器整行的 CM6 外壳。 */
+  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
+.oneday-block-scroll {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  /* 到达边缘后把滚轮交给 Markdown 页面，形成 block → 页面滚动接力。 */
+  overscroll-behavior: auto;
+  scrollbar-gutter: stable;
 }
 
 .oneday-svg-holder {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  /* 到达边缘后交给 block scroller；block 到边缘后再交给页面。 */
+  overscroll-behavior: auto;
   line-height: 0;
 }
 
@@ -25,6 +82,33 @@
   font-size: 10px;
   fill: var(--text-muted);
   font-family: var(--font-monospace);
+}
+
+.oneday-svg .oneday-span-preview-labels {
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-span-preview-label-bg {
+  fill: var(--background-primary);
+  opacity: 0.96;
+}
+
+.oneday-svg .oneday-span-preview-label-text {
+  fill: var(--text-accent);
+  font-family: var(--font-monospace);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.oneday-svg .oneday-span-preview-tick,
+.oneday-svg .oneday-span-preview-leader {
+  stroke: var(--text-accent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.oneday-svg .oneday-span-preview-leader {
+  opacity: 0.7;
 }
 
 .oneday-svg .oneday-duration {
@@ -50,24 +134,119 @@
   fill: var(--text-accent);
 }
 
-.oneday-svg .oneday-anno-line {
-  stroke: var(--text-accent);
-  stroke-width: 1;
-}
-
 .oneday-block {
   cursor: default;
 }
 
 .oneday-stats {
-  font-size: 12px;
-  color: var(--color-red);
-  font-family: var(--font-monospace);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-text);
+  font-size: 13px;
+  color: var(--text-normal);
 }
 
-.oneday-warning {
-  font-size: 11px;
+/* 首次使用：直接演示拖拽手势。展示一次后，空时间轴不再承载常驻说明。 */
+.oneday-timeline-onboarding {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
   color: var(--text-muted);
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.oneday-timeline-onboarding-gesture {
+  position: relative;
+  align-self: stretch;
+  min-height: 56px;
+  color: var(--interactive-accent);
+}
+
+.oneday-timeline-onboarding-dot {
+  position: absolute;
+  left: 4px;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.oneday-timeline-onboarding-dot.is-start { top: 0; }
+.oneday-timeline-onboarding-dot.is-end { bottom: 0; }
+
+.oneday-timeline-onboarding-line {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 7px;
+  width: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.oneday-timeline-onboarding-line::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  bottom: 1px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.oneday-timeline-onboarding-label {
+  position: absolute;
+  left: 18px;
+  color: currentColor;
+  font-size: 10px;
+  font-weight: var(--font-medium, 500);
+  white-space: nowrap;
+}
+
+.oneday-timeline-onboarding-label.is-start { top: -1px; }
+.oneday-timeline-onboarding-label.is-end { bottom: -1px; }
+
+.oneday-timeline-onboarding-copy {
+  min-width: 0;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oneday-stats-empty {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  align-items: center;
+  padding-inline: 8px;
+  box-sizing: border-box;
+  color: var(--text-faint, var(--text-muted));
+  border: 0;
+  border-radius: inherit;
+  font-family: var(--font-text);
+  line-height: 1.15;
+  text-align: center;
+}
+
+.oneday-stats-empty-label {
+  min-width: 0;
+  max-width: 100%;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .oneday-errors {
@@ -80,12 +259,26 @@
 .oneday-dialog {
   margin-top: 6px;
   width: 100%;
+  position: relative;
 }
 
 .oneday-dialog-input {
   width: 100%;
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 6px 10px;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.5;
+  box-shadow: none !important;
+  outline: none !important;
+  border: 1px solid var(--background-modifier-border) !important;
+}
+
+.oneday-dialog-input:focus,
+.oneday-dialog-input:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+  border-color: var(--background-modifier-border-focus) !important;
 }
 
 .oneday-dialog-status {
@@ -107,27 +300,86 @@
 .oneday-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: var(--oneday-control-gap);
   align-items: center;
   margin-bottom: 2px;
 }
 
-.oneday-swatch {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  padding: 1px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
+.oneday-toolbar.is-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin-bottom: 0;
+}
+
+.oneday-toolbar button.oneday-toolbar-empty {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1px;
+  box-sizing: border-box;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: calc(var(--oneday-radius-surface) - 1px);
+  background: transparent;
+  color: var(--text-faint, var(--text-muted));
+  box-shadow: none;
   cursor: pointer;
+}
+
+.oneday-toolbar button.oneday-toolbar-empty:is(:hover, :focus-visible) {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--interactive-accent) 4%, transparent);
   box-shadow: none;
 }
 
-.oneday-swatch.is-active {
+.oneday-toolbar button.oneday-toolbar-empty:focus-visible {
+  outline: none;
+}
+
+.oneday-toolbar-empty-icon {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.oneday-toolbar-empty-icon svg {
+  width: 28px;
+  height: 28px;
+  stroke-width: 1.6;
+}
+
+.oneday-toolbar-empty-label {
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.oneday-toolbar button.oneday-swatch {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oneday-control-gap);
+  font-size: 11px;
+  padding: 1px var(--oneday-control-padding-x);
+  border-radius: var(--oneday-radius-control);
+  border: 1px solid transparent;
+  background: var(--oneday-surface-control);
+  color: var(--text-normal);
+  cursor: pointer;
+  box-shadow: none;
+  box-sizing: border-box;
+  height: var(--oneday-toolbar-control-height);
+  min-height: var(--oneday-toolbar-control-height);
+}
+
+.oneday-toolbar button.oneday-swatch.is-active {
   border-color: var(--text-accent);
-  box-shadow: 0 0 0 1px var(--text-accent);
+  box-shadow: none;
 }
 
 .oneday-swatch-dot {
@@ -135,9 +387,11 @@
   height: 10px;
   border-radius: 50%;
   display: inline-block;
+  background: var(--c, #bdbdbd);
 }
 
 .oneday-draw-status {
+  flex: 0 0 auto;
   font-size: 11px;
   color: var(--text-muted);
   height: 14px;
@@ -184,19 +438,15 @@
 
 /* M4b hover 信息浮窗 + 联动高亮 */
 
-.oneday-container {
-  position: relative;
-}
-
 .oneday-tooltip {
   position: absolute;
   z-index: 20;
   pointer-events: none;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: var(--radius-m, 8px);
   padding: 6px 10px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-s);
   font-size: 12px;
   max-width: 240px;
 }
@@ -252,7 +502,7 @@
 .oneday-mode {
   display: inline-flex;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
+  border-radius: var(--oneday-radius-control);
   overflow: hidden;
   margin-left: auto; /* 钉到工具栏最右侧，与荧光笔视觉分离 */
 }
@@ -273,57 +523,173 @@
   color: var(--text-on-accent);
 }
 
-.oneday-add-wrap {
-  position: relative;
-  display: inline-flex;
+.oneday-add-menu,
+.oneday-ctx-menu {
+  position: fixed;
+  z-index: var(--layer-menu, 1000);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--shadow-s);
+  padding: 4px;
 }
 
 .oneday-add-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 30;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  min-width: 140px;
+}
+
+.oneday-ctx-menu {
   min-width: 110px;
 }
 
 .oneday-add-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--oneday-control-gap, var(--size-4-1, 4px));
   width: 100%;
-  padding: 4px 10px;
+  padding: var(--size-4-1, 4px) var(--oneday-control-padding-x, var(--size-4-2, 8px));
   border: none;
   background: none;
+  color: var(--text-normal);
   font-size: 12px;
+  line-height: 1.4;
   cursor: pointer;
   box-shadow: none;
   text-align: left;
+  border-radius: var(--oneday-radius-control, var(--button-radius, 5px));
 }
 
 .oneday-add-item:hover {
-  background: var(--background-secondary);
+  background: var(--background-modifier-hover);
 }
 
-/* 计划模式：色板点变斜线纹，与 plan 色块视觉一致 */
+.oneday-add-new {
+  position: relative;
+  margin-top: 4px;
+  border-radius: var(--oneday-radius-control, var(--button-radius, 5px));
+}
 
-.oneday-swatch-dot {
-  background: var(--c, #bdbdbd);
+/* 分隔线属于菜单分组，不应把按钮上方两个圆角削成直角。 */
+.oneday-add-new::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--background-modifier-border);
+  pointer-events: none;
+}
+
+.oneday-menu-icon {
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.oneday-menu-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.oneday-add {
+  min-width: 28px;
+  min-height: 24px;
+  justify-content: center;
+  padding-inline: 5px;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.oneday-add:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.oneday-add svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* 计划模式提示：dock 在时间轴上的开关本身高亮即可，色板不再变样 */
 
-.oneday-ctx-menu {
+.oneday-menu-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 色块类型级联菜单：作为一级 Menu 的子节点，hover 跨越时父菜单不关闭。 */
+
+.oneday-type-trigger-content {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--size-4-2, 8px);
+  min-width: 0;
+}
+
+.oneday-submenu-caret {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.oneday-cascade-menu {
   position: fixed;
-  z-index: 30;
+  z-index: calc(var(--layer-menu, 1000) + 1);
+  display: flex;
+  flex-direction: column;
+  min-width: 128px;
+  max-width: min(240px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: var(--size-4-1, 4px);
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-  min-width: 110px;
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--shadow-s);
+}
+
+.oneday-cascade-item.menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--input-height, 30px);
+  padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
+  border: 0;
+  border-radius: var(--button-radius, 5px);
+  background: transparent;
+  color: var(--text-normal);
+  box-shadow: none;
+  text-align: left;
+}
+
+.oneday-cascade-item.menu-item:hover:not(.is-disabled),
+.oneday-cascade-item.menu-item:focus-visible:not(.is-disabled) {
+  background: var(--background-modifier-hover);
+}
+
+.oneday-cascade-item.is-disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.oneday-cascade-check {
+  flex: 0 0 16px;
+  width: 16px;
+  color: var(--text-accent);
+  text-align: center;
 }
 
 /* 分栏：居右浮动 + 拖拽手柄 */
@@ -336,40 +702,61 @@
   overflow: visible;
 }
 
+/*
+ * CM6 的代码块外壳始终占满编辑器整行；若保留它的边框，拖动 Oneday
+ * viewport 时内容会缩放而“整个 block 的右边线”留在原地。外壳只负责
+ * 挂载，产品边界由真正可缩放的 .oneday-container 绘制。
+ */
+.cm-embed-block:has(.oneday-host) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 .oneday-host-float {
   float: right;
   margin: 0 0 12px 16px;
   clear: right;
 }
 
-.oneday-container {
-  width: 100%;
-}
-
-.oneday-resize-handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 14px; /* 加宽 + 骑跨边缘，不再只是 block 内部一条 */
-  cursor: col-resize;
-  z-index: 15;
-}
-
-.oneday-resize-handle.is-left {
-  left: -7px;
-}
-
-.oneday-resize-handle.is-right {
-  right: -7px;
-}
-
-.oneday-resize-handle:hover {
-  background: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
-}
-
 .oneday-container.is-resizing {
   opacity: 0.85;
   user-select: none;
+}
+
+/* 整个 Oneday block 的视口缩放：只调外框，内部网格保持像素尺寸。 */
+
+.oneday-block-resize-handle {
+  position: absolute;
+  z-index: 13;
+  opacity: 0;
+  background: transparent;
+  touch-action: none;
+}
+
+.oneday-block-resize-e {
+  top: 12px;
+  right: 0;
+  bottom: 12px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.oneday-block-resize-s {
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.oneday-block-resize-se {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
 }
 
 /* 设置页色号行：收起左侧空白，控件铺满 */
@@ -392,55 +779,21 @@
 
 .oneday-body {
   position: relative; /* 网格容器：槽位绝对定位 */
+  width: 100%; /* JS 按逻辑列数扩展到 >100%，容器负责横向滚动 */
+  min-width: 100%;
+  flex: 0 0 auto; /* 绝对定位子元素不能反向撑开 flex 子项，也不能被 flex 压回视口 */
 }
 
 .oneday-text-pane {
   flex: 1;
   min-width: 180px;
+  height: 100%;
+  overflow: auto; /* 只滚正文；外层槽位和八向手柄必须固定在组件边缘 */
+  box-sizing: border-box;
   position: relative;
   font-size: 14px;
   padding-top: 20px; /* 顶部永远留一行给手柄（yyt：编辑/渲染都从第二行起，不跳变） */
-}
-
-.oneday-text-edit {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 5;
-  opacity: 0;
-  border: none;
-  background: var(--background-secondary);
-  border-radius: 4px;
-  cursor: pointer;
-  box-shadow: none;
-  padding: 2px 8px;
-}
-
-.oneday-text-pane:hover .oneday-text-edit {
-  opacity: 1;
-}
-
-.oneday-text-modal-input {
-  width: 100%;
-  font-family: var(--font-monospace);
-  font-size: 13px;
-}
-
-
-
-.oneday-grip {
-  border: none;
-  background: none;
-  cursor: grab;
-  color: var(--text-muted);
-  box-shadow: none;
-  padding: 1px 4px;
-  font-size: 11px;
-  letter-spacing: -2px;
-}
-
-.oneday-grip:active {
-  cursor: grabbing;
+  cursor: text;
 }
 
 .oneday-text-placeholder {
@@ -464,54 +817,114 @@
   overflow: hidden; /* 高度由 JS 按内容撑开，编辑时不跳版 */
 }
 
-.oneday-modal-error {
-  color: var(--text-error);
-  font-size: 12px;
-  min-height: 14px;
-}
-
 /* 插槽化布局 + 组件拖动手柄 + 窄屏横向滚动 */
-
-.oneday-container {
-  overflow-x: auto; /* 页面太窄时块内横向滚动，不裁切 */
-}
-
-.oneday-body {
-  width: 100%; /* 容器是 flex column + align-items:flex-start，不写死宽度会被绝对定位子元素塌成 0 */
-}
 
 .oneday-slot {
   position: absolute;
   overflow: auto;
-  border-radius: 6px;
-  padding: 5px; /* 组件间 gutter（yyt：挨着没空隙难看） */
+  border-radius: var(--oneday-radius-surface);
+  /* 1px 内边框 + 4px padding 保持原来的 5px 内容起点；真实 border
+     不会像 outline 一样在横向滚动视口右缘被裁掉。 */
+  border: 1px solid transparent;
+  padding: 4px;
   box-sizing: border-box;
-  outline: 1px solid transparent; /* 边缘线平时隐藏 */
-  transition: left 0.15s ease, top 0.15s ease, width 0.15s ease, height 0.15s ease, outline-color 0.1s;
+  transition: left 0.15s ease, top 0.15s ease, width 0.15s ease, height 0.15s ease, border-color 0.1s;
+}
+
+/*
+ * 常规内容槽共享同一条左右内容起始线。时间轴不在此列：它的小时标签、
+ * 轨道和右侧标注车道使用独立坐标系，改变 slot padding 会移动几何基准。
+ */
+.oneday-slot:is(.oneday-slot-dialog, .oneday-slot-toolbar, .oneday-slot-stats, [data-slot^="text"]) {
+  padding-inline: var(--oneday-content-inset);
+}
+
+/* slot padding 变宽不应把固定在左上角的拖拽手柄一起推向右侧。 */
+.oneday-slot:is(.oneday-slot-dialog, .oneday-slot-toolbar, .oneday-slot-stats, [data-slot^="text"])
+  > .oneday-slot-grip-anchor {
+  transform: translateX(calc(var(--size-4-1, 4px) - var(--oneday-content-inset)));
+}
+
+/* 文本槽位的外框不能成为滚动容器，否则作为其子元素的缩放手柄会被正文卷走。 */
+.oneday-slot[data-slot^="text"] {
+  overflow: hidden;
+}
+
+/* 时间轴外框固定承载八向手柄；只有 SVG 内容层滚动。 */
+.oneday-slot[data-slot="timeline"] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .oneday-slot:hover {
-  outline-color: var(--background-modifier-border);
+  border-color: var(--background-modifier-border);
+  /* 当前交互槽位整体抬高，确保 grip 不会被相邻槽位覆盖。 */
+  z-index: 20;
+}
+
+/*
+ * 空状态的虚线就是元素块边界本身，不再在共享 content inset 内嵌第二张卡片。
+ * 子元素只承载文案/点击；hover 只改变同一根虚线的颜色。
+ */
+.oneday-slot.is-empty-state {
+  padding: 0;
+  border-style: dashed;
+  border-color: var(--background-modifier-border);
+}
+
+.oneday-slot.is-empty-state:hover {
+  border-style: dashed;
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.oneday-slot.is-empty-state:has(.oneday-toolbar-empty:focus-visible) {
+  border-color: var(--background-modifier-border-focus, var(--interactive-accent));
+  outline: 2px solid var(--background-modifier-border-focus, var(--interactive-accent));
+  outline-offset: 1px;
+}
+
+/* 共享 inset 被清零后，仍把移动手柄放回普通元素块统一的 4px 锚点。 */
+.oneday-slot.is-empty-state > .oneday-slot-grip-anchor {
+  transform: translateX(var(--size-4-1, 4px));
 }
 
 .oneday-slot.is-placeholder,
 .oneday-slot.is-resizing {
   transition: none;
   outline: 2px dashed var(--text-accent);
+  outline-offset: 1px;
+  border-radius: var(--oneday-radius-surface);
 }
 
-.oneday-slot-grip {
+.oneday-slot-grip-anchor {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.oneday-slot button.oneday-slot-grip {
+  appearance: none;
+  -webkit-appearance: none;
   position: absolute;
-  top: 3px;
-  left: 3px;
-  z-index: 14;
+  top: 0;
+  left: 0;
+  transform: translate(calc(0px - var(--oneday-grip-inline-overhang)), -2px);
+  z-index: 100;
+  pointer-events: auto;
   opacity: 0;
   border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  border-radius: 6px;
+  /* 使用设计系统里的不透明手柄表面，避免透出下方内容。 */
+  background: var(--oneday-surface-handle);
+  border-radius: var(--oneday-radius-control);
   cursor: grab;
   box-shadow: none;
-  width: 20px;
+  width: var(--oneday-grip-width);
   height: 22px;
   padding: 0;
   display: grid;
@@ -522,20 +935,25 @@
 }
 
 /* 六点手柄（2 列 × 3 行竖排）：JS 生成 span */
-.oneday-slot-grip span {
+.oneday-slot button.oneday-slot-grip span {
   width: 1.5px;
   height: 1.5px;
   border-radius: 50%;
   background: var(--text-muted);
 }
 
-.oneday-slot:hover .oneday-slot-grip {
-  opacity: 1;
+/* 常规工具栏已由共享 inset 给 grip 让位；时间轴顶栏仍使用自己的坐标系。 */
+.oneday-slot-toolbar .oneday-toolbar {
+  padding-left: 0;
 }
 
-.oneday-slot.is-dragging {
-  outline: 1px dashed var(--text-accent);
-  opacity: 0.75;
+.oneday-slot-timeline .oneday-timeline-topbar {
+  box-sizing: border-box;
+  padding-left: 22px;
+}
+
+.oneday-slot:hover .oneday-slot-grip {
+  opacity: 1;
 }
 
 /* 拖拽换位：浮动克隆 + 虚线占位（rbd/SortableJS 模式） */
@@ -547,14 +965,8 @@
   opacity: 0.92;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-}
-
-.oneday-slot.is-placeholder {
-  outline: 2px dashed var(--text-accent);
-  outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--oneday-radius-surface, var(--button-radius, 5px));
+  box-shadow: var(--shadow-s);
 }
 
 .oneday-slot.is-placeholder > * {
@@ -565,7 +977,7 @@
 
 .oneday-handle {
   position: absolute;
-  z-index: 8;
+  z-index: 13;
   opacity: 0;
   background: transparent;
   transition: opacity 0.1s;
@@ -576,50 +988,69 @@
 }
 
 .oneday-handle:hover {
-  background: color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+  background: transparent;
 }
 
-.oneday-handle-n { left: 28px; right: 8px; height: 8px; cursor: ns-resize; } /* 顶边左端避开 grip */
-.oneday-handle-s { left: 10px; right: 8px; height: 8px; cursor: ns-resize; } /* 底边无 grip，贴住 sw 角 */
-.oneday-handle-n { top: 0; }
-.oneday-handle-s { bottom: 0; }
-.oneday-handle-w { top: 28px; bottom: 8px; width: 8px; cursor: ew-resize; } /* 上端避开 grip */
-.oneday-handle-e { top: 10px; bottom: 8px; width: 8px; cursor: ew-resize; } /* 右侧无 grip，贴住 ne 角 */
-.oneday-handle-e { right: 0; }
-.oneday-handle-w { left: 0; }
+.oneday-handle-n { top: 0; left: 28px; right: 8px; height: 8px; cursor: ns-resize; } /* 顶边左端避开 grip */
+.oneday-handle-s { bottom: 0; left: 10px; right: 8px; height: 8px; cursor: ns-resize; }
+.oneday-handle-w { top: 28px; bottom: 8px; left: 0; width: 8px; cursor: ew-resize; }
+.oneday-handle-e { top: 10px; bottom: 8px; right: 0; width: 8px; cursor: ew-resize; }
 .oneday-handle-ne, .oneday-handle-nw, .oneday-handle-se, .oneday-handle-sw { width: 10px; height: 10px; }
 .oneday-handle-ne { top: 0; right: 0; cursor: nesw-resize; }
 .oneday-handle-sw { bottom: 0; left: 0; cursor: nesw-resize; }
 .oneday-handle-se { bottom: 0; right: 0; cursor: nwse-resize; }
 .oneday-handle-nw { top: 0; left: 0; cursor: nwse-resize; }
 
-.oneday-slot.is-placeholder {
-  outline: 2px dashed var(--text-accent);
-  outline-offset: 1px;
-}
+/* 块级快捷入口（右下角，hover 淡入） */
 
-/* 块级「＋组件」入口（右下角，hover 淡入） */
-
-.oneday-add-component {
+.oneday-more-actions,
+.oneday-open-settings {
+  appearance: none;
+  -webkit-appearance: none;
   position: absolute;
-  right: 4px;
   bottom: 4px;
-  z-index: 14;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
+  /* block 级操作必须高于 slot(20) 及其缩放热区，但低于菜单浮层(1000)。 */
+  z-index: var(--oneday-layer-block-action);
+  pointer-events: auto;
+  width: var(--oneday-icon-button-size);
+  height: var(--oneday-icon-button-size);
+  border-radius: var(--oneday-radius-control);
+  border: 1px solid transparent;
+  background: var(--oneday-surface-control);
   color: var(--text-muted);
   cursor: pointer;
   box-shadow: none;
-  opacity: 0.35;
+  /* 灰底必须与荧光笔保持同一色值；不能用整体 opacity 混入画布颜色。 */
+  opacity: 1;
   padding: 0;
-  line-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.oneday-container:hover .oneday-add-component {
-  opacity: 1;
+.oneday-more-actions {
+  right: 4px;
+}
+
+.oneday-open-settings {
+  right: calc(4px + var(--oneday-icon-button-size) + var(--oneday-control-gap));
+}
+
+.oneday-more-actions:hover,
+.oneday-open-settings:hover {
+  background: var(--oneday-surface-control);
+  color: var(--text-normal);
+  box-shadow: none;
+}
+
+.oneday-more-actions svg,
+.oneday-open-settings svg {
+  width: 15px;
+  height: 15px;
+}
+
+.oneday-layout-edit-toggle {
+  display: none;
 }
 
 /* 轨道宽度手柄：只让时间轴本体的右边线成为命中区 */
@@ -627,52 +1058,13 @@
 .oneday-width-handle {
   position: absolute;
   width: 3px;
-  /* JS 读取实际轨道边线；3px 热区以该线为中心。 */
+  /* JS 读取实际轨道矩形；3px 热区以右边线为中心。 */
   transform: translateX(-50%);
   cursor: col-resize;
   z-index: 13;
   touch-action: none;
   opacity: 0;
   background: transparent;
-  transition: opacity 0.08s, background-color 0.08s;
-}
-
-.oneday-width-handle:hover,
-.oneday-width-handle.is-active {
-  opacity: 1;
-  background: color-mix(in srgb, var(--interactive-accent) 42%, transparent);
-}
-
-/* 统计列表：每行一个类型 + 色点 */
-
-.oneday-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: var(--font-text); /* 和正文一致（yyt 2026-08-17） */
-  font-size: 13px;
-  color: var(--text-normal);
-}
-
-.oneday-stat-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.oneday-stat-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.oneday-stat-type {
-  flex: 1;
-}
-
-.oneday-stat-hours {
-  font-weight: 600;
 }
 
 /* 轴向延展预览 */
@@ -690,29 +1082,18 @@
   pointer-events: none; /* 乐观渲染的临时块不吃事件（盖在真块上会吞掉 hover/右键） */
 }
 
-/* 文字区编辑态：彻底无框 + 隐藏槽位手柄 */
+/* 文字区编辑态：彻底无框；隐藏移动 grip，但保留八向缩放热区。 */
 
 .oneday-text-inline,
 .oneday-text-inline:focus {
   background: none !important;
   box-shadow: none !important;
   outline: none !important;
+  border: none !important;
 }
 
-.oneday-slot.is-editing .oneday-slot-grip,
-.oneday-slot.is-editing .oneday-handle {
+.oneday-slot.is-editing .oneday-slot-grip {
   display: none;
-}
-
-/* 模式开关 dock 在时间轴顶部右侧 */
-
-.oneday-mode.oneday-mode-docked {
-  display: flex;
-  width: fit-content;
-  margin-left: auto; /* 右对齐 */
-  margin-bottom: 2px;
-  padding-left: 0;
-  font-size: 11px;
 }
 
 /* 计划模式：色板圆点变斜线（双线、方向与 plan 块一致） */
@@ -724,22 +1105,11 @@
   background: repeating-linear-gradient(-45deg, var(--c, #bdbdbd) 0 1.2px, transparent 1.2px 4px);
 }
 
-/* 手柄层级高于内容/滚动条 */
-
-.oneday-handle {
-  z-index: 13;
-}
-
 .oneday-body.is-settling .oneday-slot {
   transition: none !important; /* 初始量体/拟合不动画，否则创建色块时块会缩一下 */
 }
 
 /* 对话框 loading 内联 */
-
-.oneday-dialog {
-  position: relative;
-}
-
 .oneday-dialog-loading {
   position: absolute;
   right: 10px;
@@ -759,6 +1129,7 @@
 
 .oneday-timeline-topbar {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   width: 100%;
   margin-bottom: 2px;
@@ -779,7 +1150,8 @@
 
 /* 色块编辑态：目标高亮，其余冻结 */
 
-.oneday-svg.is-editing-block .oneday-block.is-frozen {
+.oneday-svg.is-editing-block .oneday-block.is-frozen,
+.oneday-svg.is-editing-block .oneday-plan-hatch.is-frozen {
   opacity: 0.3;
   pointer-events: none;
 }
@@ -796,8 +1168,8 @@
   z-index: 1000;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--shadow-s);
   padding: 4px;
 }
 
@@ -814,42 +1186,6 @@
   box-shadow: none;
 }
 
-/* 右下角设置齿轮 + 色板刷新提示 */
-
-.oneday-open-settings {
-  position: absolute;
-  right: 30px;
-  bottom: 4px;
-  z-index: 14;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  color: var(--text-muted);
-  cursor: pointer;
-  box-shadow: none;
-  opacity: 0.35;
-  padding: 0;
-  font-size: 12px;
-  line-height: 20px;
-}
-
-.oneday-container:hover .oneday-open-settings {
-  opacity: 1;
-}
-
-.oneday-palette-refresh {
-  font-size: 11px;
-  border: 1px dashed var(--text-accent);
-  background: transparent;
-  color: var(--text-accent);
-  border-radius: 10px;
-  padding: 1px 8px;
-  cursor: pointer;
-  box-shadow: none;
-}
-
 /* 编辑态光标：边缘 ns-resize / 中部 grab（yyt：全是十字不直观） */
 
 .oneday-svg.is-editing-block {
@@ -861,6 +1197,23 @@
 .oneday-brush-toggle {
   margin-right: 8px;
   display: inline-flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  height: var(--oneday-toolbar-control-height);
+  min-height: var(--oneday-toolbar-control-height);
+  /* 与荧光笔同层：默认态靠中性底色分组，不常驻一圈灰线。 */
+  border-color: transparent;
+}
+
+.oneday-brush-toggle .oneday-mode-btn {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+}
+
+.oneday-brush-toggle .oneday-mode-btn:not(.is-active) {
+  /* 与荧光笔、拖拽手柄和块级按钮共享同一个不透明中性表面。 */
+  background: var(--oneday-surface-neutral-control);
 }
 
 /* 视图三态开关（时间轴顶栏右侧） */
@@ -878,7 +1231,7 @@
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--size-4-2, 8px);
   flex-wrap: wrap;
 }
 
@@ -886,6 +1239,7 @@
   font-size: 12px;
   padding: 2px 10px;
   cursor: pointer;
+  border-radius: var(--oneday-radius-control);
 }
 
 
@@ -906,14 +1260,14 @@
 .oneday-view-toggle.oneday-mode {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   width: fit-content;
   margin-left: auto;
-  padding: 3px;
+  padding: 2px;
   overflow: visible;
-  background: color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
+  background: var(--oneday-surface-group);
   border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
-  border-radius: 11px;
+  border-radius: var(--oneday-radius-group);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--background-primary) 72%, transparent);
   position: relative;
   z-index: 6;
@@ -923,14 +1277,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 4px 10px;
+  gap: 4px;
+  height: 26px;
+  min-height: 26px;
+  padding: 2px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--oneday-radius-control);
   background: transparent;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 560;
   line-height: 1;
   white-space: nowrap;
@@ -995,41 +1350,15 @@
   white-space: nowrap;
 }
 
-/* 图层/画笔符号体系（V2 图标派，yyt 2026-08-18 拍板） */
-
-.oneday-sym {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  flex-shrink: 0;
-}
-
-.oneday-sym-dot {
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.oneday-sym-hatch {
-  border: 1px solid currentColor;
-  border-radius: 2px;
-  background: repeating-linear-gradient(-45deg, currentColor 0 1.5px, transparent 1.5px 3.5px);
-}
-
 .oneday-layer-btn {
   gap: 5px;
   display: inline-flex;
   align-items: center;
 }
 
-.oneday-eye.is-off {
-  opacity: 0.3;
-  text-decoration: line-through;
-}
-
 .oneday-brush-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
 }
 
 /* 统计柱状图 */
@@ -1049,39 +1378,29 @@
 
 .oneday-stat-bar-wrap {
   flex: 1;
-  background: var(--background-secondary);
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  background: var(--oneday-surface-data-track);
+  border-radius: var(--oneday-radius-data);
   height: 16px;
   overflow: hidden;
 }
 
 .oneday-stat-bar {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--oneday-radius-data);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding-right: 4px;
   min-width: 24px;
+  overflow: visible; /* 标签实测外置前不被裁 */
 }
 
 .oneday-stat-hours {
   font-size: 10px;
   font-weight: 600;
   /* 颜色由 JS 派生（relatedTextColor），不需要 blend hack */
-}
-
-/* 快速记录多行输入 */
-
-.oneday-dialog-input {
-  resize: none;
-  overflow: hidden;
-  line-height: 1.5;
-  padding: 6px 10px;
-}
-
-.oneday-dialog {
-  position: relative;
 }
 
 /* 全灭视图：什么都不显示 */
@@ -1094,26 +1413,10 @@
   display: none;
 }
 
-/* 短柱标签放柱外 */
-
-.oneday-stat-bar-wrap {
-  display: flex;
-  align-items: center;
-}
-
-.oneday-stat-hours-out {
-  color: var(--text-normal);
-  margin-left: 5px;
-  padding-right: 0;
-}
-
-.oneday-stat-bar {
-  overflow: visible; /* 标签实测外置前不被裁 */
-}
-
 .oneday-stat-hours-out {
   color: var(--text-normal) !important;
   margin-left: 5px;
+  padding-right: 0;
 }
 
 /* 冻结态：文字也置灰 */
@@ -1126,14 +1429,6 @@
 
 .oneday-text-host > *:first-child {
   margin-top: 0 !important;
-}
-
-.oneday-slot-grip {
-  opacity: 0; /* hover 才显示（yyt 撤回常驻淡显） */
-}
-
-.oneday-slot:hover .oneday-slot-grip {
-  opacity: 1;
 }
 
 /* 文字区：编辑/渲染两态行距一致（yyt 2026-08-19） */
@@ -1153,27 +1448,13 @@
   margin-top: 1.6em; /* 段落空行 = 恰好一个空行高度，与编辑态一致 */
 }
 
-/* 隐藏 CM6 代码块的「编辑这个区块」按钮（oneday 块自有完整编辑 UI，且它和我们顶栏重叠） */
-.cm-embed-block:has(.oneday-host) > .edit-block-button {
-  display: none;
-}
-
-/* 快速记录输入框：无系统 focus 阴影/轮廓（yyt：选中态阴影奇怪） */
-
-/* 快速记录输入框：无 focus 阴影，统一细边框 */
-.oneday-dialog-input,
-.oneday-dialog-input:focus {
-  box-shadow: none !important;
-  outline: none !important;
-  border: 1px solid var(--background-modifier-border) !important;
-}
-
-/* 文字区编辑框：完全无框（有框=内框观感，yyt 2026-08-19） */
-.oneday-text-inline,
-.oneday-text-inline:focus {
-  box-shadow: none !important;
-  outline: none !important;
-  border: none !important;
+/*
+ * 隐藏 CM6 代码块的「编辑这个区块」按钮。
+ * 不依赖按钮是否为直接子节点，并压过 Obsidian/主题对按钮重新声明的
+ * display:flex；只要当前代码块内渲染了 Oneday，就隐藏其后代按钮。
+ */
+.cm-embed-block:has(.oneday-host) .edit-block-button {
+  display: none !important;
 }
 
 /* 精确起止小浮窗 */
@@ -1183,8 +1464,8 @@
   z-index: 1000;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-m, 8px);
+  box-shadow: var(--shadow-s);
   padding: 4px;
   display: flex;
   align-items: center;
@@ -1204,4 +1485,147 @@
 
 .oneday-time-popover span {
   color: var(--text-muted);
+}
+
+/* 统一键盘焦点，不依赖主题是否给自定义按钮补样式。 */
+.oneday-container button:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 2px;
+}
+
+/* Obsidian 移动端：布局手柄只在显式编辑态出现。 */
+body.is-mobile .oneday-layout-edit-toggle,
+body.is-tablet .oneday-layout-edit-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  min-height: 44px;
+  gap: var(--oneday-control-gap);
+  padding: 0 var(--size-4-3, 12px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  box-shadow: var(--input-shadow);
+}
+
+body.is-mobile .oneday-layout-edit-toggle[aria-pressed="true"],
+body.is-tablet .oneday-layout-edit-toggle[aria-pressed="true"] {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--input-shadow-hover);
+}
+
+body.is-mobile .oneday-layout-edit-icon,
+body.is-tablet .oneday-layout-edit-icon {
+  display: inline-flex;
+}
+
+body.is-mobile .oneday-layout-edit-icon svg,
+body.is-tablet .oneday-layout-edit-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+body.is-mobile .oneday-container:not(.is-layout-editing) .oneday-slot-grip,
+body.is-mobile .oneday-container:not(.is-layout-editing) .oneday-handle,
+body.is-mobile .oneday-container:not(.is-layout-editing) .oneday-width-handle,
+body.is-mobile .oneday-container:not(.is-layout-editing) .oneday-block-resize-handle,
+body.is-tablet .oneday-container:not(.is-layout-editing) .oneday-slot-grip,
+body.is-tablet .oneday-container:not(.is-layout-editing) .oneday-handle,
+body.is-tablet .oneday-container:not(.is-layout-editing) .oneday-width-handle,
+body.is-tablet .oneday-container:not(.is-layout-editing) .oneday-block-resize-handle {
+  display: none;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-slot,
+body.is-tablet .oneday-container.is-layout-editing .oneday-slot {
+  outline-color: var(--background-modifier-border-hover);
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-slot-grip,
+body.is-tablet .oneday-container.is-layout-editing .oneday-slot-grip {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  opacity: 1;
+  touch-action: none;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-handle,
+body.is-tablet .oneday-container.is-layout-editing .oneday-handle {
+  display: block;
+  opacity: 1;
+  touch-action: none;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-handle-n,
+body.is-tablet .oneday-container.is-layout-editing .oneday-handle-n {
+  left: 48px;
+  right: 32px;
+  height: 20px;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-handle-s,
+body.is-tablet .oneday-container.is-layout-editing .oneday-handle-s {
+  left: 32px;
+  right: 32px;
+  height: 20px;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-handle-w,
+body.is-tablet .oneday-container.is-layout-editing .oneday-handle-w {
+  top: 48px;
+  bottom: 32px;
+  width: 20px;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-handle-e,
+body.is-tablet .oneday-container.is-layout-editing .oneday-handle-e {
+  top: 32px;
+  bottom: 32px;
+  width: 20px;
+}
+
+body.is-mobile .oneday-container.is-layout-editing :is(.oneday-handle-ne, .oneday-handle-nw, .oneday-handle-se, .oneday-handle-sw),
+body.is-tablet .oneday-container.is-layout-editing :is(.oneday-handle-ne, .oneday-handle-nw, .oneday-handle-se, .oneday-handle-sw) {
+  width: 32px;
+  height: 32px;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-width-handle,
+body.is-tablet .oneday-container.is-layout-editing .oneday-width-handle {
+  display: block;
+  width: 20px;
+  opacity: 1;
+  background: linear-gradient(to right, transparent 9px, var(--interactive-accent) 9px 11px, transparent 11px);
+  touch-action: none;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-block-resize-handle,
+body.is-tablet .oneday-container.is-layout-editing .oneday-block-resize-handle {
+  display: block;
+  opacity: 1;
+  z-index: 15;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-block-resize-e,
+body.is-tablet .oneday-container.is-layout-editing .oneday-block-resize-e {
+  top: 32px;
+  bottom: 32px;
+  width: 20px;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-block-resize-s,
+body.is-tablet .oneday-container.is-layout-editing .oneday-block-resize-s {
+  right: 32px;
+  left: 32px;
+  height: 20px;
+}
+
+body.is-mobile .oneday-container.is-layout-editing .oneday-block-resize-se,
+body.is-tablet .oneday-container.is-layout-editing .oneday-block-resize-se {
+  width: 32px;
+  height: 32px;
 }

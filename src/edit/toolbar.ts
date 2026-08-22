@@ -1,8 +1,10 @@
 /**
  * Highlighter toolbar (荧光笔) + plan/record mode toggle + per-block
- * hide/show management (yyt 2026-08-17: 全局色号，块内可隐藏/加回).
+ * hide/show management (yyt 2026-08-17: 全局色号，块内可隐藏/显示).
  * Pure DOM so it runs in Obsidian and Playwright smoke.
  */
+
+import { labelCustomMenu, showCustomMenu } from "./custom-menu"
 
 export type DrawMode = "actual" | "plan"
 
@@ -18,8 +20,10 @@ export interface ToolbarDeps {
   onSelect: (type: string) => void
   /** Menu item: hide this swatch for this block. */
   onHide: (type: string) => void
-  /** "+" menu picks a hidden type to show again. */
+  /** Tail management menu picks a hidden type to show again. */
   onShow: (type: string) => void
+  /** Open the global palette settings to create another highlighter. */
+  onAddNew: () => void
   /** DOM realm that owns this toolbar (Obsidian pop-out safe). */
   domDocument?: Document
 }
@@ -31,28 +35,29 @@ export interface ToolbarHandle {
   setBrushMode: (mode: DrawMode) => void
 }
 
-/** Right-click menu on a swatch (pure DOM, same pattern as the + menu). */
-function showSwatchMenu(root: HTMLElement, x: number, y: number, type: string, deps: ToolbarDeps): void {
-  const dom = root.ownerDocument
-  root.querySelectorAll(".oneday-ctx-menu").forEach((m) => m.remove())
+const PLUS_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'
+
+/** Right-click menu on a swatch, anchored to the swatch itself. */
+function showSwatchMenu(anchor: HTMLElement, type: string, deps: ToolbarDeps): void {
+  const dom = anchor.ownerDocument
   const menu = dom.createElement("div")
   menu.className = "oneday-ctx-menu"
   menu.setAttribute("role", "menu")
-  menu.setAttribute("aria-label", `${type} 荧光笔操作`)
-  menu.style.left = `${x}px`
-  menu.style.top = `${y}px`
+  // Obsidian turns aria-label on hovered surfaces into a visual tooltip.
+  // aria-labelledby keeps the accessible name without duplicating the menu as a black bubble.
+  labelCustomMenu(menu, `${type} 荧光笔操作`, dom)
   const hide = dom.createElement("button")
   hide.type = "button"
   hide.className = "oneday-add-item"
   hide.setAttribute("role", "menuitem")
-  hide.textContent = "在本块隐藏"
+  hide.textContent = "隐藏"
+  let close = (): void => {}
   hide.addEventListener("click", () => {
-    menu.remove()
+    close()
     deps.onHide(type)
   })
   menu.appendChild(hide)
-  root.appendChild(menu)
-  dom.addEventListener("click", () => menu.remove(), { once: true })
+  close = showCustomMenu(menu, { anchor })
 }
 
 export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
@@ -61,6 +66,39 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
   el.className = "oneday-toolbar"
   el.setAttribute("role", "toolbar")
   el.setAttribute("aria-label", "Oneday 荧光笔")
+
+  const statusEl = dom.createElement("div")
+  statusEl.className = "oneday-draw-status"
+  statusEl.setAttribute("role", "status")
+  statusEl.setAttribute("aria-live", "polite")
+
+  // 真正的零配置态不是一排失效控件：整块成为唯一、明确的创建入口。
+  // 若只是“全部在本块隐藏”，typeColors 仍非空，继续走下方的恢复菜单。
+  if (Object.keys(deps.typeColors).length === 0) {
+    el.classList.add("is-empty")
+    const emptyButton = dom.createElement("button")
+    emptyButton.type = "button"
+    emptyButton.className = "oneday-toolbar-empty"
+    emptyButton.setAttribute("aria-label", "添加第一个荧光笔")
+    const icon = dom.createElement("span")
+    icon.className = "oneday-toolbar-empty-icon"
+    icon.setAttribute("aria-hidden", "true")
+    icon.innerHTML = PLUS_SVG
+    const copy = dom.createElement("span")
+    copy.className = "oneday-toolbar-empty-label"
+    copy.textContent = "添加第一个荧光笔"
+    emptyButton.append(icon, copy)
+    emptyButton.addEventListener("click", (e) => {
+      e.stopPropagation()
+      deps.onAddNew()
+    })
+    el.appendChild(emptyButton)
+    return {
+      el,
+      statusEl,
+      setBrushMode: (mode) => el.classList.toggle("is-plan", mode === "plan"),
+    }
+  }
 
   // 荧光笔模式小开关（新增为 记录/计划，回到荧光笔区）
   const brushLabel = dom.createElement("span")
@@ -101,8 +139,7 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     btn.type = "button"
     btn.className = "oneday-swatch" + (type === deps.activeType ? " is-active" : "")
     btn.dataset.type = type
-    btn.title = "左键选中 · 右键隐藏（本块）"
-    btn.setAttribute("aria-label", `选择${type}荧光笔`)
+    btn.setAttribute("aria-label", `选择${type}荧光笔；右键隐藏`)
     btn.setAttribute("aria-pressed", String(type === deps.activeType))
     const dot = dom.createElement("span")
     dot.setAttribute("aria-hidden", "true")
@@ -121,62 +158,69 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     btn.addEventListener("contextmenu", (e) => {
       e.preventDefault()
       e.stopPropagation()
-      showSwatchMenu(el, e.clientX, e.clientY, type, deps)
+      showSwatchMenu(btn, type, deps)
     })
     el.appendChild(btn)
   }
 
-  // "+" add-back menu (only types already configured globally)
+  // Tail "+" is always present: restore hidden swatches or open global palette settings.
   const hidden = deps.hiddenTypes.filter((t) => t in deps.typeColors)
+  const addBtn = dom.createElement("button")
+  addBtn.type = "button"
+  addBtn.className = "oneday-swatch oneday-add"
+  addBtn.innerHTML = PLUS_SVG
+  addBtn.setAttribute("aria-label", hidden.length > 0 ? "管理荧光笔" : "添加新荧光笔")
   if (hidden.length > 0) {
-    const addBtn = dom.createElement("button")
-    addBtn.type = "button"
-    addBtn.className = "oneday-swatch oneday-add"
-    addBtn.textContent = "+"
-    addBtn.title = "加回隐藏的荧光笔（新色号请去设置页）"
     addBtn.setAttribute("aria-haspopup", "menu")
     addBtn.setAttribute("aria-expanded", "false")
-    addBtn.setAttribute("aria-label", "加回隐藏的荧光笔")
-    const menu = dom.createElement("div")
-    menu.className = "oneday-add-menu"
-    menu.setAttribute("role", "menu")
-    menu.setAttribute("aria-label", "隐藏的荧光笔")
-    menu.style.display = "none"
-    for (const type of hidden) {
-      const item = dom.createElement("button")
-      item.type = "button"
-      item.className = "oneday-add-item"
-      item.setAttribute("role", "menuitem")
-      const dot = dom.createElement("span")
-      dot.setAttribute("aria-hidden", "true")
-      dot.className = "oneday-swatch-dot"
-      dot.style.background = deps.typeColors[type]
-      item.appendChild(dot)
-      item.appendChild(dom.createTextNode(type))
-      item.addEventListener("click", () => {
-        menu.style.display = "none"
-        addBtn.setAttribute("aria-expanded", "false")
-        deps.onShow(type)
-      })
-      menu.appendChild(item)
-    }
     addBtn.addEventListener("click", (e) => {
       e.stopPropagation()
-      const open = menu.style.display === "none"
-      menu.style.display = open ? "block" : "none"
-      addBtn.setAttribute("aria-expanded", String(open))
-      if (open) {
-        dom.addEventListener("click", () => {
-          menu.style.display = "none"
-          addBtn.setAttribute("aria-expanded", "false")
-        }, { once: true })
+      const menu = dom.createElement("div")
+      menu.className = "oneday-add-menu"
+      menu.setAttribute("role", "menu")
+      labelCustomMenu(menu, "管理荧光笔", dom)
+      let close = (): void => {}
+      for (const type of hidden) {
+        const item = dom.createElement("button")
+        item.type = "button"
+        item.className = "oneday-add-item"
+        item.setAttribute("role", "menuitem")
+        const dot = dom.createElement("span")
+        dot.setAttribute("aria-hidden", "true")
+        dot.className = "oneday-swatch-dot"
+        dot.style.setProperty("--c", deps.typeColors[type])
+        item.appendChild(dot)
+        item.appendChild(dom.createTextNode(type))
+        item.addEventListener("click", () => {
+          close()
+          deps.onShow(type)
+        })
+        menu.appendChild(item)
       }
+      const addNew = dom.createElement("button")
+      addNew.type = "button"
+      addNew.className = "oneday-add-item oneday-add-new"
+      addNew.setAttribute("role", "menuitem")
+      const icon = dom.createElement("span")
+      icon.className = "oneday-menu-icon"
+      icon.setAttribute("aria-hidden", "true")
+      icon.innerHTML = PLUS_SVG
+      addNew.append(icon, dom.createTextNode("添加新荧光笔…"))
+      addNew.addEventListener("click", () => {
+        close()
+        deps.onAddNew()
+      })
+      menu.appendChild(addNew)
+      addBtn.setAttribute("aria-expanded", "true")
+      close = showCustomMenu(menu, { anchor: addBtn }, () => addBtn.setAttribute("aria-expanded", "false"))
     })
-    const wrap = dom.createElement("span")
-    wrap.className = "oneday-add-wrap"
-    wrap.append(addBtn, menu)
-    el.appendChild(wrap)
+  } else {
+    addBtn.addEventListener("click", (e) => {
+      e.stopPropagation()
+      deps.onAddNew()
+    })
   }
+  el.appendChild(addBtn)
 
   const setBrushMode = (mode: DrawMode): void => {
     brushWrap.querySelectorAll<HTMLButtonElement>(".oneday-mode-btn").forEach((b) => {
@@ -188,10 +232,6 @@ export function buildToolbar(deps: ToolbarDeps): ToolbarHandle {
     el.classList.toggle("is-plan", mode === "plan")
   }
 
-  const statusEl = dom.createElement("div")
-  statusEl.className = "oneday-draw-status"
-  statusEl.setAttribute("role", "status")
-  statusEl.setAttribute("aria-live", "polite")
   return { el, statusEl, setBrushMode }
 }
 
@@ -224,7 +264,7 @@ export function buildLayerToggles(view: LayerView, onChange: (view: LayerView) =
     btn.append(text, eye)
     const syncAria = (on: boolean): void => {
       btn.setAttribute("aria-pressed", String(on))
-      btn.title = on ? `隐藏${label}图层` : `显示${label}图层`
+      btn.setAttribute("aria-label", on ? `隐藏${label}图层` : `显示${label}图层`)
       eye.innerHTML = on ? EYE_OPEN_SVG : EYE_OFF_SVG
     }
     syncAria(state[key])

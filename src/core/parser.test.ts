@@ -119,6 +119,22 @@ describe("width/float headers (分栏)", () => {
   })
 })
 
+describe("block viewport headers", () => {
+  it("parses a persisted block viewport and fixed internal canvas width", () => {
+    const doc = parseTimeline("block-size: 560x420\ncanvas-width: 960\n---\n09:00-10:00 math")
+    expect(doc.blockSize).toEqual({ width: 560, height: 420 })
+    expect(doc.canvasWidth).toBe(960)
+    expect(doc.errors).toEqual([])
+  })
+
+  it("rejects unsafe block viewport values", () => {
+    const doc = parseTimeline("block-size: 80x40\ncanvas-width: 50\n---\n09:00-10:00 math")
+    expect(doc.blockSize).toBeUndefined()
+    expect(doc.canvasWidth).toBeUndefined()
+    expect(doc.errors).toHaveLength(2)
+  })
+})
+
 describe("text section (=== 块内图文混排)", () => {
   it("collects everything after === as free text", () => {
     const doc = parseTimeline("09:00-10:00 math\n===\n## 明日 to do\n1. 线代第一章")

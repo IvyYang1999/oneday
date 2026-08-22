@@ -7,13 +7,14 @@
  * Pure DOM (no Obsidian imports) so Playwright can smoke it headlessly.
  */
 import { TimelineDoc } from "../core/types"
-import { durationMinutes, formatClock, formatHours } from "../core/duration"
+import { formatClock } from "../core/duration"
 import { formatEntryLine } from "../core/format"
 import { AXIS_PAD_TOP, minutesFromY, snapMinutes, SNAP_MINUTES, yFromMinutes } from "../core/geometry"
 
 export interface DrawDeps {
   hourHeight: number
-  getActiveType: () => string
+  /** null/empty = 当前没有可用荧光笔；保留编辑与轴延展，但禁止创建新块。 */
+  getActiveType: () => string | null
   /** "actual" | "plan" — 计划模式下画出的色块带 plan 前缀 */
   getMode: () => "actual" | "plan"
   typeColor: (type: string) => string
@@ -37,6 +38,9 @@ export interface DrawDeps {
 }
 
 const SVGNS = "http://www.w3.org/2000/svg"
+const EDIT_DRAG_THRESHOLD_PX = 4
+const SPAN_LABEL_HEIGHT = 14
+const SPAN_LABEL_MIN_GAP = 16
 
 /** 延展预览层：拖动轴端时实时画出延伸区域和新小时刻度（窗口拖拽式实时反馈） */
 const AXIS_PAD_TOP_LOCAL = AXIS_PAD_TOP
@@ -103,17 +107,26 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   const toLocalY = (clientY: number): number => (clientY - dragOriginTop) * dragScale
   const clampMin = (m: number): number => Math.min(doc.rangeEnd, Math.max(doc.rangeStart, m))
   let fineSnap = false // ⌥Option 按下时 1 分钟吸附（yyt：精确编辑入口）
-  const snapMin = (m: number): number => snapMinutes(m, fineSnap ? 1 : SNAP_MINUTES)
+  const snapInteractionMin = (m: number): number => snapMinutes(m, fineSnap ? 1 : SNAP_MINUTES)
 
   let dragging = false
   let extending: "top" | "bottom" | null = null
   // 色块编辑态：边缘拖拽改起止 / 中部拖动移动整块
-  let editDrag: { mode: "top" | "bottom" | "move"; startMin: number; endMin: number; grabOffsetMin: number } | null = null
+  let editDrag: {
+    mode: "top" | "bottom" | "move"
+    startMin: number
+    endMin: number
+    grabOffsetMin: number
+    pointerStartX: number
+    pointerStartY: number
+    moved: boolean
+  } | null = null
   let extendPreview: SVGGElement | null = null
   let dragStartMin = 0
   let downBlockLine: number | null = null
   let downY = 0
   let ghost: SVGRectElement | null = null
+  let spanPreview: SVGGElement | null = null
 
   const setStatus = (text: string): void => {
     if (statusEl) statusEl.textContent = text
@@ -122,6 +135,107 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
   const removeGhost = (): void => {
     ghost?.remove()
     ghost = null
+  }
+
+  const removeSpanPreview = (): void => {
+    spanPreview?.remove()
+    spanPreview = null
+  }
+
+  /**
+   * Live start/end labels belong to the dragged span, so keep them beside its
+   * two edges instead of in the component footer. Very short spans separate
+   * the copy while their ticks/leaders continue to point at the exact edges.
+   */
+  const updateSpanPreview = (a: number, b: number): void => {
+    const startMin = Math.min(a, b)
+    const endMin = Math.max(a, b)
+    if (endMin <= startMin) {
+      removeSpanPreview()
+      return
+    }
+
+    if (!spanPreview) {
+      spanPreview = dom.createElementNS(SVGNS, "g")
+      spanPreview.setAttribute("class", "oneday-span-preview-labels")
+      spanPreview.setAttribute("aria-hidden", "true")
+      svg.appendChild(spanPreview)
+    }
+    spanPreview.replaceChildren()
+
+    const edgeYStart = yFromMinutes(startMin, doc.rangeStart, deps.hourHeight)
+    const edgeYEnd = yFromMinutes(endMin, doc.rangeStart, deps.hourHeight)
+    const svgHeight = Number(svg.getAttribute("height")) || edgeYEnd + SPAN_LABEL_HEIGHT
+    const minY = SPAN_LABEL_HEIGHT / 2 + 1
+    const maxY = Math.max(minY, svgHeight - SPAN_LABEL_HEIGHT / 2 - 1)
+    let labelYStart = edgeYStart
+    let labelYEnd = edgeYEnd
+
+    if (labelYEnd - labelYStart < SPAN_LABEL_MIN_GAP) {
+      const center = (edgeYStart + edgeYEnd) / 2
+      labelYStart = center - SPAN_LABEL_MIN_GAP / 2
+      labelYEnd = center + SPAN_LABEL_MIN_GAP / 2
+    }
+    if (labelYStart < minY) {
+      const shift = minY - labelYStart
+      labelYStart += shift
+      labelYEnd += shift
+    }
+    if (labelYEnd > maxY) {
+      const shift = labelYEnd - maxY
+      labelYStart -= shift
+      labelYEnd -= shift
+    }
+    labelYStart = Math.max(minY, labelYStart)
+    labelYEnd = Math.min(maxY, labelYEnd)
+
+    const addLabel = (kind: "start" | "end", minute: number, edgeY: number, labelY: number): void => {
+      const label = dom.createElementNS(SVGNS, "g")
+      label.setAttribute("class", `oneday-span-preview-label is-${kind}`)
+      label.dataset.minute = String(minute)
+      label.dataset.edgeY = String(edgeY)
+      label.dataset.labelY = String(labelY)
+
+      if (Math.abs(labelY - edgeY) > 0.5) {
+        const leader = dom.createElementNS(SVGNS, "line")
+        leader.setAttribute("class", "oneday-span-preview-leader")
+        leader.setAttribute("x1", String(trackX - 3))
+        leader.setAttribute("y1", String(edgeY))
+        leader.setAttribute("x2", String(trackX - 3))
+        leader.setAttribute("y2", String(labelY))
+        label.appendChild(leader)
+      }
+
+      const tick = dom.createElementNS(SVGNS, "line")
+      tick.setAttribute("class", "oneday-span-preview-tick")
+      tick.setAttribute("x1", String(trackX - 4))
+      tick.setAttribute("y1", String(edgeY))
+      tick.setAttribute("x2", String(trackX + 3))
+      tick.setAttribute("y2", String(edgeY))
+      label.appendChild(tick)
+
+      const backing = dom.createElementNS(SVGNS, "rect")
+      backing.setAttribute("class", "oneday-span-preview-label-bg")
+      backing.setAttribute("x", "1")
+      backing.setAttribute("y", String(labelY - SPAN_LABEL_HEIGHT / 2))
+      backing.setAttribute("width", String(Math.max(1, trackX - 6)))
+      backing.setAttribute("height", String(SPAN_LABEL_HEIGHT))
+      backing.setAttribute("rx", "2")
+      label.appendChild(backing)
+
+      const text = dom.createElementNS(SVGNS, "text")
+      text.setAttribute("class", "oneday-span-preview-label-text")
+      text.setAttribute("x", String(trackX - 6))
+      text.setAttribute("y", String(labelY))
+      text.setAttribute("text-anchor", "end")
+      text.setAttribute("dominant-baseline", "central")
+      text.textContent = formatClock(minute % (24 * 60))
+      label.appendChild(text)
+      spanPreview?.appendChild(label)
+    }
+
+    addLabel("start", startMin, edgeYStart, labelYStart)
+    addLabel("end", endMin, edgeYEnd, labelYEnd)
   }
 
   svg.addEventListener("pointerdown", (e: PointerEvent) => {
@@ -152,7 +266,10 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
             mode,
             startMin: entry.startMin,
             endMin: entry.endMin,
-            grabOffsetMin: snapMin(minutesFromY(localY0, doc.rangeStart, deps.hourHeight)) - entry.startMin,
+            grabOffsetMin: snapInteractionMin(minutesFromY(localY0, doc.rangeStart, deps.hourHeight)) - entry.startMin,
+            pointerStartX: e.clientX,
+            pointerStartY: e.clientY,
+            moved: false,
           }
           svg.setPointerCapture(e.pointerId)
           return
@@ -190,19 +307,25 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       }
     }
 
+    const activeType = deps.getActiveType()
+    // 没有可用荧光笔时，空轨道不能悄悄回退成 misc。已有块仍继续走
+    // 下方的短按路径，以便进入编辑态。
+    if (!activeType && !hit) return
+
     dragging = true
     const rect = svg.getBoundingClientRect()
     dragOriginTop = rect.top
     dragScale = svgWidth / rect.width
-    dragStartMin = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+    dragStartMin = clampMin(snapInteractionMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     svg.setPointerCapture(e.pointerId)
 
+    if (!activeType) return
     ghost = dom.createElementNS(SVGNS, "rect")
     ghost.setAttribute("class", "oneday-ghost")
     ghost.setAttribute("x", String(trackX + 2))
     ghost.setAttribute("width", String(trackW - 4))
     ghost.setAttribute("rx", "3")
-    ghost.setAttribute("fill", deps.typeColor(deps.getActiveType()))
+    ghost.setAttribute("fill", deps.typeColor(activeType))
     svg.appendChild(ghost)
     updateGhost(dragStartMin, dragStartMin)
   })
@@ -213,10 +336,8 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     const y2 = yFromMinutes(Math.max(a, b), doc.rangeStart, deps.hourHeight)
     ghost.setAttribute("y", String(y1))
     ghost.setAttribute("height", String(Math.max(2, y2 - y1)))
-    const type = deps.getActiveType()
-    setStatus(
-      `${formatClock(Math.min(a, b))} – ${formatClock(Math.max(a, b))} · ${formatHours(durationMinutes(Math.min(a, b), Math.max(a, b)))}（${type}）`
-    )
+    updateSpanPreview(a, b)
+    setStatus("")
   }
 
   svg.addEventListener("pointermove", (e: PointerEvent) => {
@@ -224,9 +345,16 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       const rect = editingRect()
       if (!rect) {
         editDrag = null
+        removeSpanPreview()
         return
       }
-      const cur = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+      if (!editDrag.moved) {
+        const dx = e.clientX - editDrag.pointerStartX
+        const dy = e.clientY - editDrag.pointerStartY
+        if (Math.hypot(dx, dy) < EDIT_DRAG_THRESHOLD_PX) return
+        editDrag.moved = true
+      }
+      const cur = clampMin(snapInteractionMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
       const { mode, grabOffsetMin } = editDrag
       let ns = editDrag.startMin
       let ne = editDrag.endMin
@@ -241,7 +369,8 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       const y2 = yFromMinutes(ne, doc.rangeStart, deps.hourHeight)
       rect.setAttribute("y", String(y1))
       rect.setAttribute("height", String(Math.max(2, y2 - y1)))
-      setStatus(`${formatClock(ns % (24 * 60))} – ${formatClock(ne % (24 * 60))} · ${formatHours(durationMinutes(ns, ne))}`)
+      updateSpanPreview(ns, ne)
+      setStatus("")
       return
     }
     if (extending) {
@@ -284,7 +413,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       }
       // hover 光标反馈：轴端热区 -> ns-resize；色块 -> context-menu；其余 crosshair
       const target = e.target as Element | null
-      let cursor = "crosshair"
+      let cursor = deps.getActiveType() ? "crosshair" : "default"
       if (target?.closest("rect.oneday-block")) {
         cursor = "context-menu"
       } else {
@@ -301,7 +430,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       svg.style.cursor = cursor
       return
     }
-    const cur = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+    const cur = clampMin(snapInteractionMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     updateGhost(dragStartMin, cur)
   })
 
@@ -311,6 +440,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     extendPreview = null
     extending = null
     removeGhost()
+    removeSpanPreview()
     dragging = false
     editDrag = null
     setStatus("")
@@ -323,10 +453,18 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       editDrag = null
       svg.releasePointerCapture(e.pointerId)
       svg.style.cursor = ""
+      removeSpanPreview()
       setStatus("")
       if (rect) {
+        const pointerDistance = Math.hypot(e.clientX - drag.pointerStartX, e.clientY - drag.pointerStartY)
+        if (!drag.moved && pointerDistance < EDIT_DRAG_THRESHOLD_PX) {
+          // pointerdown/pointerup also precede click and dblclick. A stationary
+          // press must never quantize an exact non-grid-aligned span.
+          exitEdit()
+          return
+        }
         const line = Number(rect.dataset.line)
-        const cur = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+        const cur = clampMin(snapInteractionMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
         let ns = drag.startMin
         let ne = drag.endMin
         if (drag.mode === "top") ns = Math.min(cur, drag.endMin - SNAP_MINUTES)
@@ -338,9 +476,6 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
         }
         if (ns !== drag.startMin || ne !== drag.endMin) {
           deps.onUpdateSpan(line, ns, ne)
-        } else if (Math.abs(e.clientY - downY) < 4) {
-          // 选中态再点一下（没动）-> 退出编辑
-          exitEdit()
         }
       }
       return
@@ -369,13 +504,14 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     }
     if (!dragging) return
     dragging = false
-    const end = clampMin(snapMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
+    const end = clampMin(snapInteractionMin(minutesFromY(toLocalY(e.clientY), doc.rangeStart, deps.hourHeight)))
     const startMin = Math.min(dragStartMin, end)
     const endMin = Math.max(dragStartMin, end)
     svg.releasePointerCapture(e.pointerId)
 
     if (endMin - startMin < (fineSnap ? 1 : SNAP_MINUTES)) {
       removeGhost()
+      removeSpanPreview()
       setStatus("")
       // 未拖动的点击落在色块上 -> 选中即编辑（yyt 2026-08-19：选中态默认进入编辑态）
       if (downBlockLine !== null && Math.abs(e.clientY - downY) < 4) {
@@ -389,7 +525,15 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       return
     }
     downBlockLine = null
-    const line = formatEntryLine({ plan: deps.getMode() === "plan", startMin, endMin, type: deps.getActiveType() })
+    const activeType = deps.getActiveType()
+    if (!activeType) {
+      removeGhost()
+      removeSpanPreview()
+      setStatus("")
+      return
+    }
+    const line = formatEntryLine({ plan: deps.getMode() === "plan", startMin, endMin, type: activeType })
+    removeSpanPreview()
     setStatus("")
     // 乐观渲染：ghost 直接变成正式色块样式，写回+重渲染完成前用户无感知（yyt：创建有延迟）
     if (ghost) {
@@ -413,8 +557,12 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
       r.classList.toggle("is-edit-target", rect !== null && r === rect)
       r.classList.toggle("is-frozen", rect !== null && r !== rect)
     })
-    // 文字也跟随冻结（yyt：只灰色块文字没变，看着懵）
     const editLine = deps.getEditingLine()
+    svg.querySelectorAll("rect.oneday-plan-hatch[data-line]").forEach((hatch) => {
+      const mine = Number((hatch as HTMLElement).dataset.line) === editLine
+      hatch.classList.toggle("is-frozen", editLine !== null && !mine)
+    })
+    // 文字也跟随冻结（yyt：只灰色块文字没变，看着懵）
     svg.querySelectorAll("text[data-line]").forEach((t) => {
       const mine = Number((t as HTMLElement).dataset.line) === editLine
       t.classList.toggle("is-frozen", editLine !== null && !mine)
@@ -426,6 +574,7 @@ export function attachDrawInteraction(container: HTMLElement, doc: TimelineDoc, 
     if (rect) rect.style.cursor = ""
     deps.setEditingLine(null)
     editDrag = null
+    removeSpanPreview()
     syncEditVisual()
     container.querySelectorAll(".is-focus").forEach((el) => el.classList.remove("is-focus"))
   }
