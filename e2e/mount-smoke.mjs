@@ -336,6 +336,10 @@ const page = await browser.newPage()
 page.on("pageerror", (e) => console.error("[pageerror]", e.message))
 page.on("console", (m) => { if (m.type() === "error") console.error("[console]", m.text()) })
 await page.goto("file://" + path.join(out, "index.html"))
+// ONEDAY_SMOKE_CLASSIC_SCROLLBARS=1 reproduces Linux CI on macOS: styling
+// ::-webkit-scrollbar switches Chromium from overlay to classic scrollbars,
+// which occupy a 15px gutter inside every overflow:auto box.
+if (process.env.ONEDAY_SMOKE_CLASSIC_SCROLLBARS) await page.addStyleTag({ content: "::-webkit-scrollbar{width:15px;height:15px}::-webkit-scrollbar-thumb{background:#bbb}" })
 await page.evaluate(() => {
   document.documentElement.style.setProperty("--background-modifier-hover", "rgb(224, 224, 224)")
   document.documentElement.style.setProperty("--background-modifier-border", "rgb(120, 120, 120)")
@@ -761,15 +765,24 @@ const state = await page.evaluate(() => ({
   })),
   bodyH: document.querySelector(".oneday-body")?.style.height,
   outerInsets: (() => {
-    const container = document.querySelector(".oneday-container").getBoundingClientRect()
+    const containerEl = document.querySelector(".oneday-container")
+    const scrollEl = containerEl.querySelector(".oneday-block-scroll")
+    const container = containerEl.getBoundingClientRect()
     const body = document.querySelector(".oneday-body").getBoundingClientRect()
+    // Classic (non-overlay) scrollbars — Linux CI, or macOS with "always show
+    // scroll bars" — reserve a gutter inside .oneday-block-scroll. That gutter
+    // is browser chrome, not block padding, so it is excluded from the inset.
+    const scrollRect = scrollEl ? scrollEl.getBoundingClientRect() : null
+    const gutterX = scrollRect ? scrollRect.width - scrollEl.clientWidth : 0
+    const gutterY = scrollRect ? scrollRect.height - scrollEl.clientHeight : 0
     return {
       top: body.top - container.top,
-      right: container.right - body.right,
-      bottom: container.bottom - body.bottom,
+      right: container.right - body.right - gutterX,
+      bottom: container.bottom - body.bottom - gutterY,
       left: body.left - container.left,
-      containerWidth: container.width,
+      containerWidth: container.width - gutterX,
       bodyWidth: body.width,
+      scrollbarGutter: { x: gutterX, y: gutterY },
     }
   })(),
   widthHandle: (() => {
@@ -1803,6 +1816,7 @@ if (Math.abs(scrolledEdgeChrome.leftGap - 4) > 0.5 || Math.abs(scrolledEdgeChrom
 if (rightEdgeBorder.width !== 1 || rightEdgeBorder.style !== "solid" || rightEdgeBorder.color !== "rgb(120, 120, 120)") { console.error("RIGHTMOST SLOT BORDER IS NOT VISIBLE", rightEdgeBorder); process.exit(1) }
 if (state.slots.length === 0 || state.slots.some((s) => s.html === 0)) { console.error("EMPTY SLOT"); process.exit(1) }
 if (state.slots.some((s) => s.w === 0 || s.h === 0)) { console.error("COLLAPSED SLOT (zero size)"); process.exit(1) }
+if (process.env.ONEDAY_SMOKE_CLASSIC_SCROLLBARS) console.log("outerInsets", JSON.stringify(state.outerInsets))
 if (Object.values(state.outerInsets).slice(0, 4).some((gap) => Math.abs(gap - 4) > 0.5)) { console.error("BLOCK OUTER INSETS ARE NOT UNIFORM", state.outerInsets); process.exit(1) }
 if (Math.abs(state.outerInsets.containerWidth - state.outerInsets.bodyWidth - 8) > 1) { console.error("BLOCK HORIZONTAL INSET CHANGED TOTAL WIDTH", state.outerInsets); process.exit(1) }
 if (state.widthHandle.centerDelta > 1 || state.widthHandle.topDelta > 1 || state.widthHandle.bottomDelta > 1 || state.widthHandle.width > 3.1) { console.error("WIDTH HANDLE MISALIGNED", state.widthHandle); process.exit(1) }
