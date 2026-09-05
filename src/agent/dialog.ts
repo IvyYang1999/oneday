@@ -10,6 +10,7 @@ import { AgentAction, interpretActions } from "./response"
 import { runEntryAgent } from "./runner"
 import { runEntryAgentApi } from "./direct-runner"
 import { obsidianTransport } from "./obsidian-transport"
+import { currentLocale, t } from "../i18n"
 
 export interface DialogDeps {
   settings: OnedaySettings
@@ -21,15 +22,15 @@ export interface DialogDeps {
 
 export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: DialogDeps): void {
   const box = container.createDiv({ cls: "oneday-dialog" })
-  box.setAttrs({ role: "region", "aria-label": "快速记录", "aria-busy": "false" })
+  box.setAttrs({ role: "region", "aria-label": t("quickRecord"), "aria-busy": "false" })
   const domWindow = box.ownerDocument.defaultView
 
   // 未配置 API：禁用输入框 + 配置引导（yyt 2026-08-17）
   const needsKey = deps.settings.dialogBackend === "api" && deps.settings.apiKey.trim() === ""
   if (needsKey) {
     const hint = box.createDiv({ cls: "oneday-dialog-needskey" })
-    hint.createEl("span", { text: "✦ 快速记录需要先配置模型 API：" })
-    const btn = hint.createEl("button", { text: "去设置填 API Key", attr: { type: "button" } })
+    hint.createEl("span", { text: t("quickRecordNeedsApi") })
+    const btn = hint.createEl("button", { text: t("configureApiKey"), attr: { type: "button" } })
     btn.addEventListener("click", () => deps.openSettings())
     return
   }
@@ -37,7 +38,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
   // 自动增高的多行输入（yyt：多事件时内容长）
   const input = box.createEl("textarea", {
     cls: "oneday-dialog-input",
-    attr: { placeholder: "✦ 快速记录：刚健身半小时…", rows: "1", "aria-label": "快速记录" },
+    attr: { placeholder: t("quickRecordPlaceholder"), rows: "1", "aria-label": t("quickRecord") },
   }) as unknown as HTMLInputElement
   const ta = input as unknown as HTMLTextAreaElement
   const fitInput = (): void => {
@@ -47,7 +48,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
   ta.addEventListener("input", fitInput)
   domWindow?.setTimeout(fitInput, 0)
   // loading 内联在输入行右侧（yyt：不占单独一行）
-  const loading = box.createEl("span", { cls: "oneday-dialog-loading", text: "生成中…" })
+  const loading = box.createEl("span", { cls: "oneday-dialog-loading", text: t("generating") })
   loading.setAttr("aria-hidden", "true")
   loading.style.display = "none"
   const status = box.createDiv({ cls: "oneday-dialog-status" })
@@ -68,7 +69,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
     status.removeClass("oneday-dialog-error")
 
     const systemPrompt = buildSystemPrompt({
-      typeColors: deps.settings.typeColors,
+      typeColors: deps.settings.spanTypeColors,
       now: new Date(),
       doc,
     })
@@ -99,7 +100,7 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       return
     }
 
-    const result = interpretActions(run.text, doc)
+    const result = interpretActions(run.text, doc, text)
     if (!result.ok) {
       loading.style.display = "none"
       loading.setAttr("aria-hidden", "true")
@@ -111,12 +112,12 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       ta.disabled = false
       ta.value = ""
       fitInput()
-      ta.placeholder = "补充回答它的问题…"
+      ta.placeholder = t("answerFollowup")
       return
     }
     // 成功：本轮任务完成，重置会话
     history.length = 0
-    ta.placeholder = "✦ 快速记录：刚健身半小时…"
+    ta.placeholder = t("quickRecordPlaceholder")
 
     loading.style.display = "none"
     loading.setAttr("aria-hidden", "true")
@@ -125,13 +126,20 @@ export function attachDialog(container: HTMLElement, doc: TimelineDoc, deps: Dia
       ta.value = ""
       fitInput()
       const rawCost = "costUsd" in run ? run.costUsd : undefined
-      const cost = typeof rawCost === "number" ? `（$${rawCost.toFixed(4)}）` : ""
+      const locale = currentLocale()
+      const cost = typeof rawCost === "number"
+        ? locale === "zh" ? `（$${rawCost.toFixed(4)}）` : ` ($${rawCost.toFixed(4)})`
+        : ""
       const kinds = { create: 0, update: 0, delete: 0 }
       for (const a of result.actions) kinds[a.kind]++
-      const parts = [kinds.create && `记录 ${kinds.create}`, kinds.update && `修改 ${kinds.update}`, kinds.delete && `删除 ${kinds.delete}`].filter(Boolean)
-      status.setText(`已${parts.join("、")} 条 ${cost}`.replace(" 条", ` 条`).replace("  ", " "))
+      const parts = [
+        kinds.create && t("actionCreate", { count: kinds.create }),
+        kinds.update && t("actionUpdate", { count: kinds.update }),
+        kinds.delete && t("actionDelete", { count: kinds.delete }),
+      ].filter((part): part is string => typeof part === "string")
+      status.setText(t("actionsSaved", { actions: parts.join(locale === "zh" ? "、" : ", "), cost }))
     } catch (error) {
-      status.setText(`写回失败：${error instanceof Error ? error.message : String(error)}`)
+      status.setText(t("writeFailed", { reason: error instanceof Error ? error.message : String(error) }))
       status.addClass("oneday-dialog-error")
     }
     busy = false

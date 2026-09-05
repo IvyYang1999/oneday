@@ -9,14 +9,19 @@ export const GRID_COLS = 12
 /** Safety ceiling for the horizontally scrollable canvas (10 viewport widths). */
 export const MAX_GRID_COLS = 120
 export const GRID_ROW_H = 20
+/** Header + one real habit row: empty CTA previews the post-create footprint. */
+export const HABITS_EMPTY_ROWS = 4
 
 export type SlotId = string // 核心: toolbar|timeline|stats|dialog；文本框: text, text2, text3…
 export const CORE_SLOT_IDS = ["toolbar", "timeline", "stats", "dialog"] as const
+export const OPTIONAL_SLOT_IDS = ["habits", "todos", "quote"] as const
 export function isTextSlot(id: SlotId): boolean {
   return id === "text" || /^text\d+$/.test(id)
 }
 export function isValidSlotId(id: string): id is SlotId {
-  return (CORE_SLOT_IDS as readonly string[]).includes(id) || isTextSlot(id)
+  return (CORE_SLOT_IDS as readonly string[]).includes(id)
+    || (OPTIONAL_SLOT_IDS as readonly string[]).includes(id)
+    || isTextSlot(id)
 }
 
 export interface GridItem {
@@ -40,6 +45,38 @@ export function parseLayoutHeader(value: string): GridItem[] | null {
   // dedupe by id, first wins
   const seen = new Set<string>()
   return items.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)))
+}
+
+/**
+ * Recover a narrowly misspelled `layout:` key only when its value is already
+ * a valid grid layout. This protects saved geometry from a small source-mode
+ * typo without turning arbitrary custom headers into system fields.
+ */
+export function parseRecoverableLayoutHeader(key: string, value: string): GridItem[] | null {
+  const normalized = key.trim().toLowerCase()
+  if (!/^[a-z]+$/.test(normalized) || Math.abs(normalized.length - "layout".length) > 2) return null
+  if (boundedEditDistance(normalized, "layout", 2) > 2) return null
+  return parseLayoutHeader(value)
+}
+
+function boundedEditDistance(left: string, right: string, limit: number): number {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= left.length; i++) {
+    const current = [i]
+    let rowMin = current[0]
+    for (let j = 1; j <= right.length; j++) {
+      const value = Math.min(
+        current[j - 1] + 1,
+        previous[j] + 1,
+        previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)
+      )
+      current.push(value)
+      rowMin = Math.min(rowMin, value)
+    }
+    if (rowMin > limit) return limit + 1
+    previous = current
+  }
+  return previous[right.length]
 }
 
 export function serializeLayoutHeader(items: GridItem[]): string {
@@ -190,18 +227,22 @@ export function resolveGrid(
   timelineRows: number,
   hiddenSlots: SlotId[] = [],
   statsRows = 1,
-  pristine = false
+  pristine = false,
+  extraSlots: GridItem[] = []
 ): GridItem[] {
   const wantTextIds = Array.from({ length: textCount }, (_, i) => (i === 0 ? "text" : `text${i + 1}`))
   const base = parsed ?? defaultGrid(textCount, side, timelineRows, statsRows, pristine)
   // 隐藏槽位剔除；文本槽位数量与文本区数量对齐
   let items = base.filter((it) => !hiddenSlots.includes(it.id) && (!isTextSlot(it.id) || wantTextIds.includes(it.id)))
   const present = new Set(items.map((it) => it.id))
-  const required: SlotId[] = [...wantTextIds, ...CORE_SLOT_IDS].filter((id) => !hiddenSlots.includes(id))
+  const required: SlotId[] = [...wantTextIds, ...CORE_SLOT_IDS, ...extraSlots.map((item) => item.id)]
+    .filter((id) => !hiddenSlots.includes(id))
   let maxY = items.reduce((m, it) => Math.max(m, it.y + it.h), 0)
   for (const id of required) {
     if (present.has(id)) continue
-    const d = defaultGrid(textCount, side, timelineRows, statsRows, pristine).find((it) => it.id === id)!
+    const d = defaultGrid(textCount, side, timelineRows, statsRows, pristine).find((it) => it.id === id)
+      ?? extraSlots.find((item) => item.id === id)
+    if (!d) continue
     items.push({ ...d, y: maxY })
     maxY += d.h
     present.add(id)
@@ -258,6 +299,31 @@ export function compactGrid(items: GridItem[], anchorId?: SlotId): GridItem[] {
     finalPlaced.push(it)
   }
   return finalPlaced
+}
+
+/**
+ * Move interactions compact only along the time/layout axis. Changing the
+ * dragged item's column must not make an unrelated peer jump into the vacated
+ * column; otherwise a destination such as “below timeline” moves away while
+ * the pointer is still held.
+ */
+export function compactGridVertically(items: GridItem[], anchorId?: SlotId): GridItem[] {
+  const anchor = anchorId ? items.find((item) => item.id === anchorId) : undefined
+  const placed: GridItem[] = anchor ? [{ ...anchor }] : []
+  const rest = items
+    .filter((item) => item.id !== anchorId)
+    .sort((a, b) => a.y - b.y || a.x - b.x)
+
+  for (const raw of rest) {
+    const item = { ...raw, y: 0 }
+    for (;;) {
+      const blockers = placed.filter((other) => overlaps(item, other))
+      if (blockers.length === 0) break
+      item.y = Math.min(...blockers.map((other) => other.y + other.h))
+    }
+    placed.push(item)
+  }
+  return placed
 }
 
 /** Total grid height in rows. */

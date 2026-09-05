@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import { buildSystemPrompt } from "./prompt"
 import { parseTimeline } from "../core/parser"
+import { configureI18n } from "../i18n"
+
+afterEach(() => configureI18n(() => "zh"))
 
 describe("buildSystemPrompt", () => {
   it("includes grammar, types, current time and existing entries", () => {
@@ -15,11 +18,25 @@ describe("buildSystemPrompt", () => {
     expect(p).toContain("09:00-10:00 math 行列式")
     expect(p).toContain("可与之并列重叠")
     expect(p).toContain("HH:MM-HH:MM")
+    expect(p).toContain("2:30–3:15 表示 14:30–15:15")
   })
 
   it("notes when the day is still empty", () => {
     const p = buildSystemPrompt({ typeColors: { misc: "#ccc" }, now: new Date(), doc: parseTimeline("") })
     expect(p).toContain("还没有实际色块")
+  })
+
+  it("follows the English locale without translating stored category names", () => {
+    configureI18n(() => "en")
+    const p = buildSystemPrompt({
+      typeColors: { 睡觉: "#333", development: "#5bc" },
+      now: new Date(2026, 7, 18, 21, 35),
+      doc: parseTimeline(""),
+    })
+    expect(p).toContain("Registered time categories")
+    expect(p).toContain("睡觉, development")
+    expect(p).toContain("one concise follow-up question")
+    expect(p).not.toContain("一句中文追问")
   })
 })
 

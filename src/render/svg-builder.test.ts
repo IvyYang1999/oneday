@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { yFromMinutes } from "../core/geometry"
 import { parseTimeline } from "../core/parser"
 import { renderTimelineSvg, FALLBACK_COLOR } from "./svg-builder"
 
@@ -10,10 +11,10 @@ function svgOf(source: string, colors = COLORS, width?: number): string {
 
 describe("renderTimelineSvg", () => {
   it("renders a block at the right y/height with color and centered duration", () => {
-    // range 7-23, hourHeight 48: 09:00 -> y=104；统一留白 x=2：y+1, 高度-2（yyt 间距规范）
+    // range 7-23, hourHeight 48；统一留白 x=2：y+1, 高度-2（yyt 间距规范）
     const svg = svgOf("09:00-12:00 math")
     expect(svg).toContain(`fill="#7fd4c1"`)
-    expect(svg).toContain(`y="105"`)
+    expect(svg).toContain(`y="${yFromMinutes(9 * 60, 7 * 60, 48) + 1}"`)
     expect(svg).toContain(`height="142"`)
     expect(svg).toContain(`>3h</text>`)
   })
@@ -43,15 +44,75 @@ describe("renderTimelineSvg", () => {
     expect(svg).toMatch(/<text pointer-events="none" class="oneday-duration"[^>]*style="font-size:([\d.]+)px;fill:(?:#[0-9a-f]+|hsl\([^)]+\))"[^>]*>0.5h<\/text>/)
   })
 
-  it("shows note combined with duration inside the block (yyt 2026-08-17)", () => {
+  it("separates duration and note in tall blocks so the note can wrap within the inset", () => {
     const svg = svgOf("09:00-12:00 math 李林线代")
-    expect(svg).toContain("3h · 李林线代") // 同一行合并显示
+    expect(svg).not.toContain("3h · 李林线代")
+    expect(svg).toMatch(/class="oneday-duration"[^>]*>3h<\/text>/)
+    expect(svg).toMatch(/class="oneday-note"[^>]*>李林线代<\/text>/)
+  })
+
+  it("wraps a short CJK note when an overlapping column is too narrow", () => {
+    const svg = svgOf("13:15-15:05 watch 看怪奇物语\n13:30-14:00 math")
+    expect(svg).not.toContain("1.83h · 看怪奇物语")
+    expect(svg).toMatch(/class="oneday-duration"[^>]*>1.83h<\/text>/)
+    expect(svg).toMatch(/class="oneday-note"[^>]*>看怪奇物语<\/text>/)
+  })
+
+  it("uses the same inset multiline layout for a plan block", () => {
+    const svg = svgOf("plan 09:00-10:00 math 计划备注也应该在色块内部自动换成多行显示出来")
+    expect(svg).toMatch(/class="oneday-duration oneday-plan-label"[^>]*>1h<\/text>/)
+    expect(svg.match(/class="oneday-note oneday-plan-label"/g)?.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("keeps a scheduled Todo title visible inside a compact plan block", () => {
+    const svg = svgOf("plan 16:45-17:15 math bonjour更新 [todo:bonjour]")
+    expect(svg).toMatch(/class="oneday-duration oneday-plan-label"[^>]*>0\.5h · bonjour更新<\/text>/)
   })
 
   it("renders annotations in the right label lane (D5 + M4)", () => {
     const svg = svgOf("@21:40 头晕")
     expect(svg).toContain("oneday-anno")
     expect(svg).toContain(">头晕</text>")
+  })
+
+  it("renders categorized time markers as colored interactive lines and labels", () => {
+    const doc = parseTimeline("@10:00 [deadline] 论文 ddl\nplan @11:00 [meeting] 站会")
+    const svg = renderTimelineSvg(doc, { typeColors: { deadline: "#e33", meeting: "#36c" } })
+    expect(svg).toContain('class="oneday-marker"')
+    expect(svg).toContain('data-line="0"')
+    expect(svg).toContain('data-type="deadline"')
+    expect(svg).toContain('stroke="#e33"')
+    expect(svg).toContain('class="oneday-marker oneday-marker-plan"')
+    expect(svg).toContain("论文 ddl")
+  })
+
+  it("resolves span and point colors from independent palettes even when names collide", () => {
+    const doc = parseTimeline("09:00-10:00 focus\n@09:30 [focus] checkpoint")
+    const svg = renderTimelineSvg(doc, {
+      typeColors: { focus: "#22aa66" }, markerTypeColors: { focus: "#dd3355" },
+    })
+    expect(svg).toContain('fill="#22aa66"')
+    expect(svg).toContain('class="oneday-marker-line"')
+    expect(svg).toContain('stroke="#dd3355"')
+  })
+
+  it("stacks same-time markers on distinct adjacent rows", () => {
+    const doc = parseTimeline("@10:00 [a] A\n@10:00 [b] B")
+    const svg = renderTimelineSvg(doc, { typeColors: { a: "#f00", b: "#00f" } })
+    const ys = Array.from(svg.matchAll(/class="oneday-marker(?: [^"]*)?"[^>]* data-marker-y="([^"]+)"/g), (m) => Number(m[1]))
+    expect(ys).toHaveLength(2)
+    expect(new Set(ys).size).toBe(2)
+    expect(Math.abs(ys[1] - ys[0])).toBeLessThanOrEqual(8)
+  })
+
+  it("filters actual and plan markers with the same layer contract as duration blocks", () => {
+    const doc = parseTimeline("@10:00 [a] actual\nplan @11:00 [b] plan")
+    const actual = renderTimelineSvg(doc, { typeColors: { a: "#f00", b: "#00f" }, view: "actual" })
+    const plan = renderTimelineSvg(doc, { typeColors: { a: "#f00", b: "#00f" }, view: "plan" })
+    expect(actual).toContain('data-type="a"')
+    expect(actual).not.toContain('data-type="b"')
+    expect(plan).toContain('data-type="b"')
+    expect(plan).not.toContain('data-type="a"')
   })
 
   it("extends the axis past 23 with 24h-wrapped labels (D10, 25->1)", () => {
@@ -109,9 +170,12 @@ describe("note visibility (yyt 2026-08-17: 备注必须看得见)", () => {
     expect(svg).toContain("晚饭吃太多")
   })
 
-  it("narrow columns combine note with duration inline (adaptive)", () => {
+  it("narrow tall columns keep duration and note on separate lines", () => {
     const svg = svgOf("09:00-12:00 math\n09:30-11:00 micro\n09:45-10:45 english 背单词打卡")
-    expect(svg).toContain("1h · 背单词打卡") // 合并后自适应字号仍在块内
+    expect(svg).not.toContain("1h · 背单词打卡")
+    expect(svg).toMatch(/class="oneday-duration"[^>]*>1h<\/text>/)
+    expect(svg).toMatch(/class="oneday-note"[^>]*>背单词打<\/text>/)
+    expect(svg).toMatch(/class="oneday-note"[^>]*>卡<\/text>/)
   })
 
   it("truncates long side notes", () => {

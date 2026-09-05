@@ -4,6 +4,9 @@ export interface TextPaneDeps {
   renderMarkdown: (host: HTMLElement, text: string) => void
   /** Persist edited text（第 index 个文本区） */
   onSave: (index: number, text: string) => void | Promise<void>
+  /** Drafts live above the disposable MarkdownPostProcessor DOM tree. */
+  getDraft?: (index: number) => TextDraftState | null
+  onDraftChange?: (index: number, draft: TextDraftState | null) => void
 }
 
 /** DOM mount: svg string + stats row + error list, into a code-block container. */
@@ -12,35 +15,50 @@ import { statsByType } from "../core/stats"
 import { formatHours } from "../core/duration"
 import { renderTimelineSvg, RenderOptions, SIDE_LANE_W } from "./svg-builder"
 import { hashTypeColor } from "../core/type-colors"
+import { t } from "../i18n"
 import { relatedTextColor } from "../core/contrast"
-import { GRID_ROW_H, gridRows, isTextSlot, resolveGrid } from "../core/grid-layout"
+import { GRID_ROW_H, GridItem, gridRows, isTextSlot, resolveGrid } from "../core/grid-layout"
 import { applyGridToBody } from "../edit/grid-interact"
+import type { TextDraftState } from "../edit/text-draft"
+import { captureViewportAnchor, stabilizeViewportAnchor } from "../edit/viewport-anchor"
 
 interface InlineEditorDeps {
   renderMarkdown: (host: HTMLElement, text: string) => void
   onSave: (text: string) => void | Promise<void>
+  initialDraft?: TextDraftState | null
+  onDraftChange?: (draft: TextDraftState | null) => void
 }
 
 export interface TimelineViewOptions extends RenderOptions {
   /** 仅给真正的新用户展示一次的时间轴拖拽引导。 */
   showTimelineOnboarding?: boolean
+  /** Optional product components requested for this date/block. */
+  extraSlots?: GridItem[]
 }
 
 const TEXT_EDITOR_FLUSH_EVENT = "oneday:text-editor-flush"
 
+interface TextEditorFlushEvent extends Event {
+  waitUntil?: (promise: Promise<void>) => void
+}
+
 /** Commit every dirty inline text editor below root before its DOM is replaced. */
-export function flushInlineTextEditors(root: ParentNode): void {
+export function flushInlineTextEditors(root: ParentNode): Promise<void> {
+  const pending: Promise<void>[] = []
   root.querySelectorAll<HTMLElement>(".oneday-text-pane").forEach((pane) => {
-    const event = pane.ownerDocument.createEvent("Event")
+    const event = pane.ownerDocument.createEvent("Event") as TextEditorFlushEvent
     event.initEvent(TEXT_EDITOR_FLUSH_EVENT, false, false)
+    event.waitUntil = (promise) => pending.push(promise.catch(() => undefined))
     pane.dispatchEvent(event)
   })
+  return Promise.all(pending).then(() => undefined)
 }
 
 /** 文字区原地编辑：点击渲染区 -> textarea；失焦/⌘Enter 保存，Esc 取消（yyt：不要弹窗）。 */
-export function attachInlineTextEditor(pane: HTMLElement, text: string, deps: InlineEditorDeps): void {
+export function attachInlineTextEditor(pane: HTMLElement, initialText: string, deps: InlineEditorDeps): void {
   const dom = pane.ownerDocument
   const domWindow = dom.defaultView
+  let text = initialText
   let detachFocusout: (() => void) | null = null
   let detachResizeGuard: (() => void) | null = null
   let detachLifecycle: (() => void) | null = null
@@ -54,17 +72,35 @@ export function attachInlineTextEditor(pane: HTMLElement, text: string, deps: In
     pane.closest(".oneday-slot")?.classList.remove("is-editing")
     pane.empty()
     if (text.trim() === "") {
-      pane.createDiv({ cls: "oneday-text-placeholder", text: "点击书写…" })
+      pane.createDiv({ cls: "oneday-text-placeholder", text: t("clickToWrite") })
     } else {
-      const host = pane.createDiv({ cls: "oneday-text-host" })
+      // MarkdownRenderer only supplies the rendered children. Obsidian's own
+      // typography (notably <hr>) is scoped by the markdown-rendered host
+      // class, so keep that semantic wrapper instead of restyling individual
+      // Markdown nodes with a parallel Oneday theme.
+      const host = pane.createDiv({ cls: "oneday-text-host markdown-rendered" })
       deps.renderMarkdown(host, text)
     }
   }
-  const edit = (): void => {
+  const edit = (draft: TextDraftState | null = null, focus = true, caretAtEnd = false): void => {
+    // Entering edit mode replaces the rendered Markdown tree. Capture the
+    // actual visible owner before that replacement; otherwise CodeMirror or
+    // the browser may reveal the newly focused textarea at scrollTop=0.
+    const viewportAnchor = captureViewportAnchor(pane)
+    const paneScrollTop = pane.scrollTop
+    const paneScrollLeft = pane.scrollLeft
     pane.empty()
     pane.closest(".oneday-slot")?.classList.add("is-editing")
     const ta = pane.createEl("textarea", { cls: "oneday-text-inline" })
-    ta.value = text
+    ta.value = draft?.value ?? text
+    const paneStyle = domWindow?.getComputedStyle(pane)
+    const paneVerticalPadding = Number.parseFloat(paneStyle?.paddingTop ?? "0")
+      + Number.parseFloat(paneStyle?.paddingBottom ?? "0")
+    const editorFloor = Math.max(0, pane.clientHeight - paneVerticalPadding)
+    ta.style.minHeight = `${editorFloor}px`
+    const publishDraft = (shouldFocus = dom.activeElement === ta): void => {
+      deps.onDraftChange?.({ value: ta.value, editing: true, shouldFocus })
+    }
     const slot = pane.closest<HTMLElement>(".oneday-slot")
     let resizing = false
     const onResizeStart = (e: PointerEvent): void => {
@@ -90,7 +126,7 @@ export function attachInlineTextEditor(pane: HTMLElement, text: string, deps: In
       const oldMax = scroller.scrollHeight - scroller.clientHeight
       const wasAtBottom = scrollTop >= oldMax - 2
       ta.style.height = "0px"
-      ta.style.height = `${ta.scrollHeight}px`
+      ta.style.height = `${Math.max(editorFloor, ta.scrollHeight)}px`
       // Measuring via 0px briefly collapses the overflow content and the browser
       // clamps its parent scrollTop to 0. Restore the user's viewport immediately;
       // when editing at the end, follow the newly grown bottom instead.
@@ -98,57 +134,84 @@ export function attachInlineTextEditor(pane: HTMLElement, text: string, deps: In
         ? scroller.scrollHeight - scroller.clientHeight
         : scrollTop
     }
-    ta.addEventListener("input", fit)
+    ta.addEventListener("input", () => {
+      fit()
+      publishDraft()
+    })
     fit() // 同步定高：setTimeout 会先画一帧默认高度，产生闪烁（yyt 2026-08-19）
+    publishDraft(focus)
     let finished = false
     let committing = false
-    const commit = (): void => {
-      if (finished || committing) return
+    let commitPromise: Promise<void> | null = null
+    const commit = (): Promise<void> => {
+      if (finished) return Promise.resolve()
+      if (commitPromise) return commitPromise
       if (ta.value === text) {
         finished = true
+        deps.onDraftChange?.(null)
         show() // 没变就不写回，避免无谓重渲染
-        return
+        return Promise.resolve()
       }
       committing = true
       const submitted = ta.value
-      void Promise.resolve().then(() => deps.onSave(submitted)).then(() => {
+      const running = Promise.resolve().then(() => deps.onSave(submitted)).then(() => {
+        text = submitted
         // 输入极快时，保存进行中可能又出现新字符；继续提交最新值，不能
         // 因为前一笔已经成功就把后来的字符视为已保存。
         if (ta.value !== submitted) {
           committing = false
-          commit()
-          return
+          commitPromise = null
+          publishDraft()
+          return commit()
         }
         finished = true
+        deps.onDraftChange?.(null)
         detachFocusout?.()
         detachFocusout = null
         detachResizeGuard?.()
         detachResizeGuard = null
         detachLifecycle?.()
         detachLifecycle = null
+        if (pane.isConnected) show()
       }).catch((error: unknown) => {
         committing = false
-        // 保留 textarea、内容和全部提交监听，用户可以在源码稳定后再次失焦重试。
+        commitPromise = null
+        publishDraft(dom.hasFocus())
+        // The plugin-owned draft survives even if this renderer is replaced.
         console.error("Oneday: failed to save inline text; draft kept in editor", error)
-        if (ta.isConnected) ta.focus({ preventScroll: true })
+        if (ta.isConnected && dom.hasFocus()) ta.focus({ preventScroll: true })
       })
+      commitPromise = running
+      return running
     }
     // 容器级 focusout（专家方案）：焦点离开整个文字区才提交
     const onFocusout = (): void => {
+      publishDraft(false)
       domWindow?.setTimeout(() => {
-        if (!resizing && pane.querySelector("textarea") && !pane.contains(dom.activeElement)) commit()
+        if (!resizing && pane.querySelector("textarea") && !pane.contains(dom.activeElement)) {
+          void commit()
+        }
       }, 0)
     }
     pane.addEventListener("focusout", onFocusout)
     detachFocusout = () => pane.removeEventListener("focusout", onFocusout)
     // macOS 切到另一应用时，textarea 可能仍是 document.activeElement，因而
     // 不产生 focusout。窗口隐藏、页面卸载和组件重绘也都必须先提交草稿。
-    const onWindowBlur = (): void => commit()
-    const onVisibilityChange = (): void => {
-      if (dom.visibilityState === "hidden") commit()
+    const onWindowBlur = (): void => {
+      publishDraft(false)
+      void commit()
     }
-    const onPageHide = (): void => commit()
-    const onForcedFlush = (): void => commit()
+    const onVisibilityChange = (): void => {
+      if (dom.visibilityState === "hidden") {
+        publishDraft(false)
+        void commit()
+      }
+    }
+    const onPageHide = (): void => { void commit() }
+    const onForcedFlush = (event: Event): void => {
+      const promise = commit()
+      ;(event as TextEditorFlushEvent).waitUntil?.(promise)
+    }
     domWindow?.addEventListener("blur", onWindowBlur)
     domWindow?.addEventListener("pagehide", onPageHide)
     dom.addEventListener("visibilitychange", onVisibilityChange)
@@ -162,12 +225,22 @@ export function attachInlineTextEditor(pane: HTMLElement, text: string, deps: In
     ta.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        commit()
+        void commit()
       } else if (e.key === "Escape") {
+        finished = true
+        deps.onDraftChange?.(null)
         show()
       }
     })
-    ta.focus()
+    // Restore the text pane before focus, then keep the owning page viewport
+    // visually fixed through the next two layout frames. A click in the blank
+    // area below rendered text means "continue writing", so place the caret at
+    // the end rather than letting the browser reveal offset zero.
+    pane.scrollTop = paneScrollTop
+    pane.scrollLeft = paneScrollLeft
+    if (caretAtEnd) ta.setSelectionRange(ta.value.length, ta.value.length)
+    if (focus) ta.focus({ preventScroll: true })
+    stabilizeViewportAnchor(viewportAnchor, pane, 2)
   }
   // 文字内容通常比槽位矮；编辑入口必须覆盖整个文字面板，而不只是字形本身。
   // 编辑态和链接/控件点击保持原行为，避免 textarea 被点击时重新创建。
@@ -175,9 +248,12 @@ export function attachInlineTextEditor(pane: HTMLElement, text: string, deps: In
     if (pane.querySelector("textarea")) return
     const target = e.target as Element | null
     if (target?.closest("a, button, input, textarea")) return
-    edit()
+    const host = pane.querySelector<HTMLElement>(".oneday-text-host")
+    const caretAtEnd = host === null || e.clientY > host.getBoundingClientRect().bottom
+    edit(null, true, caretAtEnd)
   })
   show()
+  if (deps.initialDraft?.editing) edit(deps.initialDraft, deps.initialDraft.shouldFocus)
 }
 
 export function renderTimelineInto(
@@ -204,7 +280,7 @@ export function renderTimelineInto(
   const timelineRows = Math.ceil(svgHeight / GRID_ROW_H)
   const stats = statsByType(doc.entries)
   const emptyStatsRows = stats.length === 0 && doc.errors.length === 0 ? 2 : 1
-  const pristine = texts.length === 0 && doc.entries.length === 0 && doc.errors.length === 0
+  const pristine = texts.length === 0 && doc.entries.length === 0 && doc.annotations.length === 0 && doc.errors.length === 0
   const items = resolveGrid(
     doc.layout ?? null,
     texts.length,
@@ -212,7 +288,8 @@ export function renderTimelineInto(
     timelineRows,
     doc.hiddenSlots,
     emptyStatsRows,
-    pristine
+    pristine,
+    opts.extraSlots ?? []
   )
   body.style.height = `${gridRows(items) * GRID_ROW_H}px`
   for (const it of items) {
@@ -227,8 +304,9 @@ export function renderTimelineInto(
       svgHolder.innerHTML = timelineSvg
       if (
         opts.showTimelineOnboarding
-        && Object.keys(opts.typeColors).length > 0
+        && (Object.keys(opts.typeColors).length > 0 || Object.keys(opts.markerTypeColors ?? {}).length > 0)
         && doc.entries.length === 0
+        && doc.annotations.length === 0
         && doc.errors.length === 0
       ) {
         const guide = svgHolder.createDiv({ cls: "oneday-timeline-onboarding" })
@@ -256,9 +334,9 @@ export function renderTimelineInto(
         gesture.createEl("span", { cls: "oneday-timeline-onboarding-dot is-start" })
         gesture.createEl("span", { cls: "oneday-timeline-onboarding-line" })
         gesture.createEl("span", { cls: "oneday-timeline-onboarding-dot is-end" })
-        gesture.createEl("span", { cls: "oneday-timeline-onboarding-label is-start", text: "起点" })
-        gesture.createEl("span", { cls: "oneday-timeline-onboarding-label is-end", text: "终点" })
-        guide.createEl("span", { cls: "oneday-timeline-onboarding-copy", text: "从起点拖到终点" })
+        gesture.createEl("span", { cls: "oneday-timeline-onboarding-label is-start", text: t("start") })
+        gesture.createEl("span", { cls: "oneday-timeline-onboarding-label is-end", text: t("end") })
+        guide.createEl("span", { cls: "oneday-timeline-onboarding-copy", text: t("dragStartToEnd") })
       }
     } else if (isTextSlot(it.id) && textPane) {
       const idx = it.id === "text" ? 0 : Number(it.id.slice(4)) - 1
@@ -266,6 +344,8 @@ export function renderTimelineInto(
       attachInlineTextEditor(pane, texts[idx] ?? "", {
         renderMarkdown: (host, text) => textPane.renderMarkdown(host, text),
         onSave: (text) => textPane.onSave(idx, text),
+        initialDraft: textPane.getDraft?.(idx) ?? null,
+        onDraftChange: (draft) => textPane.onDraftChange?.(idx, draft),
       })
     }
   }
@@ -314,14 +394,20 @@ export function renderTimelineInto(
     empty.setAttribute("role", "note")
     empty.createEl("span", {
       cls: "oneday-stats-empty-label",
-      text: "创建记录后，这里会显示用时分布",
+      text: t("statsEmpty"),
     })
   }
 
   if (doc.errors.length > 0 && statsSlot) {
     const box = (statsSlot as HTMLElement).createDiv({ cls: "oneday-errors" })
     for (const err of doc.errors) {
-      box.createDiv({ text: `第 ${err.line + 1} 行：${err.reason}${err.text ? `（${err.text.trim()}）` : ""}` })
+      box.createDiv({
+        text: t("lineError", {
+          line: err.line + 1,
+          reason: err.reason,
+          detail: err.text ? t("errorDetail", { text: err.text.trim() }) : "",
+        }),
+      })
     }
   }
 

@@ -1,4 +1,5 @@
 import { trackAnchor } from "./popover-anchor"
+import { t } from "../i18n"
 /**
  * Precise time editor: small popover with start/end inputs (HH:MM free
  * typing) docked at the block's right edge — the typing-precision
@@ -19,10 +20,10 @@ export function openTimePopover(
   const pop = dom.createElement("div")
   pop.className = "oneday-time-popover"
   pop.setAttribute("role", "dialog")
-  pop.setAttribute("aria-label", "编辑时间块起止时间")
+  pop.setAttribute("aria-label", t("editBlockTimes"))
   const start = dom.createElement("input")
   start.type = "text"
-  start.setAttribute("aria-label", "开始时间")
+  start.setAttribute("aria-label", t("startTime"))
   start.value = initial.start
   start.placeholder = "HH:MM"
   const dash = dom.createElement("span")
@@ -30,7 +31,7 @@ export function openTimePopover(
   dash.textContent = "–"
   const end = dom.createElement("input")
   end.type = "text"
-  end.setAttribute("aria-label", "结束时间")
+  end.setAttribute("aria-label", t("endTime"))
   end.value = initial.end
   end.placeholder = "HH:MM"
   pop.append(start, dash, end)
@@ -91,4 +92,66 @@ export function openTimePopover(
     }, 0)
   })
   domWindow.setTimeout(() => start.focus(), 0)
+}
+
+/** Single-clock counterpart used by point-in-time markers. */
+export function openPointTimePopover(
+  container: HTMLElement,
+  anchorEl: Element,
+  anchorRect: { x: number; y: number; width: number; height: number },
+  initial: string,
+  onSave: (time: string) => void
+): void {
+  const dom = container.ownerDocument
+  const domWindow = dom.defaultView
+  if (!domWindow) return
+  dom.querySelectorAll(".oneday-time-popover").forEach((el) => el.remove())
+  const pop = dom.createElement("div")
+  pop.className = "oneday-time-popover oneday-point-time-popover"
+  pop.setAttribute("role", "dialog")
+  pop.setAttribute("aria-label", t("editMarkerTime"))
+  const input = dom.createElement("input")
+  input.type = "text"
+  input.value = initial
+  input.placeholder = "HH:MM"
+  input.setAttribute("aria-label", t("markerTime"))
+  pop.appendChild(input)
+  const place = (rect: { x: number; width: number; y: number; height: number }): void => {
+    pop.style.left = `${rect.x + rect.width + 6}px`
+    pop.style.top = `${rect.y + rect.height / 2 - 14}px`
+    if (pop.offsetLeft + pop.offsetWidth > domWindow.innerWidth - 8) {
+      pop.style.left = `${Math.max(8, rect.x - pop.offsetWidth - 6)}px`
+    }
+  }
+  place(anchorRect)
+  dom.body.appendChild(pop)
+  const stopTracking = trackAnchor(pop, anchorEl, place)
+  let done = false
+  const finish = (save: boolean): void => {
+    if (done) return
+    if (save) {
+      const match = /^(\d{1,2}):(\d{2})$/.exec(input.value.trim())
+      const hour = Number(match?.[1])
+      const minute = Number(match?.[2])
+      if (!match || hour > 23 || minute > 59) return
+    }
+    done = true
+    stopTracking()
+    pop.remove()
+    if (save) onSave(input.value.trim())
+  }
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault()
+      finish(true)
+    } else if (event.key === "Escape") {
+      event.preventDefault()
+      finish(false)
+    }
+    event.stopPropagation()
+  })
+  pop.addEventListener("focusout", () => domWindow.setTimeout(() => {
+    if (!pop.contains(dom.activeElement)) finish(true)
+  }, 0))
+  domWindow.setTimeout(() => input.focus(), 0)
 }

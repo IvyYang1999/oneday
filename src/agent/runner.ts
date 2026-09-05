@@ -4,6 +4,7 @@
  */
 import { spawn } from "node:child_process"
 import { resolveClaudeBinary } from "./cli-resolver"
+import { t } from "../i18n"
 
 export type AgentRunResult =
   | { ok: true; text: string; costUsd?: number }
@@ -19,7 +20,7 @@ export interface RunOptions {
 export async function runEntryAgent(userText: string, systemPrompt: string, opts: RunOptions = {}): Promise<AgentRunResult> {
   const binary = opts.binaryPath ?? (await resolveClaudeBinary())
   if (!binary) {
-    return { ok: false, reason: "未检测到本机 claude CLI（可先去装 Claude Code）" }
+    return { ok: false, reason: t("missingClaudeCli") }
   }
 
   return new Promise((resolve) => {
@@ -31,7 +32,7 @@ export async function runEntryAgent(userText: string, systemPrompt: string, opts
         { stdio: ["ignore", "pipe", "pipe"] }
       )
     } catch (error) {
-      resolve({ ok: false, reason: `启动失败：${error instanceof Error ? error.message : String(error)}` })
+      resolve({ ok: false, reason: t("launchFailed", { reason: error instanceof Error ? error.message : String(error) }) })
       return
     }
 
@@ -48,12 +49,12 @@ export async function runEntryAgent(userText: string, systemPrompt: string, opts
       } catch {
         /* already gone */
       }
-      resolve({ ok: false, reason: "生成超时（60s）" })
+      resolve({ ok: false, reason: t("generationTimeout") })
     }, TIMEOUT_MS)
 
     child.on("error", (error) => {
       clearTimeout(timer)
-      resolve({ ok: false, reason: `进程错误：${error.message}` })
+      resolve({ ok: false, reason: t("processError", { reason: error.message }) })
     })
 
     child.on("close", (code) => {
@@ -62,12 +63,12 @@ export async function runEntryAgent(userText: string, systemPrompt: string, opts
       try {
         parsed = JSON.parse(stdout)
       } catch {
-        resolve({ ok: false, reason: `CLI 输出无法解析（exit ${code}）：${stderrTail.trim().slice(-300)}` })
+        resolve({ ok: false, reason: t("cliParseFailed", { code: code ?? "?", detail: stderrTail.trim().slice(-300) }) })
         return
       }
       if (parsed.is_error === true || code !== 0) {
         const msg = typeof parsed.result === "string" ? parsed.result : stderrTail.trim().slice(-300)
-        resolve({ ok: false, reason: `生成失败：${msg}` })
+        resolve({ ok: false, reason: t("generationFailed", { reason: msg }) })
         return
       }
       const text = typeof parsed.result === "string" ? parsed.result : ""

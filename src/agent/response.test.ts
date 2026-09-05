@@ -44,6 +44,41 @@ describe("interpretResponse", () => {
       expect(r.entry.sourceLine).toBe("23:30-00:30 reading")
     }
   })
+
+  it("resolves an unqualified 02:30 range to the only same-day candidate inside a 07:00 timeline", () => {
+    const r = interpretResponse(
+      '{"start":"02:30","end":"03:15","type":"装修","note":"安装吹风机支架"}',
+      DOC,
+      "2：30~3：15装修"
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.entry.startMin).toBe(14 * 60 + 30)
+      expect(r.entry.endMin).toBe(15 * 60 + 15)
+      expect(r.entry.endMin - r.entry.startMin).toBe(45)
+      expect(r.entry.sourceLine).toBe("14:30-15:15 装修 安装吹风机支架")
+    }
+  })
+
+  it("keeps an explicitly early-morning range on the next-day portion", () => {
+    const r = interpretResponse(
+      '{"start":"02:30","end":"03:15","type":"装修"}',
+      DOC,
+      "凌晨2:30到3:15装修"
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) expect([r.entry.startMin, r.entry.endMin]).toEqual([26 * 60 + 30, 27 * 60 + 15])
+  })
+
+  it("normalizes an explicitly afternoon range even if the model returns 12-hour clocks", () => {
+    const r = interpretResponse(
+      '{"start":"02:30","end":"03:15","type":"装修"}',
+      DOC,
+      "下午2:30至3:15装修"
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok) expect([r.entry.startMin, r.entry.endMin]).toEqual([14 * 60 + 30, 15 * 60 + 15])
+  })
 })
 
 describe("interpretResponses (一句话多个色块)", () => {
@@ -92,6 +127,18 @@ describe("interpretActions (编辑已有色块)", () => {
     if (r.ok) {
       expect(r.actions[0].kind).toBe("create")
       expect(r.actions[1]).toMatchObject({ kind: "update", targetIndex: 0 })
+    }
+  })
+
+  it("uses the original sentence to disambiguate a created 12-hour range", () => {
+    const r = interpretActions(
+      '{"start":"02:30","end":"03:15","type":"装修","note":"安装吹风机支架"}',
+      DOC,
+      "2：30~3：15装修"
+    )
+    expect(r.ok).toBe(true)
+    if (r.ok && r.actions[0]?.kind === "create") {
+      expect(r.actions[0].entry.sourceLine).toBe("14:30-15:15 装修 安装吹风机支架")
     }
   })
 

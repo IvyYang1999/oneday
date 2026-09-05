@@ -15,6 +15,8 @@ export interface TimelineDoc {
   errors: ParseError[]
   /** Per-block hidden highlighters (`hide:` header); global palette minus these is shown. */
   hiddenTypes: string[]
+  /** Per-block hidden point categories (`hide-marker:`), independent from spans. */
+  hiddenMarkerTypes: string[]
   /** Per-block width override in px (`width:` header, base width without the label lane). */
   width?: number
   /** Outer Oneday viewport size; internal components keep their own geometry and scroll behind it. */
@@ -33,6 +35,14 @@ export interface TimelineDoc {
   layout?: import("./grid-layout").GridItem[]
   /** 隐藏的组件（`off:` 头，如 off: stats dialog）；更多菜单可重新显示 */
   hiddenSlots: import("./grid-layout").SlotId[]
+  /** Per-day exceptions for global recurring habits. */
+  habitSkips: string[]
+  /** Todo items stored in repeated `todo:` headers. */
+  todos: TodoItem[]
+  /** Block-local presentation rule for the Todo component. */
+  todoView: TodoViewConfig
+  /** Block-local Daily Quote selection, snapshot and appearance overrides. */
+  dailyQuote: import("./daily-quotes").DailyQuoteBlockState
 }
 
 export interface Entry {
@@ -44,14 +54,39 @@ export interface Entry {
   /** Task type key; color comes from settings mapping (D2). */
   type: string
   note?: string
+  /** Stable binding to a Todo item in this Oneday block. */
+  todoId?: string
   /** 0-based source line inside the code block, for write-back. */
   line: number
+}
+
+export interface TodoItem {
+  id: string
+  title: string
+  group: string
+  type?: string
+  estimateMin: number
+  completed: boolean
+  line: number
+}
+
+export type TodoGroupBy = "none" | "category" | "status"
+export type TodoSortBy = "manual" | "estimate" | "actual"
+export type TimelineDrawTool = "span" | "marker"
+
+export interface TodoViewConfig {
+  groupBy: TodoGroupBy
+  sortBy: TodoSortBy
 }
 
 export interface Annotation {
   timeMin: number
   text: string
   line: number
+  /** Categorized annotations are interactive point-in-time markers. Omitted for legacy `@HH:MM text`. */
+  type?: string
+  /** Uses the same actual/plan layer semantics as duration blocks. */
+  plan?: boolean
 }
 
 export interface ParseError {

@@ -2,6 +2,7 @@
 import { normalizeSpan } from "../core/parser"
 import { TimelineDoc } from "../core/types"
 import { formatEntryLine } from "../core/format"
+import { t } from "../i18n"
 
 export interface AgentEntry {
   start: string
@@ -49,9 +50,47 @@ function parseClock(s: unknown): number | null {
   return h * 60 + min
 }
 
-export function validateEntry(raw: unknown, doc: TimelineDoc): ResponseResult {
+const CLOCK_RANGE_RE = /(\d{1,2})\s*[:：]\s*(\d{2})\s*(?:~|～|—|–|-|到|至)\s*(\d{1,2})\s*[:：]\s*(\d{2})/
+const EARLY_DAY_RE = /(?:凌晨|半夜|清晨|早上|早晨|上午|\ba\.?m\.?\b)/i
+const LATE_DAY_RE = /(?:中午|下午|傍晚|晚上|晚间|\bp\.?m\.?\b)/i
+
+/**
+ * Preserve an explicit range from the user's sentence instead of trusting the
+ * model to choose AM/PM. For an unqualified 02:30 on a 07:00–23:00 timeline,
+ * 14:30 is the only same-day candidate inside the visible range.
+ */
+function explicitUserSpan(userText: string | undefined, doc: TimelineDoc): [number, number] | null {
+  if (!userText) return null
+  const match = CLOCK_RANGE_RE.exec(userText)
+  if (!match) return null
+  const startHour = Number(match[1])
+  const startMinute = Number(match[2])
+  const endHour = Number(match[3])
+  const endMinute = Number(match[4])
+  if (startHour > 24 || endHour > 24 || startMinute > 59 || endMinute > 59) return null
+  let start = startHour * 60 + startMinute
+  let end = endHour * 60 + endMinute
+
+  const explicitlyEarly = EARLY_DAY_RE.test(userText)
+  const explicitlyLate = LATE_DAY_RE.test(userText)
+  if (explicitlyLate) {
+    if (start < 12 * 60) start += 12 * 60
+    if (end < 12 * 60) end += 12 * 60
+  } else if (!explicitlyEarly) {
+    const sameDayEnd = Math.min(doc.rangeEnd, 24 * 60)
+    const afternoonStart = start + 12 * 60
+    const afternoonEnd = end + 12 * 60
+    if (start < doc.rangeStart && afternoonStart >= doc.rangeStart && afternoonEnd <= sameDayEnd) {
+      start = afternoonStart
+      end = afternoonEnd
+    }
+  }
+  return normalizeSpan(start, end, doc.rangeStart)
+}
+
+export function validateEntry(raw: unknown, doc: TimelineDoc, userText?: string): ResponseResult {
   if (raw === null || typeof raw !== "object") {
-    return { ok: false, reason: "返回不是 JSON 对象" }
+    return { ok: false, reason: t("returnedNotObject") }
   }
   const obj = raw as Record<string, unknown>
   if (typeof obj.error === "string") {
@@ -60,15 +99,15 @@ export function validateEntry(raw: unknown, doc: TimelineDoc): ResponseResult {
   const rawStart = parseClock(obj.start)
   const rawEnd = parseClock(obj.end)
   if (rawStart === null || rawEnd === null) {
-    return { ok: false, reason: "start/end 时间格式应为 HH:MM" }
+    return { ok: false, reason: t("invalidStartEnd") }
   }
   const type = typeof obj.type === "string" ? obj.type.trim() : ""
   if (!/^\S+$/.test(type)) {
-    return { ok: false, reason: "type 不能含空白字符" }
+    return { ok: false, reason: t("categoryNoWhitespace") }
   }
-  const [startMin, endMin] = normalizeSpan(rawStart, rawEnd, doc.rangeStart)
+  const [startMin, endMin] = explicitUserSpan(userText, doc) ?? normalizeSpan(rawStart, rawEnd, doc.rangeStart)
   if (endMin - startMin < 5) {
-    return { ok: false, reason: "时长不足 5 分钟，疑似有误" }
+    return { ok: false, reason: t("durationTooShort") }
   }
   const plan = obj.plan === true
   const note = typeof obj.note === "string" && obj.note.trim() ? obj.note.trim() : undefined
@@ -77,12 +116,12 @@ export function validateEntry(raw: unknown, doc: TimelineDoc): ResponseResult {
 }
 
 /** Full pipeline: raw agent text -> validated entry. */
-export function interpretResponse(text: string, doc: TimelineDoc): ResponseResult {
+export function interpretResponse(text: string, doc: TimelineDoc, userText?: string): ResponseResult {
   const json = extractJson(text)
   if (json === null) {
-    return { ok: false, reason: "返回中没有 JSON" }
+    return { ok: false, reason: t("responseMissingJson") }
   }
-  return validateEntry(json, doc)
+  return validateEntry(json, doc, userText)
 }
 
 export type ResponsesResult =
@@ -100,16 +139,16 @@ export type ActionsResult =
   | { ok: false; reason: string }
 
 /** 多段描述：一句话多个色块（JSON 数组）；单对象也接受（yyt 2026-08-19）。 */
-export function interpretResponses(text: string, doc: TimelineDoc): ResponsesResult {
+export function interpretResponses(text: string, doc: TimelineDoc, userText?: string): ResponsesResult {
   const json = extractJson(text)
   if (json === null) {
     const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0)
-    return { ok: false, reason: firstLine ? `模型没按 JSON 格式回答：${firstLine.slice(0, 60)}` : "返回中没有 JSON" }
+    return { ok: false, reason: firstLine ? t("modelDidNotReturnJson", { detail: firstLine.slice(0, 60) }) : t("responseMissingJson") }
   }
   const list = Array.isArray(json) ? json : [json]
   const entries: ValidatedEntry[] = []
   for (const item of list) {
-    const r = validateEntry(item, doc)
+    const r = validateEntry(item, doc, list.length === 1 ? userText : undefined)
     if (!r.ok) return { ok: false, reason: r.reason }
     entries.push(r.entry)
   }
@@ -117,22 +156,22 @@ export function interpretResponses(text: string, doc: TimelineDoc): ResponsesRes
 }
 
 /** 编辑动作管道：create（裸对象）/ update / delete / error，数组混合。 */
-export function interpretActions(text: string, doc: TimelineDoc): ActionsResult {
+export function interpretActions(text: string, doc: TimelineDoc, userText?: string): ActionsResult {
   const json = extractJson(text)
   if (json === null) {
     const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0)
-    return { ok: false, reason: firstLine ? `模型没按 JSON 格式回答：${firstLine.slice(0, 60)}` : "返回中没有 JSON" }
+    return { ok: false, reason: firstLine ? t("modelDidNotReturnJson", { detail: firstLine.slice(0, 60) }) : t("responseMissingJson") }
   }
   const list = Array.isArray(json) ? json : [json]
   const actions: AgentAction[] = []
   for (const raw of list) {
-    if (raw === null || typeof raw !== "object") return { ok: false, reason: "返回不是 JSON 对象" }
+    if (raw === null || typeof raw !== "object") return { ok: false, reason: t("returnedNotObject") }
     const obj = raw as Record<string, unknown>
     if (typeof obj.error === "string") return { ok: false, reason: obj.error }
     const action = typeof obj.action === "string" ? obj.action : "create"
 
     if (action === "create") {
-      const r = validateEntry(obj, doc)
+      const r = validateEntry(obj, doc, list.length === 1 ? userText : undefined)
       if (!r.ok) return { ok: false, reason: r.reason }
       actions.push({ kind: "create", entry: r.entry })
       continue
@@ -142,7 +181,7 @@ export function interpretActions(text: string, doc: TimelineDoc): ActionsResult 
     const target = typeof obj.target === "number" ? obj.target : NaN
     const actualCount = doc.entries.filter((e) => !e.plan).length
     if (!Number.isInteger(target) || target < 1 || target > actualCount) {
-      return { ok: false, reason: `target 应为 1-${actualCount} 的编号` }
+      return { ok: false, reason: t("targetOutOfRange", { count: actualCount }) }
     }
     if (action === "delete") {
       actions.push({ kind: "delete", targetIndex: target - 1 })
@@ -152,25 +191,25 @@ export function interpretActions(text: string, doc: TimelineDoc): ActionsResult 
       const patch: { startMin?: number; endMin?: number; type?: string; note?: string } = {}
       if (obj.start !== undefined) {
         const v = parseClock(obj.start)
-        if (v === null) return { ok: false, reason: "start 时间格式应为 HH:MM" }
+        if (v === null) return { ok: false, reason: t("invalidStart") }
         patch.startMin = v
       }
       if (obj.end !== undefined) {
         const v = parseClock(obj.end)
-        if (v === null) return { ok: false, reason: "end 时间格式应为 HH:MM" }
+        if (v === null) return { ok: false, reason: t("invalidEnd") }
         patch.endMin = v
       }
       if (obj.type !== undefined) {
-        const t = String(obj.type).trim()
-        if (!/^\S+$/.test(t)) return { ok: false, reason: "type 不能含空白字符" }
-        patch.type = t
+        const category = String(obj.type).trim()
+        if (!/^\S+$/.test(category)) return { ok: false, reason: t("categoryNoWhitespace") }
+        patch.type = category
       }
       if (obj.note !== undefined) patch.note = String(obj.note).trim()
-      if (Object.keys(patch).length === 0) return { ok: false, reason: "update 没有要改的字段" }
+      if (Object.keys(patch).length === 0) return { ok: false, reason: t("emptyUpdate") }
       actions.push({ kind: "update", targetIndex: target - 1, patch })
       continue
     }
-    return { ok: false, reason: `未知 action：${action}` }
+    return { ok: false, reason: t("unknownAction", { action }) }
   }
   return { ok: true, actions }
 }

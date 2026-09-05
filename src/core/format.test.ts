@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatClockPlain, formatEntryLine, weekdayZh } from "./format"
+import { formatClockPlain, formatEntryLine, formatMarkerLine, weekdayZh } from "./format"
 
 describe("formatEntryLine", () => {
   it("formats plain and plan lines", () => {
@@ -13,6 +13,20 @@ describe("formatEntryLine", () => {
     expect(formatClockPlain(25 * 60 + 30)).toBe("01:30")
     expect(formatEntryLine({ plan: false, startMin: 23 * 60 + 30, endMin: 24 * 60 + 30, type: "reading" }))
       .toBe("23:30-00:30 reading")
+  })
+})
+
+describe("formatMarkerLine", () => {
+  it("writes actual and plan markers with an explicit category", () => {
+    expect(formatMarkerLine({ plan: false, timeMin: 10 * 60, type: "起床", text: "正式起床" }))
+      .toBe("@10:00 [起床] 正式起床")
+    expect(formatMarkerLine({ plan: true, timeMin: 22 * 60, type: "论文", text: "ddl" }))
+      .toBe("plan @22:00 [论文] ddl")
+  })
+
+  it("wraps after-midnight marker times back to a plain clock", () => {
+    expect(formatMarkerLine({ plan: false, timeMin: 25 * 60 + 5, type: "睡眠" }))
+      .toBe("@01:05 [睡眠]")
   })
 })
 

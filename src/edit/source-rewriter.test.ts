@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { addHiddenType, deleteEntryLine, extractBlockSourceFromContent, insertEntryLine, removeHeaderValue, removeHiddenType, removeTextSection, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./source-rewriter"
+import { addHiddenType, convertMarkerToEntry, deleteEntryLine, extractBlockSourceFromContent, insertEntryLine, insertMarkerLine, removeHeaderValue, removeHiddenType, removeTextSection, removeTimelineBlockFromContent, replaceBlockInContent, replaceEntryLine, setHeaderValue, setTextSection } from "./source-rewriter"
 import { parseTimeline } from "../core/parser"
 
 describe("insertEntryLine", () => {
@@ -36,6 +36,33 @@ describe("insertEntryLine", () => {
     const doc = parseTimeline(out)
     expect(doc.errors).toEqual([])
     expect(doc.entries).toHaveLength(3)
+  })
+})
+
+describe("insertMarkerLine", () => {
+  it("keeps markers source-ordered by timestamp and before text sections", () => {
+    const source = "range: 7-23\n---\n@09:00 [a] A\n@11:00 [b] B\n===\n正文"
+    expect(insertMarkerLine(source, "@10:00 [c] C", 10 * 60)).toBe(
+      "range: 7-23\n---\n@09:00 [a] A\n@10:00 [c] C\n@11:00 [b] B\n===\n正文"
+    )
+  })
+
+  it("puts another same-time marker after existing markers at that minute", () => {
+    expect(insertMarkerLine("@10:00 [a] A", "@10:00 [b] B", 10 * 60))
+      .toBe("@10:00 [a] A\n@10:00 [b] B")
+  })
+})
+
+describe("convertMarkerToEntry", () => {
+  it("replaces one time point with a five-minute block while preserving its semantics", () => {
+    const source = "range: 7-23\n---\nplan @16:00 [ddl] 交论文\n==="
+    const converted = convertMarkerToEntry(source, 2)
+
+    expect(converted).toBe("range: 7-23\n---\nplan 16:00-16:05 ddl 交论文\n===")
+    expect(parseTimeline(converted)).toMatchObject({
+      annotations: [],
+      entries: [{ plan: true, startMin: 16 * 60, endMin: 16 * 60 + 5, type: "ddl", note: "交论文", line: 2 }],
+    })
   })
 })
 
@@ -80,6 +107,14 @@ describe("addHiddenType / removeHiddenType", () => {
   it("remove is a no-op without a hide header", () => {
     expect(removeHiddenType("09:00-10:00 math", "sleep")).toBe("09:00-10:00 math")
   })
+
+  it("stores point-category visibility in an independent header", () => {
+    const source = addHiddenType("hide: sleep\n@10:00 [deadline] ddl", "deadline", "marker")
+    expect(source).toBe("hide-marker: deadline\nhide: sleep\n@10:00 [deadline] ddl")
+    expect(parseTimeline(source).hiddenTypes).toEqual(["sleep"])
+    expect(parseTimeline(source).hiddenMarkerTypes).toEqual(["deadline"])
+    expect(removeHiddenType(source, "deadline", "marker")).toBe("hide: sleep\n@10:00 [deadline] ddl")
+  })
 })
 
 describe("setHeaderValue / removeHeaderValue", () => {
@@ -94,6 +129,22 @@ describe("setHeaderValue / removeHeaderValue", () => {
 
   it("updates in place", () => {
     expect(setHeaderValue("width: 200\n---\n09:00-10:00 math", "width", "300")).toBe("width: 300\n---\n09:00-10:00 math")
+  })
+
+  it("canonicalizes one recoverable layout typo in place instead of duplicating the header", () => {
+    const source = "layoiiut: timeline@7,0,5,44\n---\n09:00-10:00 math"
+    const updated = setHeaderValue(source, "layout", "timeline@7,0,5,45")
+
+    expect(updated).toBe("layout: timeline@7,0,5,45\n---\n09:00-10:00 math")
+    expect(updated.match(/^layout:/gm)).toHaveLength(1)
+    expect(updated).not.toContain("layoiiut:")
+  })
+
+  it("updates the block date without changing entries", () => {
+    const source = "date: 2026-08-18\n---\n09:00-10:00 math"
+    const updated = setHeaderValue(source, "date", "2026-08-24")
+    expect(updated).toBe("date: 2026-08-24\n---\n09:00-10:00 math")
+    expect(parseTimeline(updated)).toMatchObject({ date: "2026-08-24", entries: [{ type: "math" }] })
   })
 
   it("removeHeaderValue drops the line, no-op when absent", () => {
@@ -134,6 +185,36 @@ describe("replaceBlockInContent (callout 前缀保留)", () => {
     const content = "```timeline\n09:00-10:00 math\n```"
     const out = replaceBlockInContent(content, { lineStart: 0, lineEnd: 2 }, "10:00-11:00 math")
     expect(out).toBe("```timeline\n10:00-11:00 math\n```")
+  })
+})
+
+describe("removeTimelineBlockFromContent", () => {
+  it("removes only the selected timeline fence and preserves adjacent prose", () => {
+    const content = [
+      "before",
+      "```timeline",
+      "date: 2026-08-24",
+      "---",
+      "09:00-10:00 develop",
+      "```",
+      "after",
+    ].join("\n")
+    expect(removeTimelineBlockFromContent(content, { lineStart: 1, lineEnd: 5 }))
+      .toBe("before\nafter")
+  })
+
+  it("preserves a surrounding callout and refuses a stale non-timeline section", () => {
+    const content = [
+      "> [!note]",
+      "> ```timeline",
+      "> date: 2026-08-24",
+      "> ```",
+      "> following text",
+    ].join("\n")
+    expect(removeTimelineBlockFromContent(content, { lineStart: 1, lineEnd: 3 }))
+      .toBe("> [!note]\n> following text")
+    expect(removeTimelineBlockFromContent("```js\ncode\n```", { lineStart: 0, lineEnd: 2 }))
+      .toBeNull()
   })
 })
 

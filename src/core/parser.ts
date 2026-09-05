@@ -10,8 +10,10 @@
  * Cross-midnight (D10): an entry starting before rangeStart belongs to the next
  * calendar morning but the same logical day -> shifted +24h internally.
  */
-import { parseLayoutHeader } from "./grid-layout"
+import { parseLayoutHeader, parseRecoverableLayoutHeader } from "./grid-layout"
 import { parseBlockSize, parseCanvasWidth } from "./block-size"
+import { DEFAULT_TODO_VIEW, parseTodoHeaderValue, parseTodoViewHeaderValue, splitTodoBinding } from "./todos"
+import { t as tr } from "../i18n"
 import {
   Annotation,
   DAY_MINUTES,
@@ -23,6 +25,7 @@ import {
 } from "./types"
 
 const ENTRY_RE = /^(plan\s+)?(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})\s+([^\s]+)(?:\s+(.*))?$/
+const MARKER_RE = /^(plan\s+)?@(\d{1,2}):(\d{2})\s+\[([^\]]+)\](?:\s+(.*))?$/
 const ANNOTATION_RE = /^@(\d{1,2}):(\d{2})\s+(.*)$/
 const HEADER_RE = /^([A-Za-z][\w-]*)\s*:\s*(.*)$/
 const RANGE_RE = /^(\d{1,2})(?:-(\d{1,2}))?$/
@@ -66,7 +69,12 @@ export function parseTimeline(source: string, opts: ParseOptions = {}): Timeline
     annotations: [],
     errors: [],
     hiddenTypes: [],
+    hiddenMarkerTypes: [],
     hiddenSlots: [],
+    habitSkips: [],
+    todos: [],
+    todoView: { ...DEFAULT_TODO_VIEW },
+    dailyQuote: { appearance: {} },
     texts: [],
   }
 
@@ -100,7 +108,7 @@ export function parseTimeline(source: string, opts: ParseOptions = {}): Timeline
     if (inHeader) {
       const header = HEADER_RE.exec(text)
       // A line that parses as an entry/annotation ends the header section.
-      if (!header || ENTRY_RE.test(text) || ANNOTATION_RE.test(text)) {
+      if (!header || ENTRY_RE.test(text) || MARKER_RE.test(text) || ANNOTATION_RE.test(text)) {
         inHeader = false
       } else {
         applyHeader(doc, header[1].toLowerCase(), header[2].trim(), line, raw)
@@ -108,11 +116,31 @@ export function parseTimeline(source: string, opts: ParseOptions = {}): Timeline
       }
     }
 
+    const marker = MARKER_RE.exec(text)
+    if (marker) {
+      const timeMin = toMinutes(marker[2], marker[3])
+      const type = marker[4].trim()
+      if (timeMin === null || !type) {
+        doc.errors.push({ line, text: raw, reason: tr("invalidTime") })
+        return
+      }
+      let value = timeMin
+      if (value < doc.rangeStart) value += DAY_MINUTES
+      doc.annotations.push({
+        timeMin: value,
+        text: marker[5]?.trim() ?? "",
+        line,
+        type,
+        plan: Boolean(marker[1]),
+      })
+      return
+    }
+
     const annotation = ANNOTATION_RE.exec(text)
     if (annotation) {
       const timeMin = toMinutes(annotation[1], annotation[2])
       if (timeMin === null) {
-        doc.errors.push({ line, text: raw, reason: "invalid time" })
+        doc.errors.push({ line, text: raw, reason: tr("invalidTime") })
         return
       }
       let t = timeMin
@@ -127,23 +155,25 @@ export function parseTimeline(source: string, opts: ParseOptions = {}): Timeline
       const rawStart = toMinutes(entry[2], entry[3])
       const rawEnd = toMinutes(entry[4], entry[5])
       if (rawStart === null || rawEnd === null) {
-        doc.errors.push({ line, text: raw, reason: "invalid time" })
+        doc.errors.push({ line, text: raw, reason: tr("invalidTime") })
         return
       }
       const [startMin, endMin] = normalizeSpan(rawStart, rawEnd, doc.rangeStart)
+      const binding = splitTodoBinding(entry[7]?.trim())
       const item: Entry = {
         plan: Boolean(entry[1]),
         startMin,
         endMin,
         type: entry[6],
-        note: entry[7]?.trim() || undefined,
+        note: binding.note,
+        todoId: binding.todoId,
         line,
       }
       doc.entries.push(item)
       return
     }
 
-    doc.errors.push({ line, text: raw, reason: sawSeparator || !inHeader ? "unrecognized line" : "unrecognized line" })
+    doc.errors.push({ line, text: raw, reason: tr("unrecognizedLine") })
   })
 
   // Axis extends past rangeEnd to cover after-midnight entries (D10 自然延伸).
@@ -158,25 +188,32 @@ export function parseTimeline(source: string, opts: ParseOptions = {}): Timeline
 }
 
 function applyHeader(doc: TimelineDoc, key: string, value: string, line: number, raw: string): void {
+  if (key !== "layout") {
+    const recoveredLayout = parseRecoverableLayoutHeader(key, value)
+    if (recoveredLayout) {
+      doc.layout = recoveredLayout
+      return
+    }
+  }
   switch (key) {
     case "date": {
       if (DATE_RE.test(value)) {
         doc.date = value
       } else {
-        doc.errors.push({ line, text: raw, reason: "date must be YYYY-MM-DD" })
+        doc.errors.push({ line, text: raw, reason: tr("invalidDate") })
       }
       return
     }
     case "range": {
       const m = RANGE_RE.exec(value)
       if (!m) {
-        doc.errors.push({ line, text: raw, reason: "range must look like 7-23" })
+        doc.errors.push({ line, text: raw, reason: tr("invalidRangeFormat") })
         return
       }
       const start = Number(m[1])
       const end = m[2] !== undefined ? Number(m[2]) : DEFAULT_RANGE_END / 60
       if (start < 0 || start > 23 || end <= start || end > MAX_HOUR) {
-        doc.errors.push({ line, text: raw, reason: "range out of bounds" })
+        doc.errors.push({ line, text: raw, reason: tr("rangeOutOfBounds") })
         return
       }
       doc.rangeStart = start * 60
@@ -186,7 +223,7 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
     case "width": {
       const n = Number(value)
       if (!Number.isFinite(n) || n < 140 || n > 640) {
-        doc.errors.push({ line, text: raw, reason: "width 应为 140-640 的数字" })
+        doc.errors.push({ line, text: raw, reason: tr("invalidWidth") })
         return
       }
       doc.width = Math.round(n)
@@ -195,7 +232,7 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
     case "block-size": {
       const size = parseBlockSize(value)
       if (!size) {
-        doc.errors.push({ line, text: raw, reason: "block-size 应为 240-4096 x 160-4096" })
+        doc.errors.push({ line, text: raw, reason: tr("invalidBlockSize") })
         return
       }
       doc.blockSize = size
@@ -204,7 +241,7 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
     case "canvas-width": {
       const width = parseCanvasWidth(value)
       if (width === null) {
-        doc.errors.push({ line, text: raw, reason: "canvas-width 应为 240-8192 的数字" })
+        doc.errors.push({ line, text: raw, reason: tr("invalidCanvasWidth") })
         return
       }
       doc.canvasWidth = width
@@ -214,7 +251,7 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
       if (value === "right") {
         doc.floatRight = true
       } else {
-        doc.errors.push({ line, text: raw, reason: "float 只支持 right" })
+        doc.errors.push({ line, text: raw, reason: tr("floatRightOnly") })
       }
       return
     }
@@ -228,13 +265,13 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
       if (value === "left" || value === "right") {
         doc.side = value
       } else {
-        doc.errors.push({ line, text: raw, reason: "side 只支持 left/right" })
+        doc.errors.push({ line, text: raw, reason: tr("sideLeftRightOnly") })
       }
       return
     }
     case "off": {
       const ids = value.split(/[\s,，]+/).filter((t): t is import("./grid-layout").SlotId =>
-        ["toolbar", "stats", "dialog"].includes(t) // text/timeline 不允许隐藏
+        ["toolbar", "stats", "dialog", "habits", "todos", "quote"].includes(t) // text/timeline 不允许隐藏
       )
       doc.hiddenSlots.push(...ids)
       return
@@ -242,13 +279,53 @@ function applyHeader(doc: TimelineDoc, key: string, value: string, line: number,
     case "hide": {
       const types = value.split(/[\s,，]+/).filter((t) => /^\S+$/.test(t))
       if (types.length === 0) {
-        doc.errors.push({ line, text: raw, reason: "hide 需要至少一个类型名" })
+        doc.errors.push({ line, text: raw, reason: tr("hideNeedsCategory") })
         return
       }
       doc.hiddenTypes.push(...types)
       return
     }
+    case "hide-marker": {
+      const types = value.split(/[\s,，]+/).filter((t) => /^\S+$/.test(t))
+      if (types.length === 0) {
+        doc.errors.push({ line, text: raw, reason: tr("hideNeedsCategory") })
+        return
+      }
+      doc.hiddenMarkerTypes.push(...types)
+      return
+    }
+    case "habit-skip": {
+      doc.habitSkips.push(...value.split(/[\s,，]+/).filter((id) => /^[a-z0-9_-]+$/i.test(id)))
+      return
+    }
+    case "todo": {
+      const todo = parseTodoHeaderValue(value, line)
+      if (todo) doc.todos.push(todo)
+      else doc.errors.push({ line, text: raw, reason: tr("invalidTodo") })
+      return
+    }
+    case "todo-view": {
+      const view = parseTodoViewHeaderValue(value)
+      if (view) doc.todoView = view
+      else doc.errors.push({ line, text: raw, reason: tr("invalidTodoView") })
+      return
+    }
+    case "quote": doc.dailyQuote.quoteId = value; return
+    case "quote-text": doc.dailyQuote.text = value; return
+    case "quote-author": doc.dailyQuote.author = value; return
+    case "quote-theme": doc.dailyQuote.appearance.theme = value as import("./daily-quotes").DailyQuoteTheme; return
+    case "quote-layout": doc.dailyQuote.appearance.layout = value as import("./daily-quotes").DailyQuoteLayout; return
+    case "quote-font": doc.dailyQuote.appearance.font = value as import("./daily-quotes").DailyQuoteFont; return
+    case "quote-size": doc.dailyQuote.appearance.fontSize = Number(value); return
+    case "quote-bg": doc.dailyQuote.appearance.backgroundColor = value; return
+    case "quote-text-color": doc.dailyQuote.appearance.textColor = value; return
+    case "quote-accent": doc.dailyQuote.appearance.accentColor = value; return
+    case "quote-image": doc.dailyQuote.appearance.backgroundImage = value; return
+    case "quote-overlay": doc.dailyQuote.appearance.overlay = Number(value); return
+    case "quote-image-x": doc.dailyQuote.appearance.imageFocalX = Number(value); return
+    case "quote-image-y": doc.dailyQuote.appearance.imageFocalY = Number(value); return
+    case "quote-image-zoom": doc.dailyQuote.appearance.imageZoom = Number(value); return
     default:
-      doc.errors.push({ line, text: raw, reason: `unknown header key: ${key}` })
+      doc.errors.push({ line, text: raw, reason: tr("unknownHeaderKey", { key }) })
   }
 }

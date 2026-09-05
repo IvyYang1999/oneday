@@ -1,7 +1,12 @@
 /** y(px) <-> minutes mapping shared by the SVG builder and draw interaction. */
 
-export const AXIS_PAD_TOP = 8
-export const AXIS_PAD_BOTTOM = 8
+/**
+ * The range step buttons are real controls outside the visible track. Keep a
+ * dedicated gutter at both ends so their painted boxes never overlap the
+ * creation surface or rely on clipped SVG overflow.
+ */
+export const AXIS_PAD_TOP = 26
+export const AXIS_PAD_BOTTOM = 26
 export const LABEL_W = 36
 export const TRACK_PAD = 6
 export const DEFAULT_HOUR_HEIGHT = 48

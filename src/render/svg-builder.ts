@@ -15,6 +15,8 @@ import { AXIS_PAD_TOP, AXIS_PAD_BOTTOM, LABEL_W, TRACK_PAD, inlineFontSize } fro
 export interface RenderOptions {
   /** type -> css color (D2). Unknown types fall back to FALLBACK_COLOR. */
   typeColors: Record<string, string>
+  /** Independent category colors for point markers. */
+  markerTypeColors?: Record<string, string>
   /** px per hour, default 48 */
   hourHeight?: number
   /** total svg width, default 200 */
@@ -30,12 +32,15 @@ const PLAN_OPACITY = 0.12
 const BLOCK_OPACITY = 0.95 // 盖住底部 plan 层，文字不糊（yyt 2026-08-17）
 /** 统一留白 x（yyt 2026-08-19 定稿）：色块间/贴边/并列列间距全部一致 */
 const GAP_X = 2
+/** Text stays inside this inset; SVG text has no native padding box. */
+const LABEL_INSET_X = 6
+const LABEL_INSET_Y = 4
 /** Below this height (px) the duration label moves to the right of the block. */
 const MIN_INLINE_LABEL_H = 30
 /** Below this width (px) the duration label moves to the right (并列分列后列宽变窄). */
 const MIN_INLINE_LABEL_W = 56
 /** Tall enough to also show the note inside the block. */
-const MIN_NOTE_H = 54
+const MIN_NOTE_H = 32
 /** Right lane reserved for side labels & annotations (M4: no more clipping). */
 export const SIDE_LANE_W = 112
 /** Vertical row height used by the side-label collision avoidance. */
@@ -59,6 +64,9 @@ export interface SideItem {
   dataLine?: number
   /** block right-edge x; when set, a leader line is always drawn (多列时标注↔色块对应关系) */
   anchorX?: number
+  /** Categorized point marker label. */
+  markerColor?: string
+  markerPlan?: boolean
 }
 
 export interface PlacedSideItem extends SideItem {
@@ -131,7 +139,7 @@ function placeActual(actual: Entry[], trackX: number, trackW: number): Placed[] 
 
 /** 长备注按宽度贪心换行（yyt：字多直接多行，放不下才截断）。 */
 function wrapNote(text: string, blockW: number, maxLines: number): string[] {
-  const perLine = Math.max(3, Math.floor((blockW - 16) / 8.5)) // 左右各留 ~8px margin
+  const perLine = Math.max(3, Math.floor((blockW - LABEL_INSET_X * 2) / 8.5))
   const lines: string[] = []
   let rest = text
   while (rest.length > 0 && lines.length < maxLines) {
@@ -207,15 +215,32 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
     )
     // plan 块也显示时长/备注（yyt 2026-08-17），样式淡一档
     const label = formatHours(durationMinutes(e.startMin, e.endMin))
-    const fs = inlineFontSize(trackW - GAP_X * 2, hh - GAP_X, label)
+    const blockW = trackW - GAP_X * 2
+    const blockH = hh - GAP_X
+    const labelWidth = Math.max(0, blockW - LABEL_INSET_X * 2)
+    const combined = e.note ? `${label} · ${truncate(e.note, 12)}` : label
+    const fsCombined = e.note ? inlineFontSize(labelWidth, blockH, combined) : 0
+    const fs = inlineFontSize(labelWidth, blockH, label)
     if (fs > 0) {
-      const showNote = hh >= MIN_NOTE_H && e.note
-      parts.push(
-        `<text pointer-events="none" class="oneday-duration oneday-plan-label" data-line="${e.line}" font-size="${fs}" x="${trackX + trackW / 2}" y="${yy + hh / 2 + (showNote ? -4 : fs / 2 - 1.5)}" text-anchor="middle">${label}</text>`
-      )
+      const showNote = blockH >= MIN_NOTE_H && e.note
       if (showNote) {
+        const maxNoteLines = Math.max(1, Math.floor((blockH - LABEL_INSET_Y * 2 - fs) / 11))
+        const noteLines = wrapNote(e.note ?? "", blockW, maxNoteLines)
+        const totalH = fs + noteLines.length * 11
+        const startY = yy + GAP_X / 2 + (blockH - totalH) / 2
         parts.push(
-          `<text pointer-events="none" class="oneday-note oneday-plan-label" data-line="${e.line}" x="${trackX + trackW / 2}" y="${yy + hh / 2 + 12}" text-anchor="middle">${escapeXml(truncate(e.note ?? ""))}</text>`
+          `<text pointer-events="none" class="oneday-duration oneday-plan-label" data-line="${e.line}" font-size="${fs}" x="${trackX + trackW / 2}" y="${startY + fs - 2}" text-anchor="middle">${label}</text>`
+        )
+        noteLines.forEach((line, index) => parts.push(
+          `<text pointer-events="none" class="oneday-note oneday-plan-label" data-line="${e.line}" x="${trackX + trackW / 2}" y="${startY + fs + 11 * (index + 1)}" text-anchor="middle">${escapeXml(line)}</text>`
+        ))
+      } else if (e.note && fsCombined > 0) {
+        parts.push(
+          `<text pointer-events="none" class="oneday-duration oneday-plan-label" data-line="${e.line}" font-size="${fsCombined}" x="${trackX + trackW / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
+        )
+      } else {
+        parts.push(
+          `<text pointer-events="none" class="oneday-duration oneday-plan-label" data-line="${e.line}" font-size="${fs}" x="${trackX + trackW / 2}" y="${yy + hh / 2 + fs / 2 - 1.5}" text-anchor="middle">${label}</text>`
         )
       }
     }
@@ -236,17 +261,14 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
     // 备注排版（yyt 2026-08-17）：短备注与时长同行；长备注且块够高 ->
     // 时长加粗居中 + 备注第二行小字不加粗；再不行才去侧栏
     const combined = e.note ? `${label} · ${truncate(e.note, 8)}` : label
-    const fsCombined = e.note ? inlineFontSize(p.w, hh, combined) : 0
-    const fs = inlineFontSize(p.w, hh, label)
-    const shortNote = Boolean(e.note) && (e.note?.length ?? 0) <= 8
+    const textInsetX = Math.min(LABEL_INSET_X, Math.max(2, p.w * 0.12))
+    const labelWidth = Math.max(0, p.w - textInsetX * 2)
+    const fsCombined = e.note ? inlineFontSize(labelWidth, hh, combined) : 0
+    const fs = inlineFontSize(labelWidth, hh, label)
     const canTwoLine = Boolean(e.note) && hh >= MIN_NOTE_H && fs > 0
-    if (e.note && shortNote && fsCombined > 0) {
-      parts.push(
-        `<text pointer-events="none" class="oneday-duration" data-line="${e.line}" style="font-size:${fsCombined}px;fill:${relatedTextColor(color)}" x="${p.x + p.w / 2}" y="${yy + hh / 2 + fsCombined / 2 - 1.5}" text-anchor="middle">${escapeXml(combined)}</text>`
-      )
-    } else if (canTwoLine) {
+    if (canTwoLine) {
       // 长备注多行：时长加粗居中在上，备注小字换行在下（放不下才省略号）
-      const maxNoteLines = Math.max(1, Math.floor((hh - fs - 8) / 11))
+      const maxNoteLines = Math.max(1, Math.floor((hh - LABEL_INSET_Y * 2 - fs) / 11))
       const noteLines = wrapNote(e.note ?? "", p.w, maxNoteLines)
       const totalH = fs + noteLines.length * 11
       const startY = yy + (hh - totalH) / 2
@@ -277,8 +299,41 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
     }
   }
 
-  // @annotations share the same label lane (D5 + M4 collision avoidance)
-  for (const a of doc.annotations) {
+  // Categorized annotations are interactive point markers. Markers at the
+  // exact same minute get a tiny source-ordered visual offset while retaining
+  // their canonical timestamp in data-time-min.
+  const markerView = opts.view ?? "all"
+  const markers = doc.annotations.filter((a) => a.type && (markerView === "all" || (markerView === "plan") === Boolean(a.plan)))
+  const markerCounts = new Map<number, number>()
+  markers.forEach((marker) => markerCounts.set(marker.timeMin, (markerCounts.get(marker.timeMin) ?? 0) + 1))
+  const markerIndexes = new Map<number, number>()
+  for (const marker of markers) {
+    const index = markerIndexes.get(marker.timeMin) ?? 0
+    markerIndexes.set(marker.timeMin, index + 1)
+    const count = markerCounts.get(marker.timeMin) ?? 1
+    const markerY = y(marker.timeMin) + (index - (count - 1) / 2) * 7
+    const color = (opts.markerTypeColors ?? opts.typeColors)[marker.type ?? ""] ?? hashTypeColor(marker.type ?? "")
+    const cls = `oneday-marker${marker.plan ? " oneday-marker-plan" : ""}`
+    parts.push(
+      `<g class="${cls}" data-line="${marker.line}" data-type="${escapeXml(marker.type ?? "")}" data-time-min="${marker.timeMin}" data-marker-y="${markerY}">` +
+      `<line class="oneday-marker-hit" x1="${trackX}" y1="${markerY}" x2="${trackX + trackW}" y2="${markerY}" stroke="transparent" stroke-width="6"/>` +
+      `<line class="oneday-marker-line" x1="${trackX}" y1="${markerY}" x2="${trackX + trackW}" y2="${markerY}" stroke="${escapeXml(color)}"/>` +
+      `<circle class="oneday-marker-dot" cx="${trackX}" cy="${markerY}" r="2.5" fill="${escapeXml(color)}"/>` +
+      `<circle class="oneday-marker-dot" cx="${trackX + trackW}" cy="${markerY}" r="2.5" fill="${escapeXml(color)}"/>` +
+      `</g>`
+    )
+    sideItems.push({
+      naturalY: markerY,
+      text: truncate(marker.text || marker.type || "", 14),
+      cls: `oneday-marker-label${marker.plan ? " oneday-marker-plan-label" : ""}`,
+      dataLine: marker.line,
+      anchorX: trackX + trackW,
+      markerColor: color,
+      markerPlan: marker.plan,
+    })
+  }
+  // Legacy annotations keep their quiet, read-only label-lane rendering.
+  for (const a of doc.annotations.filter((annotation) => !annotation.type)) {
     sideItems.push({ naturalY: y(a.timeMin), text: truncate(a.text, 14), cls: "oneday-anno" })
   }
 
@@ -296,7 +351,14 @@ function renderTimelineSvgEntries(doc: TimelineDoc, entries: Entry[], opts: Rend
       )
     }
     const dataAttr = it.dataLine !== undefined ? ` data-line="${it.dataLine}"` : ""
-    parts.push(`<text pointer-events="none" class="${it.cls}"${dataAttr} x="${laneX}" y="${it.y + 3}">${escapeXml(it.text)}</text>`)
+    if (it.markerColor) {
+      const labelW = Math.min(SIDE_LANE_W - 8, Math.max(36, it.text.length * 8 + 14))
+      const opacity = it.markerPlan ? 0.08 : 0.14
+      parts.push(
+        `<rect pointer-events="all" class="oneday-marker-label-bg${it.markerPlan ? " oneday-marker-plan-label" : ""}"${dataAttr} x="${laneX - 2}" y="${it.y - 7}" width="${labelW}" height="14" rx="4" fill="${escapeXml(it.markerColor)}" fill-opacity="${opacity}" stroke="${escapeXml(it.markerColor)}" stroke-opacity="0.55"/>`
+      )
+    }
+    parts.push(`<text pointer-events="none" class="${it.cls}"${dataAttr} x="${laneX + (it.markerColor ? 4 : 0)}" y="${it.y + 3}">${escapeXml(it.text)}</text>`)
   }
 
   const lastSideBottom = placedSide.length > 0 ? placedSide[placedSide.length - 1].y + SIDE_LINE_H / 2 : 0

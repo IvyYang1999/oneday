@@ -28,8 +28,24 @@
   --oneday-grip-inline-overhang: 2px;
   /* 内容起始线由手柄的真实占位推导：统一，同时避免 hover 时盖住文字。 */
   --oneday-content-inset: calc(var(--oneday-grip-width) + var(--oneday-grip-inline-overhang));
+  /*
+   * 所有常规元素块共享同一条纵向内容边界。网格高度按 20px 量化，
+   * 内容放得下时由各内容根节点在剩余空间内安全居中；溢出时回退到顶部，
+   * 避免为了“看起来居中”而把可滚动内容的开头裁掉。
+   */
+  --oneday-slot-padding-block: var(--size-4-2, 8px);
   --oneday-icon-button-size: 28px;
-  --oneday-toolbar-control-height: var(--input-height, 30px);
+  /* 分类、创建模式和图层按钮属于同一 compact-control 层级。外层图层
+   * 胶囊另有 padding/border，但三个按钮本体必须始终等高。 */
+  --oneday-compact-control-height: calc(var(--input-height, 30px) - var(--size-4-1, 4px));
+  --oneday-toolbar-control-height: var(--oneday-compact-control-height);
+  /* Creation, Habit and Todo headers share one information tier. */
+  --oneday-component-title-font-size: 12px;
+  /* Thin semantic strokes remain perceptually louder than filled blocks at
+   * the same alpha. Focus mode therefore uses a quieter stroke-layer alpha
+   * while filled surfaces keep the standard frozen-layer alpha. */
+  --oneday-focus-frozen-opacity: 0.3;
+  --oneday-focus-frozen-stroke-opacity: 0.16;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -43,6 +59,13 @@
   border-radius: var(--oneday-radius-surface);
   /* 产品可缩放边界属于 Oneday viewport，而不是占满编辑器整行的 CM6 外壳。 */
   box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
+/* Aria-hidden visual handoff across an Obsidian-owned processor remount. */
+.oneday-remount-overlay {
+  pointer-events: none !important;
+  user-select: none !important;
+  contain: layout paint style;
 }
 
 .oneday-block-scroll {
@@ -111,6 +134,28 @@
   opacity: 0.7;
 }
 
+/* 拖拽创建时的精确模式提示：跟随操作但不抢夺时间标签的视觉层级。 */
+.oneday-svg .oneday-precision-hint {
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-precision-hint-bg {
+  fill: var(--background-primary);
+  fill-opacity: 0.92;
+}
+
+.oneday-svg .oneday-precision-hint-text {
+  fill: var(--text-muted);
+  font-family: var(--font-interface);
+  font-size: 8px;
+  font-weight: 500;
+  opacity: 0.62;
+}
+
+.oneday-svg .oneday-precision-hint.is-active .oneday-precision-hint-text {
+  opacity: 0.78;
+}
+
 .oneday-svg .oneday-duration {
   font-size: 11px;
   fill: var(--text-normal);
@@ -134,6 +179,49 @@
   fill: var(--text-accent);
 }
 
+.oneday-svg .oneday-marker {
+  cursor: context-menu;
+}
+
+.oneday-svg .oneday-marker-line {
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-marker-hit {
+  pointer-events: stroke;
+}
+
+.oneday-svg .oneday-marker-dot {
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-marker-plan {
+  opacity: 0.58;
+  stroke-dasharray: 4 3;
+}
+
+.oneday-svg .oneday-marker-label {
+  fill: var(--text-normal);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.oneday-svg .oneday-marker-label-bg {
+  cursor: context-menu;
+}
+
+.oneday-svg .oneday-marker-ghost {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-marker-ghost line {
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
 .oneday-block {
   cursor: default;
 }
@@ -141,6 +229,9 @@
 .oneday-stats {
   display: flex;
   flex-direction: column;
+  min-height: 100%;
+  box-sizing: border-box;
+  justify-content: safe center;
   gap: 2px;
   font-family: var(--font-text);
   font-size: 13px;
@@ -257,8 +348,12 @@
 }
 
 .oneday-dialog {
-  margin-top: 6px;
   width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
   position: relative;
 }
 
@@ -300,16 +395,78 @@
 .oneday-toolbar {
   display: flex;
   flex-wrap: wrap;
+  min-height: 100%;
+  box-sizing: border-box;
   gap: var(--oneday-control-gap);
   align-items: center;
-  margin-bottom: 2px;
+  align-content: safe center;
+  margin-bottom: 0;
+}
+
+.oneday-toolbar.has-category-rows {
+  flex-flow: column nowrap;
+  align-items: stretch;
+  justify-content: safe center;
+}
+
+.oneday-slot-toolbar > .oneday-toolbar.has-category-rows {
+  /* Creation always grows downward from the slot's shared top inset.  The
+     number of categories must never recenter the controls inside a tall slot. */
+  justify-content: flex-start;
+}
+
+.oneday-creation-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--oneday-control-gap);
+  width: 100%;
+  min-width: max-content;
+}
+
+.oneday-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--oneday-control-gap);
+  min-width: 0;
+}
+
+/* Categories are a separate choice set, so they always begin on a fresh row
+ * instead of filling leftover space beside the creation tools. */
+.oneday-category-list {
+  width: 100%;
+}
+
+.oneday-plan-mode-group {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .oneday-toolbar.is-empty {
-  display: block;
   width: 100%;
   height: 100%;
   margin-bottom: 0;
+}
+
+.oneday-toolbar.is-empty .oneday-category-list {
+  flex: 1 1 auto;
+  min-height: var(--oneday-control-height);
+  box-sizing: border-box;
+  /* South resize hot zone is 8px tall; keep a visible 2px safety gap so the
+   * category CTA never advertises a click where resize owns the pointer. */
+  padding: 2px 8px 10px;
+}
+
+/* The category list owns the clearance above the slot's south resize edge.
+ * Do not let the CTA's generic 100% height expand through that padding. */
+.oneday-toolbar.is-empty .oneday-category-list > .oneday-toolbar-empty {
+  flex: 1 1 auto;
+  align-self: stretch;
+  height: auto;
+  min-height: var(--oneday-control-height);
 }
 
 .oneday-toolbar button.oneday-toolbar-empty {
@@ -404,6 +561,8 @@
 .oneday-svg {
   cursor: crosshair;
   touch-action: none;
+  -webkit-user-select: none !important;
+  user-select: none !important;
   overflow: visible;
 }
 
@@ -420,6 +579,13 @@
   stroke: var(--text-accent);
   stroke-dasharray: 3 2;
   pointer-events: none;
+}
+
+/* The live start/end labels already describe a creation drag precisely. Keep
+   the fixed-size duration copy out of the provisional block so five-minute
+   spans cannot overflow; it becomes visible as soon as the drag commits. */
+.oneday-svg .oneday-preview-duration.is-dragging {
+  visibility: hidden;
 }
 
 /* M4 标注车道 */
@@ -474,7 +640,6 @@
 .oneday-svg .is-hover.oneday-duration,
 .oneday-svg .is-hover.oneday-note,
 .oneday-svg .is-hover.oneday-anno {
-  fill: var(--text-accent);
   font-weight: 700;
 }
 
@@ -488,12 +653,22 @@
 .oneday-svg .oneday-block.is-focus {
   stroke: var(--text-accent);
   stroke-width: 2;
+  stroke-opacity: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.oneday-svg .oneday-marker:is(.is-hover, .is-focus, .is-edit-target) .oneday-marker-line {
+  stroke-width: 2.5;
+}
+
+.oneday-svg .oneday-marker.is-edit-target .oneday-marker-dot {
+  stroke: var(--text-accent);
+  stroke-width: 1.5;
 }
 
 .oneday-svg .is-focus.oneday-note,
 .oneday-svg .is-focus.oneday-duration,
 .oneday-svg .is-focus.oneday-anno {
-  fill: var(--text-accent);
   font-weight: 700;
 }
 
@@ -695,6 +870,8 @@
 /* 分栏：居右浮动 + 拖拽手柄 */
 
 .oneday-host {
+  /* The plugin preserves its own visual anchor across full DOM replacement. */
+  overflow-anchor: none;
   /* 宿主是 Obsidian 代码块容器：去掉默认边框/背景，允许手柄溢出 */
   border: none !important;
   background: transparent !important;
@@ -775,6 +952,532 @@
   flex: 1;
 }
 
+/* 聚焦设置：分类与打卡共用后台数据，但从组件入口只呈现当前任务。 */
+.oneday-settings-modal {
+  width: min(760px, calc(100vw - 32px));
+  max-width: 760px;
+}
+
+.oneday-focused-settings {
+  container-type: inline-size;
+  color: var(--text-normal);
+  --oneday-settings-control-height: var(--input-height, 30px);
+  --oneday-settings-gap-xs: var(--size-4-1, 4px);
+  --oneday-settings-gap-sm: var(--size-4-2, 8px);
+  --oneday-settings-gap-md: var(--size-4-3, 12px);
+}
+
+.oneday-settings-modal-description {
+  margin: 0 0 var(--size-4-4, 16px);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small, 13px);
+  line-height: var(--line-height-normal);
+}
+
+.oneday-category-scope-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px;
+  margin: 0 0 var(--size-4-4, 16px);
+  border-radius: var(--oneday-radius-control);
+  background: var(--background-secondary);
+}
+
+.oneday-category-scope-tabs > button {
+  min-height: var(--oneday-settings-control-height);
+  padding: 0 var(--size-4-3, 12px);
+  border: 0;
+  border-radius: calc(var(--oneday-radius-control) - 2px);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+.oneday-category-scope-tabs > button.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* The full settings tab and focused modals share the same editor primitives,
+ * but the tab needs explicit section rhythm instead of relying on Obsidian's
+ * adjacent heading margins (which vary between themes). */
+.oneday-settings-tab > h2 {
+  margin-bottom: 0;
+}
+
+.oneday-settings-section {
+  margin-top: var(--size-4-6, 24px);
+}
+
+.oneday-settings-section > h3 {
+  margin: 0 0 var(--oneday-settings-gap-sm);
+}
+
+.oneday-settings-section > .setting-item-description {
+  margin: 0 0 var(--oneday-settings-gap-md);
+}
+
+.oneday-settings-section-editor {
+  min-width: 0;
+}
+
+.oneday-settings-add-rule {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oneday-settings-gap-xs);
+  min-height: var(--oneday-settings-control-height);
+  padding: 0 var(--oneday-settings-gap-sm);
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--button-radius, 5px);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.oneday-settings-add-rule:hover {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.oneday-settings-add-rule svg {
+  width: 14px;
+  height: 14px;
+}
+
+.oneday-rule-editor-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.oneday-category-editor-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--oneday-settings-gap-sm);
+  min-width: 0;
+  max-height: min(62vh, 640px);
+  padding: 1px var(--oneday-settings-gap-xs) 1px 1px;
+  overflow-y: auto;
+}
+
+.oneday-category-editor-row {
+  display: grid;
+  grid-template-columns: 20px minmax(96px, 1fr) 28px;
+  align-items: center;
+  gap: var(--oneday-settings-gap-sm);
+  min-width: 0;
+  min-height: 40px;
+  padding: var(--oneday-settings-gap-xs) var(--oneday-settings-gap-xs) var(--oneday-settings-gap-xs) var(--oneday-settings-gap-sm);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--button-radius, 5px);
+  background: var(--background-primary);
+  box-sizing: border-box;
+}
+
+.oneday-category-editor-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.oneday-category-color-input {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text-normal) 18%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.oneday-category-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.oneday-category-color-input::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+
+.oneday-category-color-input::-moz-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+
+.oneday-category-editor-row > input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  height: var(--oneday-settings-control-height);
+  padding-inline: var(--oneday-settings-gap-xs);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+.oneday-category-editor-row > input[type="text"]:focus {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-form-field, var(--background-primary));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+}
+
+.oneday-rule-editor {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    minmax(128px, 1.35fr)
+    minmax(96px, 1fr)
+    minmax(82px, 0.75fr)
+    minmax(108px, 1fr)
+    minmax(108px, 1fr)
+    28px;
+  align-items: end;
+  gap: var(--size-4-2, 8px);
+  min-width: 0;
+  padding: var(--size-4-3, 12px) 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Keep the editor a real table even when a completion condition omits its
+   target field. Grid auto-placement would otherwise pull recurrence and the
+   delete action into the empty column, making every row use a different
+   visual schema. */
+.oneday-rule-editor [data-field="name"] {
+  grid-column: 1;
+}
+
+.oneday-rule-editor [data-field="category"] {
+  grid-column: 2;
+}
+
+.oneday-rule-editor [data-field="goal"] {
+  grid-column: 3;
+}
+
+.oneday-rule-editor [data-field="target"] {
+  grid-column: 4;
+}
+
+.oneday-rule-editor [data-field="repeat"] {
+  grid-column: 5;
+}
+
+.oneday-rule-editor > .oneday-settings-row-actions {
+  grid-column: 6;
+}
+
+.oneday-rule-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+
+.oneday-rule-field.is-full {
+  grid-column: 1 / -2;
+}
+
+.oneday-rule-field-label {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oneday-rule-field-control {
+  display: flex;
+  min-width: 0;
+}
+
+.oneday-category-picker,
+.oneday-duration-control,
+.oneday-count-control {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: var(--oneday-settings-control-height);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--input-radius, var(--button-radius, 5px));
+  background: var(--background-modifier-form-field, var(--background-primary));
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.oneday-category-picker:focus-within,
+.oneday-duration-control:focus-within,
+.oneday-count-control:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+}
+
+.oneday-category-picker-dot {
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  margin-left: var(--oneday-settings-gap-sm);
+  border-radius: 50%;
+  background: var(--oneday-category-color);
+}
+
+.oneday-category-picker > select,
+.oneday-duration-control > input,
+.oneday-duration-control > select,
+.oneday-count-control > input {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.oneday-category-picker > select {
+  flex: 1;
+  min-width: 0;
+  padding-left: var(--oneday-settings-gap-sm);
+}
+
+.oneday-category-picker > select:hover,
+.oneday-category-picker > select:focus {
+  background: transparent !important;
+}
+
+.oneday-duration-control > input {
+  flex: 1 1 60%;
+  width: 60%;
+  min-width: 46px;
+}
+
+.oneday-duration-control > select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 58px;
+  border-left: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.oneday-count-control > input {
+  flex: 1;
+  width: 60%;
+  min-width: 46px;
+}
+
+.oneday-count-unit {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  align-self: stretch;
+  padding-inline: var(--oneday-settings-gap-sm);
+  border-left: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small, 12px);
+}
+
+.oneday-interval-control {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.65fr) minmax(150px, 1fr);
+  gap: var(--oneday-settings-gap-sm);
+  width: 100%;
+  min-width: 0;
+}
+
+.oneday-interval-control > label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--oneday-settings-gap-sm);
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small, 12px);
+}
+
+.oneday-interval-control input {
+  width: 100%;
+  min-width: 0;
+  height: var(--oneday-settings-control-height);
+  box-sizing: border-box;
+}
+
+.oneday-date-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--oneday-settings-gap-xs);
+  width: 100%;
+  min-width: 0;
+}
+
+.oneday-date-item {
+  display: inline-flex;
+  align-items: center;
+  height: var(--oneday-settings-control-height);
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--input-radius, var(--button-radius, 5px));
+  background: var(--background-modifier-form-field, var(--background-primary));
+  box-sizing: border-box;
+}
+
+.oneday-date-item:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+}
+
+.oneday-date-item > input[type="date"] {
+  width: 138px;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.oneday-date-item > .oneday-date-remove {
+  width: 27px;
+  height: 100%;
+  min-height: 0;
+  border-left: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+}
+
+.oneday-date-add {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--oneday-settings-gap-xs);
+  height: var(--oneday-settings-control-height);
+  min-height: var(--oneday-settings-control-height);
+  padding-inline: var(--oneday-settings-gap-sm);
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--button-radius, 5px);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.oneday-date-add:hover {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  background: transparent;
+  color: var(--text-normal);
+}
+
+.oneday-date-add svg {
+  width: 14px;
+  height: 14px;
+}
+
+.oneday-rule-field-control > input,
+.oneday-rule-field-control > select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  min-height: 30px;
+  box-sizing: border-box;
+}
+
+.oneday-settings-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  align-self: end;
+}
+
+.oneday-settings-icon-button {
+  appearance: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--button-radius, 5px);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.oneday-settings-icon-button:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-error, var(--text-normal));
+}
+
+.oneday-settings-icon-button svg,
+.oneday-settings-add-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.oneday-settings-add-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-4-1, 4px);
+  min-height: 34px;
+  margin-top: var(--size-4-3, 12px);
+  padding: 4px 10px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--button-radius, 5px);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.oneday-settings-add-button:hover {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  background: transparent;
+  color: var(--text-normal);
+}
+
+@container (max-width: 480px) {
+  .oneday-category-editor-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oneday-rule-editor {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 28px;
+    padding-right: 0;
+  }
+
+  .oneday-rule-editor [data-field="name"] {
+    grid-column: 1 / 3;
+  }
+
+  .oneday-rule-editor .oneday-settings-row-actions {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .oneday-rule-editor [data-field="category"],
+  .oneday-rule-editor [data-field="goal"] {
+    grid-column: 1;
+  }
+
+  .oneday-rule-editor [data-field="target"],
+  .oneday-rule-editor [data-field="repeat"] {
+    grid-column: 2 / 4;
+  }
+
+  .oneday-rule-field.is-full {
+    grid-column: 1 / 4;
+  }
+
+  .oneday-interval-control {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* 块内图文混排：左文右图 */
 
 .oneday-body {
@@ -817,6 +1520,613 @@
   overflow: hidden; /* 高度由 JS 按内容撑开，编辑时不跳版 */
 }
 
+/* 打卡 / Todo：保持紧凑；打卡状态行使用无阴影描边以承载只读状态徽标。 */
+.oneday-habits,
+.oneday-todos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-1, 4px);
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  box-sizing: border-box;
+  color: var(--text-normal);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.oneday-component-header {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 24px;
+  gap: var(--size-4-1, 4px);
+}
+
+.oneday-component-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--oneday-component-title-font-size);
+  line-height: 1.25;
+  font-weight: var(--font-semibold, 600);
+}
+
+.oneday-component-count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.oneday-component-actions {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.oneday-component-actions > button,
+.oneday-item-more,
+.oneday-todo-check {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--oneday-radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.oneday-component-actions > button:hover,
+.oneday-item-more:hover {
+  background: var(--oneday-surface-control);
+  color: var(--text-normal);
+}
+
+.oneday-todo-row button.oneday-todo-check,
+.oneday-todo-row button.oneday-todo-check:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.oneday-todo-row button.oneday-todo-check:hover:not(:disabled) {
+  color: var(--text-accent);
+}
+
+.oneday-todo-row button.oneday-todo-check:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.oneday-component-actions svg,
+.oneday-item-more svg,
+.oneday-todo-check svg,
+.oneday-item-status svg {
+  width: 14px;
+  height: 14px;
+}
+
+.oneday-habit-list,
+.oneday-todo-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.oneday-habit-list {
+  gap: var(--oneday-control-gap);
+}
+
+.oneday-todo-list {
+  gap: 2px;
+}
+
+.oneday-habit-row,
+.oneday-todo-row {
+  position: relative;
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  min-height: 34px;
+  padding: 3px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.oneday-habit-row {
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  column-gap: 5px;
+  height: calc(var(--oneday-compact-control-height) + 8px);
+  min-height: calc(var(--oneday-compact-control-height) + 8px);
+  padding: 3px 4px 3px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+}
+
+.oneday-habit-row:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.oneday-todo-row {
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 4px;
+  padding: 3px 4px;
+  border-radius: var(--oneday-radius-control);
+}
+
+.oneday-todo-row.is-manual {
+  grid-template-columns: 22px minmax(0, 1fr);
+}
+
+.oneday-todo-row:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+}
+
+.oneday-habit-row:hover,
+.oneday-todo-row:hover {
+  background: color-mix(in srgb, var(--oneday-surface-control) 72%, transparent);
+}
+
+button.oneday-item-drag {
+  appearance: none;
+  -webkit-appearance: none;
+  position: absolute;
+  left: calc(0px - var(--oneday-content-inset));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: inline-grid;
+  place-content: center;
+  gap: 2px 2px;
+  grid-auto-flow: row;
+  grid-template-columns: repeat(2, 1.5px);
+  width: var(--oneday-grip-width);
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: var(--oneday-radius-control);
+  /* Obsidian themes commonly restyle every button when its parent row is
+     hovered. Row grips are deliberately dot-only, so their shell must remain
+     transparent even under host/theme button chrome. */
+  background: transparent !important;
+  color: var(--text-faint);
+  box-shadow: none !important;
+  cursor: grab;
+  opacity: 0;
+  touch-action: none;
+  user-select: none;
+}
+
+.oneday-habit-row:is(:hover, :focus-within) button.oneday-item-drag,
+.oneday-todo-row:is(:hover, :focus-within) button.oneday-item-drag,
+button.oneday-item-drag:hover,
+button.oneday-item-drag:focus,
+button.oneday-item-drag:active {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+button.oneday-item-drag:active {
+  cursor: grabbing;
+}
+
+.oneday-item-sort-placeholder {
+  outline: 1px dashed var(--background-modifier-border-hover, var(--background-modifier-border));
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--oneday-surface-control) 36%, transparent);
+}
+
+.oneday-item-sort-placeholder > * {
+  visibility: hidden;
+}
+
+.oneday-item-sort-ghost {
+  position: fixed !important;
+  z-index: var(--layer-popover, 1000);
+  margin: 0 !important;
+  pointer-events: none;
+  opacity: 0.96;
+  background: var(--background-primary) !important;
+  border: 1px solid var(--background-modifier-border) !important;
+  box-shadow: var(--shadow-s);
+  will-change: transform;
+}
+
+/* A pointer-owned sort gesture has one visual grip: the grip travelling with
+   the source row. Candidate rows may still move to preview the drop position,
+   but ordinary row hover must not reveal a second grip under the pointer. */
+.oneday-habit-list.is-ordering .oneday-habit-row .oneday-habit-drag,
+.oneday-todo-list.is-ordering .oneday-todo-row .oneday-todo-drag {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.oneday-item-sort-ghost button.oneday-item-drag {
+  opacity: 1;
+  pointer-events: none;
+}
+
+.oneday-todo-row:is(:hover, :focus-within) .oneday-todo-drag,
+.oneday-habit-row:is(:hover, :focus-within) .oneday-habit-drag {
+  opacity: 1;
+}
+
+/* Pointer hover is the active row signal. A previously keyboard-focused grip
+   may keep :focus-within after the pointer moves to another row; suppress that
+   stale visual while preserving focus visibility when the pointer leaves the
+   list. */
+.oneday-todo-list:has(.oneday-todo-row:hover)
+  .oneday-todo-row:not(:hover) .oneday-todo-drag,
+.oneday-habit-list:has(.oneday-habit-row:hover)
+  .oneday-habit-row:not(:hover) .oneday-habit-drag {
+  opacity: 0;
+}
+
+.oneday-item-dot {
+  width: 8px;
+  height: 8px;
+  justify-self: center;
+  border-radius: 50%;
+  background: var(--c, var(--text-muted));
+}
+
+.oneday-habit-body,
+.oneday-todo-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  gap: 2px 6px;
+}
+
+.oneday-item-title,
+.oneday-item-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oneday-item-title {
+  font-weight: var(--font-medium, 500);
+}
+
+.oneday-item-meta {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.oneday-item-progress {
+  grid-column: 1 / -1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: var(--oneday-radius-data);
+  background: var(--oneday-surface-data-track);
+}
+
+.oneday-item-progress-bar {
+  height: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: inherit;
+  transition: width 160ms ease-out;
+}
+
+.oneday-schedule-source {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.oneday-schedule-source:active,
+.oneday-schedule-source.is-scheduling {
+  cursor: grabbing;
+}
+
+.oneday-schedule-source.is-scheduling {
+  opacity: 0.58;
+}
+
+.oneday-schedule-drag-ghost {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: var(--layer-popover, 1000);
+  max-width: 240px;
+  padding: 5px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-s);
+  font-size: var(--font-ui-small);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.oneday-schedule-drag-ghost.is-valid {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+.oneday-svg .oneday-schedule-preview {
+  pointer-events: none;
+}
+
+.oneday-svg .oneday-schedule-preview rect {
+  fill-opacity: 0.24;
+  stroke: var(--interactive-accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.oneday-svg .oneday-schedule-preview text {
+  fill: var(--text-normal);
+  font-size: 10px;
+  font-weight: var(--font-medium, 500);
+}
+
+.oneday-item-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--oneday-control-gap);
+  height: calc(var(--oneday-compact-control-height) - 2px);
+  min-height: calc(var(--oneday-compact-control-height) - 2px);
+  padding: 0 var(--size-4-2, 8px);
+  border-radius: var(--oneday-radius-control);
+  background: var(--oneday-surface-control);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  cursor: default;
+  user-select: none;
+}
+
+.oneday-habit-row.is-complete .oneday-item-status {
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
+  color: var(--text-accent);
+}
+
+.oneday-todo-row.is-complete .oneday-todo-check {
+  color: var(--text-accent);
+}
+
+.oneday-todo-row.is-complete .oneday-item-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.oneday-item-more {
+  opacity: 0;
+}
+
+.oneday-habit-row:is(:hover, :focus-within) .oneday-item-more,
+.oneday-todo-row:is(:hover, :focus-within) .oneday-item-more {
+  opacity: 1;
+}
+
+.oneday-todo-group {
+  display: block;
+  padding: 5px 0 2px;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: var(--font-semibold, 600);
+  line-height: 1;
+}
+
+.oneday-todo-form {
+  display: grid;
+  grid-template-columns: minmax(110px, 2fr) minmax(80px, 1fr) 108px 26px;
+  gap: 3px;
+  padding: 3px 0 5px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.oneday-todo-form-error {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  padding: 0 4px;
+  color: var(--text-error);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.oneday-todo-form-error[hidden] {
+  display: none;
+}
+
+.oneday-todo-form [aria-invalid="true"] {
+  box-shadow: inset 0 0 0 1px var(--text-error) !important;
+}
+
+.oneday-todo-edit-form {
+  grid-column: 1 / -1;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.oneday-todo-row.is-editing > :not(.oneday-todo-edit-form) {
+  display: none;
+}
+
+.oneday-todo-form[hidden] {
+  display: none;
+}
+
+.oneday-todo-form input,
+.oneday-todo-form select,
+.oneday-todo-form button {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  min-height: 26px;
+  padding-block: 0;
+  border-radius: var(--oneday-radius-control);
+  font-size: 11px;
+}
+
+.oneday-todo-estimate-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(44px, auto);
+  align-items: center;
+  height: 26px;
+  min-width: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  background: var(--background-modifier-form-field);
+}
+
+.oneday-todo-form input.oneday-todo-estimate-input {
+  height: 24px;
+  min-height: 24px;
+  padding-inline: 7px 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.oneday-todo-form select.oneday-todo-estimate-unit-select {
+  width: auto;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 16px 0 5px;
+  border: 0;
+  border-left: 1px solid var(--background-modifier-border);
+  border-radius: 0 var(--oneday-radius-control) var(--oneday-radius-control) 0;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.oneday-todo-form button {
+  padding-inline: 4px;
+}
+
+.oneday-container button.oneday-component-empty {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  padding: 3px 8px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.oneday-container button.oneday-component-empty:hover {
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+  background: transparent;
+  color: var(--text-normal);
+}
+
+.oneday-container button.oneday-component-empty:focus-visible {
+  border-color: var(--background-modifier-border-focus, var(--interactive-accent));
+  outline: 2px solid var(--background-modifier-border-focus, var(--interactive-accent));
+  outline-offset: 1px;
+}
+
+.oneday-component-empty-icon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.oneday-component-empty-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 700px) {
+  .oneday-todo-form {
+    grid-template-columns: minmax(100px, 1fr) minmax(70px, 1fr) 52px 26px;
+  }
+
+  .oneday-todo-title-input {
+    grid-column: 1 / 3;
+    grid-row: 1;
+  }
+
+  .oneday-todo-save {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .oneday-todo-category-select {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+
+  .oneday-todo-estimate-field {
+    grid-column: 3 / 5;
+    grid-row: 2;
+  }
+}
+
+.oneday-rules-settings .setting-item {
+  align-items: flex-start;
+}
+
+.oneday-rule-setting .setting-item-control {
+  flex: 1 1 520px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--size-4-1, 4px);
+}
+
+.oneday-rule-setting input[type="text"],
+.oneday-rule-setting input[type="number"],
+.oneday-rule-setting select {
+  min-width: 92px;
+}
+
+.oneday-weekday-control {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.oneday-weekday-control > button {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: var(--button-radius, 5px);
+}
+
+.oneday-weekday-control > button[aria-pressed="true"] {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
 /* 插槽化布局 + 组件拖动手柄 + 窄屏横向滚动 */
 
 .oneday-slot {
@@ -826,7 +2136,7 @@
   /* 1px 内边框 + 4px padding 保持原来的 5px 内容起点；真实 border
      不会像 outline 一样在横向滚动视口右缘被裁掉。 */
   border: 1px solid transparent;
-  padding: 4px;
+  padding: var(--oneday-slot-padding-block) 4px;
   box-sizing: border-box;
   transition: left 0.15s ease, top 0.15s ease, width 0.15s ease, height 0.15s ease, border-color 0.1s;
 }
@@ -835,14 +2145,17 @@
  * 常规内容槽共享同一条左右内容起始线。时间轴不在此列：它的小时标签、
  * 轨道和右侧标注车道使用独立坐标系，改变 slot padding 会移动几何基准。
  */
-.oneday-slot:is(.oneday-slot-dialog, .oneday-slot-toolbar, .oneday-slot-stats, [data-slot^="text"]) {
+.oneday-slot:is(.oneday-slot-dialog, .oneday-slot-toolbar, .oneday-slot-stats, .oneday-slot-habits, .oneday-slot-todos, .oneday-slot-quote, [data-slot^="text"]) {
   padding-inline: var(--oneday-content-inset);
 }
 
-/* slot padding 变宽不应把固定在左上角的拖拽手柄一起推向右侧。 */
-.oneday-slot:is(.oneday-slot-dialog, .oneday-slot-toolbar, .oneday-slot-stats, [data-slot^="text"])
+/* slot padding 变宽不应把固定在左上角的拖拽手柄一起推向内侧。 */
+.oneday-slot:is(.oneday-slot-dialog, .oneday-slot-toolbar, .oneday-slot-stats, .oneday-slot-habits, .oneday-slot-todos, .oneday-slot-quote, [data-slot^="text"])
   > .oneday-slot-grip-anchor {
-  transform: translateX(calc(var(--size-4-1, 4px) - var(--oneday-content-inset)));
+  transform: translate(
+    calc(var(--size-4-1, 4px) - var(--oneday-content-inset)),
+    calc(var(--size-4-1, 4px) - var(--oneday-slot-padding-block))
+  );
 }
 
 /* 文本槽位的外框不能成为滚动容器，否则作为其子元素的缩放手柄会被正文卷走。 */
@@ -855,6 +2168,15 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/*
+ * 时间轴使用独立的横向坐标系，因此不能套用常规内容槽的完整 transform；
+ * 但移动手柄仍应和其它元素块一样锚在外壳顶边，而不是被 8px 上内边距
+ * 推低。这里只抵消纵向 padding，保留时间轴原本的横向几何。
+ */
+.oneday-slot[data-slot="timeline"] > .oneday-slot-grip-anchor {
+  transform: translateY(calc(var(--size-4-1, 4px) - var(--oneday-slot-padding-block)));
 }
 
 .oneday-slot:hover {
@@ -889,12 +2211,43 @@
   transform: translateX(var(--size-4-1, 4px));
 }
 
+/*
+ * 空状态的虚线仍是 slot 的真实边界，只在移动手柄周围开一个 legend 式
+ * 缺口。整体内缩虚线会让空状态再次变成“卡片套卡片”，也无法撑满元素块。
+ */
+.oneday-slot.is-empty-state > .oneday-slot-grip-anchor::before {
+  content: "";
+  position: absolute;
+  z-index: 99;
+  left: calc(0px - var(--size-4-1, 4px));
+  top: calc(0px - var(--size-4-1, 4px));
+  width: calc(var(--oneday-grip-width) + var(--size-4-2, 8px));
+  height: calc(22px + var(--size-4-2, 8px));
+  border-radius: var(--oneday-radius-control);
+  background: var(--background-primary);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.oneday-slot.is-empty-state:is(:hover, :focus-within) > .oneday-slot-grip-anchor::before {
+  opacity: 1;
+}
+
 .oneday-slot.is-placeholder,
 .oneday-slot.is-resizing {
   transition: none;
+  /*
+   * 缩放/换位预览必须完整属于 slot 自身。向外的 outline 在第 0 行或
+   * 滚动视口边缘会被 block 裁掉；负 offset 将同一根 2px 虚线绘制在
+   * 边界内侧，不改变盒模型，也不会推动内容或相邻元素。
+   */
   outline: 2px dashed var(--text-accent);
-  outline-offset: 1px;
+  outline-offset: -2px;
   border-radius: var(--oneday-radius-surface);
+}
+
+.oneday-body.is-grid-interacting .oneday-slot {
+  transition: none !important;
 }
 
 .oneday-slot-grip-anchor {
@@ -923,6 +2276,8 @@
   background: var(--oneday-surface-handle);
   border-radius: var(--oneday-radius-control);
   cursor: grab;
+  touch-action: none;
+  user-select: none;
   box-shadow: none;
   width: var(--oneday-grip-width);
   height: 22px;
@@ -935,7 +2290,8 @@
 }
 
 /* 六点手柄（2 列 × 3 行竖排）：JS 生成 span */
-.oneday-slot button.oneday-slot-grip span {
+.oneday-slot button.oneday-slot-grip span,
+.oneday-item-drag span {
   width: 1.5px;
   height: 1.5px;
   border-radius: 50%;
@@ -981,6 +2337,8 @@
   opacity: 0;
   background: transparent;
   transition: opacity 0.1s;
+  touch-action: none;
+  user-select: none;
 }
 
 .oneday-slot:hover .oneday-handle {
@@ -1053,6 +2411,188 @@
   display: none;
 }
 
+/* Block-level source mode: an opaque editor plane over the live visual block. */
+
+.oneday-source-mode {
+  position: absolute;
+  inset: var(--size-4-1, 4px);
+  z-index: calc(var(--oneday-layer-block-action) + 1);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--oneday-radius-surface);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.oneday-source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4-3, 12px);
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: var(--size-4-2, 8px) var(--size-4-3, 12px);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.oneday-source-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-4-2, 8px);
+  min-width: 0;
+}
+
+.oneday-source-title {
+  flex: 0 0 auto;
+  font-size: var(--oneday-component-title-font-size);
+  font-weight: var(--font-semibold, 600);
+}
+
+.oneday-source-subtitle {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oneday-source-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--oneday-control-gap);
+  flex: 0 0 auto;
+}
+
+.oneday-source-actions button {
+  appearance: none;
+  min-height: var(--oneday-compact-control-height);
+  padding: 0 var(--oneday-control-padding-x);
+  border: 1px solid transparent;
+  border-radius: var(--oneday-radius-control);
+  box-shadow: none;
+  font-size: var(--font-ui-smaller);
+  cursor: pointer;
+}
+
+.oneday-source-cancel {
+  background: var(--oneday-surface-control);
+  color: var(--text-normal);
+}
+
+.oneday-source-apply {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.oneday-source-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.oneday-source-editor {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: var(--size-4-2, 8px) var(--size-4-3, 12px) 0;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  background: var(--background-secondary);
+}
+
+.oneday-source-fence {
+  flex: 0 0 auto;
+  padding: 3px var(--size-4-2, 8px);
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.45;
+  user-select: none;
+}
+
+.oneday-source-textarea {
+  appearance: none;
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  resize: none;
+  overflow: auto;
+  padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  caret-color: var(--text-accent);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.oneday-source-textarea:focus {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.oneday-source-textarea[aria-invalid="true"] {
+  background: color-mix(in srgb, var(--text-error) 5%, transparent);
+}
+
+.oneday-source-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4-2, 8px);
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: var(--size-4-1, 4px) var(--size-4-3, 12px) var(--size-4-2, 8px);
+  font-size: var(--font-ui-smaller);
+}
+
+.oneday-source-feedback,
+.oneday-source-shortcut {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oneday-source-feedback.is-error {
+  color: var(--text-error);
+}
+
+.oneday-source-shortcut {
+  flex: 0 1 auto;
+  color: var(--text-faint);
+}
+
+@container (max-width: 520px) {
+  .oneday-source-header {
+    align-items: flex-start;
+  }
+
+  .oneday-source-heading {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .oneday-source-subtitle,
+  .oneday-source-shortcut {
+    display: none;
+  }
+}
+
 /* 轨道宽度手柄：只让时间轴本体的右边线成为命中区 */
 
 .oneday-width-handle {
@@ -1067,15 +2607,52 @@
   background: transparent;
 }
 
-/* 轴向延展预览 */
+/* 轴向范围：轨道外的绘制矩形就是完整热区，绝不借用边线透明命中。 */
 
-.oneday-svg .oneday-extend-zone {
-  fill: var(--interactive-accent);
-  fill-opacity: 0.08;
+.oneday-svg .oneday-range-step-controls {
+  opacity: 0;
+  pointer-events: all;
 }
 
-.oneday-svg .oneday-extend-tick {
-  stroke-dasharray: 4 3;
+.oneday-svg .oneday-range-step-controls:hover,
+.oneday-svg .oneday-range-step-controls:focus-within {
+  opacity: 1;
+}
+
+.oneday-svg .oneday-range-step-button {
+  cursor: pointer;
+  outline: none;
+}
+
+.oneday-svg .oneday-range-step-button[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.oneday-svg .oneday-range-step-button-bg {
+  fill: var(--background-modifier-hover);
+  stroke: var(--background-modifier-border);
+  stroke-width: 1;
+}
+
+.oneday-svg .oneday-range-step-button:hover .oneday-range-step-button-bg,
+.oneday-svg .oneday-range-step-button:focus .oneday-range-step-button-bg {
+  fill: var(--background-modifier-active-hover);
+  stroke: var(--interactive-accent);
+}
+
+.oneday-svg .oneday-range-step-button[aria-disabled="true"] .oneday-range-step-button-bg {
+  fill: var(--background-secondary);
+  stroke: var(--background-modifier-border);
+}
+
+.oneday-svg .oneday-range-step-button-text {
+  fill: var(--text-muted);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.oneday-svg .oneday-range-step-button[aria-disabled="true"] .oneday-range-step-button-text {
+  fill: var(--text-faint);
 }
 
 .oneday-svg .oneday-preview-block {
@@ -1105,6 +2682,20 @@
   background: repeating-linear-gradient(-45deg, var(--c, #bdbdbd) 0 1.2px, transparent 1.2px 4px);
 }
 
+/* 标记工具用“时间点的横线”而不是时段色块。符号本身同时编码
+   记录/计划：记录为实线，计划为虚线；10px 占位保持文字不跳动。 */
+.oneday-swatch-dot.is-marker {
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--c, #bdbdbd), var(--c, #bdbdbd)) center / 100% 2px no-repeat;
+}
+
+.oneday-swatch-dot.is-marker.is-plan {
+  border: 0;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, var(--c, #bdbdbd) 0 3px, transparent 3px 5px) center / 100% 2px no-repeat;
+}
+
 .oneday-body.is-settling .oneday-slot {
   transition: none !important; /* 初始量体/拟合不动画，否则创建色块时块会缩一下 */
 }
@@ -1131,14 +2722,144 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  gap: var(--size-4-2, 8px);
   width: 100%;
   margin-bottom: 2px;
 }
 
-.oneday-date-row {
+.oneday-timeline-topbar > button.oneday-timeline-date-control {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 24px;
+  margin: 0;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: var(--oneday-radius-control);
+  background: transparent;
+  box-shadow: none;
   font-size: 12px;
   color: var(--text-muted);
   font-family: var(--font-monospace);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.oneday-timeline-topbar > button.oneday-timeline-date-control:hover,
+.oneday-timeline-topbar > button.oneday-timeline-date-control:focus-visible,
+.oneday-timeline-topbar > button.oneday-timeline-date-control[aria-expanded="true"] {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.oneday-timeline-topbar > button.oneday-timeline-date-control:active {
+  transform: translateY(1px);
+}
+
+.oneday-date-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 220px;
+  padding: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-primary);
+  box-shadow: var(--shadow-s);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.oneday-date-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.oneday-date-picker-title {
+  flex: 1;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: var(--font-semibold, 600);
+  text-align: center;
+}
+
+.oneday-date-picker-nav {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.oneday-date-picker-nav:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.oneday-date-picker-weekdays,
+.oneday-date-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.oneday-date-picker-weekdays {
+  margin-bottom: 2px;
+}
+
+.oneday-date-picker-weekdays span {
+  color: var(--text-faint);
+  font-size: 9px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.oneday-date-picker-day {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s, 4px);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.oneday-date-picker-day.is-outside-month {
+  color: var(--text-faint);
+  opacity: 0.55;
+}
+
+.oneday-date-picker-day:hover,
+.oneday-date-picker-day:focus-visible {
+  background: var(--background-modifier-hover);
+  outline: none;
+}
+
+.oneday-date-picker-day.is-today:not(.is-selected) {
+  box-shadow: inset 0 0 0 1px var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.oneday-date-picker-day.is-selected {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: var(--font-semibold, 600);
 }
 
 /* plan 块标注（比实际块淡一档） */
@@ -1151,14 +2872,55 @@
 /* 色块编辑态：目标高亮，其余冻结 */
 
 .oneday-svg.is-editing-block .oneday-block.is-frozen,
-.oneday-svg.is-editing-block .oneday-plan-hatch.is-frozen {
-  opacity: 0.3;
+.oneday-svg.is-editing-block .oneday-plan-hatch.is-frozen,
+.oneday-svg.is-editing-block .oneday-marker-label-bg.is-frozen,
+.oneday-svg.is-editing-block .oneday-side-leader.is-frozen {
+  opacity: var(--oneday-focus-frozen-opacity);
   pointer-events: none;
+}
+
+.oneday-svg.is-editing-block .oneday-marker.is-frozen,
+.oneday-svg.is-editing-marker .oneday-marker.is-frozen {
+  opacity: var(--oneday-focus-frozen-stroke-opacity);
+  filter: grayscale(0.65);
+  pointer-events: none;
+}
+
+.oneday-svg.is-editing-marker :is(.oneday-block, .oneday-plan-hatch).is-frozen {
+  opacity: var(--oneday-focus-frozen-opacity);
+  pointer-events: none;
+}
+
+.oneday-svg.is-editing-marker :is(.oneday-marker-label-bg, .oneday-side-leader).is-frozen {
+  opacity: var(--oneday-focus-frozen-opacity);
+  pointer-events: none;
+}
+
+.oneday-svg.is-editing-marker {
+  cursor: default;
 }
 
 .oneday-svg .oneday-block.is-edit-target {
   stroke: var(--text-accent);
   stroke-width: 2;
+  stroke-opacity: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Delete is optimistic: remove every visual belonging to the source line in
+ * the click/key frame, then let the Markdown transaction remount the canvas. */
+.oneday-svg [data-line].is-pending-delete {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Selected time blocks own two real edge hit targets. The hot zones remain
+ * transparent: the block itself is the single visual owner of the four-sided
+ * selection frame, so top/bottom can never double-paint over that frame. */
+.oneday-svg .oneday-edit-edge {
+  fill: transparent;
+  pointer-events: all;
+  cursor: ns-resize;
 }
 
 /* 备注小浮窗（色块右侧） */
@@ -1194,26 +2956,110 @@
 
 /* 荧光笔模式小开关（色板前） */
 
-.oneday-brush-toggle {
-  margin-right: 8px;
+.oneday-tool-toggle {
+  /* 创建模式紧跟“新增为”；通用 .oneday-mode 的 auto 只属于右侧图层开关。 */
+  margin-left: 0;
+  margin-right: 0;
   display: inline-flex;
   align-items: stretch;
   box-sizing: border-box;
   height: var(--oneday-toolbar-control-height);
   min-height: var(--oneday-toolbar-control-height);
   /* 与荧光笔同层：默认态靠中性底色分组，不常驻一圈灰线。 */
-  border-color: transparent;
+  /* A transparent 1px border still subtracts 2px from the children's 100%
+   * height, making Record/Plan visibly shorter than category buttons. */
+  border: 0 solid transparent;
 }
 
-.oneday-brush-toggle .oneday-mode-btn {
+.oneday-tool-toggle .oneday-mode-btn {
   box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   height: 100%;
   min-height: 0;
 }
 
-.oneday-brush-toggle .oneday-mode-btn:not(.is-active) {
+.oneday-tool-toggle .oneday-mode-btn:not(.is-active) {
   /* 与荧光笔、拖拽手柄和块级按钮共享同一个不透明中性表面。 */
   background: var(--oneday-surface-neutral-control);
+}
+
+.oneday-tool-symbol {
+  display: inline-block;
+  width: 12px;
+  flex: 0 0 12px;
+  color: currentColor;
+}
+
+.oneday-tool-symbol.is-span {
+  height: 8px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.oneday-tool-symbol.is-marker {
+  height: 0;
+  border-top: 2px solid currentColor;
+}
+
+button.oneday-plan-mode-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--oneday-toolbar-control-height);
+  min-height: var(--oneday-toolbar-control-height);
+  padding: 0 2px;
+  border: 0;
+  border-radius: var(--oneday-radius-control);
+  background: transparent;
+  color: var(--text-normal);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+button.oneday-plan-mode-toggle:hover,
+button.oneday-plan-mode-toggle:focus-visible {
+  background: transparent;
+  box-shadow: none;
+}
+
+.oneday-plan-mode-track {
+  position: relative;
+  width: 24px;
+  height: 14px;
+  flex: 0 0 24px;
+  border-radius: 999px;
+  background-color: var(--oneday-surface-neutral-control, var(--background-secondary));
+  transition: background-color 120ms ease-out;
+}
+
+.oneday-plan-mode-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+  transition: transform 120ms ease-out, background-color 120ms ease-out;
+}
+
+.oneday-plan-mode-toggle.is-plan .oneday-plan-mode-track {
+  background-color: color-mix(in srgb, var(--interactive-accent) 30%, var(--oneday-surface-neutral-control, var(--background-secondary)));
+}
+
+.oneday-plan-mode-toggle.is-plan .oneday-plan-mode-thumb {
+  transform: translateX(10px);
+  background-color: var(--interactive-accent);
+}
+
+.oneday-plan-mode-label {
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 /* 视图三态开关（时间轴顶栏右侧） */
@@ -1247,11 +3093,19 @@
 
 .oneday-view-actual .oneday-svg .oneday-plan,
 .oneday-view-actual .oneday-svg .oneday-plan-hatch,
-.oneday-view-actual .oneday-svg .oneday-plan-label {
+.oneday-view-actual .oneday-svg .oneday-plan-label,
+.oneday-view-actual .oneday-svg .oneday-marker-plan,
+.oneday-view-actual .oneday-svg .oneday-marker-plan-label {
   display: none;
 }
 
 .oneday-view-plan .oneday-svg .oneday-block:not(.oneday-plan):not(.oneday-preview-block) {
+  display: none;
+}
+
+.oneday-view-plan .oneday-svg .oneday-marker:not(.oneday-marker-plan),
+.oneday-view-plan .oneday-svg .oneday-marker-label:not(.oneday-marker-plan-label),
+.oneday-view-plan .oneday-svg .oneday-marker-label-bg:not(.oneday-marker-plan-label) {
   display: none;
 }
 
@@ -1278,8 +3132,8 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  height: 26px;
-  min-height: 26px;
+  height: var(--oneday-compact-control-height);
+  min-height: var(--oneday-compact-control-height);
   padding: 2px 8px;
   border: 0;
   border-radius: var(--oneday-radius-control);
@@ -1346,8 +3200,13 @@
   font-size: 11px;
   color: var(--text-muted);
   align-self: center;
-  margin-right: 4px;
+  /* 相邻控件间距统一由 toolbar 的 gap token 管理，避免重复叠加。 */
+  margin-right: 0;
   white-space: nowrap;
+}
+
+.oneday-creation-title {
+  color: var(--text-normal);
 }
 
 .oneday-layer-btn {
@@ -1410,6 +3269,13 @@
 .oneday-view-none .oneday-svg .oneday-duration,
 .oneday-view-none .oneday-svg .oneday-note,
 .oneday-view-none .oneday-svg .oneday-plan-label {
+  display: none;
+}
+
+
+.oneday-view-none .oneday-svg .oneday-marker,
+.oneday-view-none .oneday-svg .oneday-marker-label,
+.oneday-view-none .oneday-svg .oneday-marker-label-bg {
   display: none;
 }
 
@@ -1628,4 +3494,560 @@ body.is-mobile .oneday-container.is-layout-editing .oneday-block-resize-se,
 body.is-tablet .oneday-container.is-layout-editing .oneday-block-resize-se {
   width: 32px;
   height: 32px;
+}
+
+/* Daily Quote — an editorial card anchored by a small timeline cursor. */
+.oneday-slot-quote {
+  overflow: hidden;
+}
+
+.oneday-daily-quote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2, 8px);
+  height: 100%;
+  min-height: 0;
+}
+
+.oneday-daily-quote .oneday-component-header {
+  flex: 0 0 auto;
+}
+
+.oneday-component-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--oneday-radius-control);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+.oneday-daily-quote-card {
+  --oneday-quote-bg: var(--oneday-surface-control);
+  --oneday-quote-text: var(--text-normal);
+  --oneday-quote-accent: var(--interactive-accent);
+  --oneday-quote-font-size: 20px;
+  --oneday-quote-overlay: .28;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 78px;
+  margin: 0;
+  padding: clamp(16px, 4%, 28px);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--oneday-quote-accent) 25%, var(--background-modifier-border));
+  border-radius: var(--oneday-radius-surface);
+  background-color: var(--oneday-quote-bg);
+  background-size: cover;
+  background-position: center;
+  color: var(--oneday-quote-text);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color .12s ease, transform .12s ease;
+}
+
+.oneday-daily-quote-card:hover,
+.oneday-daily-quote-card:focus-visible {
+  border-color: var(--oneday-quote-accent);
+}
+
+.oneday-daily-quote-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--oneday-quote-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.oneday-daily-quote-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--oneday-quote-accent) 10%, transparent), transparent 58%);
+  pointer-events: none;
+}
+
+.oneday-daily-quote-media {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.oneday-daily-quote-media > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center;
+}
+
+.oneday-daily-quote-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / var(--oneday-quote-overlay));
+}
+
+.oneday-daily-quote-cursor {
+  display: flex;
+  align-items: center;
+  width: 26px;
+  margin-right: 14px;
+  flex: 0 0 auto;
+}
+
+.oneday-daily-quote-cursor::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--oneday-quote-accent);
+}
+
+.oneday-daily-quote-cursor span {
+  width: 18px;
+  height: 1px;
+  background: var(--oneday-quote-accent);
+}
+
+.oneday-daily-quote-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.oneday-daily-quote-body blockquote {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  font-size: var(--oneday-quote-font-size);
+  line-height: 1.55;
+  font-weight: 560;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.oneday-daily-quote-body blockquote.is-long { font-size: calc(var(--oneday-quote-font-size) * .86); }
+.oneday-daily-quote-body blockquote.is-very-long { font-size: calc(var(--oneday-quote-font-size) * .72); }
+
+.oneday-daily-quote-body figcaption {
+  margin-top: 10px;
+  color: color-mix(in srgb, currentColor 68%, transparent);
+  font-size: 12px;
+}
+
+.oneday-daily-quote-card.font-serif { font-family: ui-serif, "Songti SC", "Noto Serif CJK SC", Georgia, serif; }
+.oneday-daily-quote-card.font-mono { font-family: var(--font-monospace); }
+.oneday-daily-quote-card.layout-center { text-align: center; }
+.oneday-daily-quote-card.layout-center .oneday-daily-quote-cursor { display: none; }
+.oneday-daily-quote-card.layout-editorial .oneday-daily-quote-cursor { align-self: flex-start; margin-top: .55em; }
+
+.oneday-daily-quote-empty {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--oneday-radius-surface);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+.oneday-daily-quote-empty:hover { border-color: var(--interactive-accent); color: var(--text-normal); }
+.oneday-daily-quote-empty-icon { display: inline-flex; }
+
+/* Daily Quote settings: split design workbench and compact quote library. */
+.oneday-quote-settings {
+  --oneday-radius-control: var(--button-radius, 6px);
+  --oneday-radius-surface: var(--oneday-radius-control);
+  --oneday-surface-control: color-mix(in srgb, var(--text-normal) 10%, var(--background-primary));
+  display: flex;
+  flex-direction: column;
+  gap: var(--oneday-settings-gap-md, 16px);
+  min-width: 0;
+}
+
+.oneday-settings-modal.oneday-quote-settings,
+.oneday-settings-modal:has(.oneday-quote-settings) {
+  width: min(920px, calc(100vw - 32px));
+  max-width: 920px;
+  box-sizing: border-box;
+}
+
+.oneday-quote-settings-status {
+  min-height: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+.oneday-quote-settings-status:empty { display: none; }
+.oneday-quote-settings-status.is-error { color: var(--text-error); }
+
+.oneday-quote-settings-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  border-radius: var(--oneday-radius-control);
+  background: var(--background-modifier-hover);
+}
+
+.oneday-quote-settings-tabs button {
+  min-height: var(--oneday-settings-control-height, 34px);
+  padding: 5px 14px;
+  border: 0;
+  border-radius: calc(var(--oneday-radius-control) - 2px);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+.oneday-quote-settings-tabs button[aria-selected="true"] {
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.oneday-quote-designer {
+  display: grid;
+  grid-template-columns: minmax(340px, 400px) minmax(320px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.oneday-quote-design-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.oneday-quote-design-section {
+  padding: 0;
+  border: 0;
+}
+.oneday-quote-design-section h4,
+.oneday-quote-preview-panel > h4 { margin: 0 0 10px; font-size: 13px; }
+
+.oneday-quote-preview-panel {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+}
+.oneday-quote-settings-preview { min-height: 238px; }
+.oneday-quote-settings-preview .oneday-daily-quote-card {
+  min-height: 238px;
+  cursor: default;
+}
+.oneday-quote-settings-preview .oneday-daily-quote-card.is-cropping {
+  cursor: grab;
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+.oneday-quote-settings-preview .oneday-daily-quote-card.is-cropping:active { cursor: grabbing; }
+
+.oneday-quote-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.oneday-quote-theme-grid button {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 54px;
+  padding: 6px 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+}
+
+.oneday-quote-theme-grid button:hover { background: var(--background-modifier-hover); }
+.oneday-quote-theme-grid button[aria-checked="true"] {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 9%, transparent);
+  color: var(--text-accent, var(--interactive-accent));
+}
+.oneday-quote-theme-swatch { width: 20px; height: 20px; border-radius: 6px; background: var(--background-modifier-hover); }
+.oneday-quote-theme-swatch.theme-paper { background: #f4efe5; }
+.oneday-quote-theme-swatch.theme-midnight { background: #201d2e; }
+.oneday-quote-theme-swatch.theme-aurora { background: #e6f4ef; }
+.oneday-quote-theme-swatch.theme-photo { background: #52677d; }
+
+.oneday-quote-settings-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.oneday-quote-settings-controls > .oneday-quote-setting-field.is-font-size { grid-column: 1 / -1; }
+
+.oneday-quote-setting-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.oneday-quote-setting-field > label { color: var(--text-muted); font-size: 12px; }
+.oneday-quote-setting-field :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--input-height, 30px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--input-radius, var(--oneday-radius-control));
+  background: var(--background-modifier-form-field, var(--background-primary));
+  color: var(--text-normal);
+  box-sizing: border-box;
+}
+.oneday-quote-setting-field textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.oneday-quote-setting-field :is(input, select):focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  outline: none;
+}
+.oneday-quote-color-control { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; }
+.oneday-quote-color-control input[type="color"] { width: 38px; padding: 3px; }
+
+.oneday-quote-file-input { display: none; }
+.oneday-quote-media-editor {
+  display: flex;
+  min-height: 92px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  outline: none;
+  box-sizing: border-box;
+}
+.oneday-quote-media-editor:is(:focus-visible, .is-dragover) {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
+}
+.oneday-quote-media-empty {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.oneday-quote-media-empty strong { color: var(--text-normal); font-size: 13px; }
+.oneday-quote-media-empty span:last-child { font-size: 12px; }
+.oneday-quote-media-icon { display: inline-flex; }
+.oneday-quote-media-icon svg { width: 20px; height: 20px; }
+.oneday-quote-media-thumb {
+  width: 92px;
+  height: 66px;
+  overflow: hidden;
+  border-radius: var(--oneday-radius-control);
+  background: var(--background-secondary);
+  flex: 0 0 auto;
+}
+.oneday-quote-media-thumb img { width: 100%; height: 100%; object-fit: cover; transform-origin: center; }
+.oneday-quote-media-tools,
+.oneday-quote-media-sources,
+.oneday-quote-url-row,
+.oneday-quote-crop-buttons,
+.oneday-quote-settings-primary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.oneday-quote-media-sources { margin-top: 8px; }
+.oneday-quote-media-sources :is(button, select),
+.oneday-quote-media-tools button,
+.oneday-quote-url-row button,
+.oneday-quote-crop-buttons button,
+.oneday-quote-settings-footer button,
+.oneday-quote-library-editor-actions button {
+  min-height: 36px;
+}
+.oneday-quote-media-tools .is-destructive,
+.oneday-quote-icon-button.is-destructive { color: var(--text-error); }
+.oneday-quote-url-source { margin-top: 8px; }
+.oneday-quote-url-source summary,
+.oneday-quote-advanced summary { color: var(--text-muted); cursor: pointer; }
+.oneday-quote-url-row { margin-top: 8px; }
+.oneday-quote-url-row input { flex: 1 1 220px; min-width: 0; }
+.oneday-quote-range { display: grid; grid-template-columns: minmax(0, 1fr) 56px; align-items: center; gap: 8px; }
+.oneday-quote-range output { color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+
+.oneday-quote-crop-actions {
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+}
+.oneday-quote-crop-actions.is-visible { display: grid; gap: 10px; }
+.oneday-quote-advanced { padding-top: 0; }
+.oneday-quote-advanced[open] summary { margin-bottom: 12px; }
+
+.oneday-quote-settings-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.oneday-quote-library-header { display: flex; align-items: center; gap: 12px; }
+.oneday-quote-library-header > div:first-child { flex: 1 1 auto; }
+.oneday-quote-library-header h4 { margin: 0; }
+.oneday-quote-library-header p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.oneday-quote-library-list { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
+.oneday-quote-library-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  box-sizing: border-box;
+}
+.oneday-quote-library-row:hover { background: var(--background-modifier-hover); }
+.oneday-quote-library-grip {
+  appearance: none;
+  display: inline-flex;
+  width: 24px;
+  height: 32px;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none;
+}
+.oneday-quote-library-grip:hover,
+.oneday-quote-library-grip:focus-visible { background: transparent; color: var(--text-normal); }
+.oneday-quote-library-grip:active { cursor: grabbing; }
+.oneday-quote-library-grip svg { width: 15px; height: 15px; }
+.oneday-quote-library-summary { display: flex; flex-direction: column; min-width: 0; }
+.oneday-quote-library-summary strong,
+.oneday-quote-library-summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oneday-quote-library-summary span { color: var(--text-muted); font-size: 12px; }
+.oneday-quote-library-actions {
+  display: flex;
+  opacity: 0;
+  pointer-events: none;
+}
+.oneday-quote-library-row:is(:hover, :focus-within) .oneday-quote-library-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.oneday-quote-library-row.is-dragging {
+  margin: 0;
+  background: var(--background-primary);
+  box-shadow: var(--shadow-s);
+  cursor: grabbing;
+  opacity: .96;
+  will-change: transform;
+}
+.oneday-quote-library-placeholder {
+  border: 1px dashed var(--interactive-accent);
+  border-radius: var(--oneday-radius-control);
+  background: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
+  box-sizing: border-box;
+}
+.oneday-quote-icon-button {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+.oneday-quote-icon-button:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.oneday-quote-library-editor {
+  display: none;
+  grid-column: 2 / -1;
+  grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr);
+  gap: 10px;
+  padding: 8px 0;
+}
+.oneday-quote-library-row.is-editing .oneday-quote-library-editor { display: grid; }
+.oneday-quote-library-editor-actions { grid-column: 1 / -1; justify-content: flex-end; }
+.oneday-quote-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+}
+.oneday-quote-composer h5 { grid-column: 1 / -1; margin: 0; }
+.oneday-quote-library-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--oneday-radius-control);
+  background: var(--background-modifier-hover);
+}
+.oneday-quote-add {
+  appearance: none;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  min-height: 38px;
+  padding: 4px 10px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--oneday-radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  white-space: nowrap;
+}
+.oneday-quote-add:hover { border-color: var(--background-modifier-border-hover, var(--background-modifier-border)); color: var(--text-normal); }
+.oneday-quote-add svg,
+.oneday-quote-icon-button svg { width: 16px; height: 16px; }
+
+@media (max-width: 760px) {
+  .oneday-settings-modal.oneday-quote-settings,
+  .oneday-settings-modal:has(.oneday-quote-settings) { width: calc(100vw - 20px); }
+  .oneday-quote-designer { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .oneday-quote-preview-panel { position: static; order: -1; }
+  .oneday-quote-settings-preview,
+  .oneday-quote-settings-preview .oneday-daily-quote-card { min-height: 180px; }
+  .oneday-quote-settings-controls,
+  .oneday-quote-library-editor,
+  .oneday-quote-composer { grid-template-columns: 1fr; }
+  .oneday-quote-library-editor-actions,
+  .oneday-quote-composer h5 { grid-column: 1; }
+  .oneday-quote-library-actions .oneday-quote-icon-button { width: 36px; height: 36px; min-height: 36px; }
+  .oneday-quote-library-header { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .oneday-quote-theme-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .oneday-quote-settings-footer { align-items: stretch; flex-direction: column; }
+  .oneday-quote-settings-primary-actions { justify-content: flex-end; }
 }

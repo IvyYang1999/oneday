@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  clampItem, compactGrid, defaultGrid, gridColumns, gridRows, overlaps, parseLayoutHeader, resolveGrid,
+  clampItem, compactGrid, compactGridVertically, defaultGrid, gridColumns, gridRows, HABITS_EMPTY_ROWS, overlaps, parseLayoutHeader, resolveGrid,
   resolveHorizontalOverlaps, resolveOverlaps, serializeLayoutHeader,
 } from "./grid-layout"
 
@@ -77,6 +77,35 @@ describe("resolveGrid", () => {
   })
 })
 
+describe("optional habit and todo components", () => {
+  it("keeps an empty habit component to one prospective item row", () => {
+    expect(HABITS_EMPTY_ROWS).toBe(4)
+  })
+
+  it("adds requested optional slots without making them mandatory for every block", () => {
+    const ordinary = resolveGrid(null, 0, undefined, 20)
+    expect(ordinary.some((item) => item.id === "habits" || item.id === "todos")).toBe(false)
+
+    const enriched = resolveGrid(null, 0, undefined, 20, [], 1, false, [
+      { id: "habits", x: 0, y: 0, w: 7, h: HABITS_EMPTY_ROWS },
+      { id: "todos", x: 0, y: 0, w: 7, h: 8 },
+    ])
+    expect(enriched.filter((item) => ["habits", "todos"].includes(item.id)).map((item) => item.id)).toEqual([
+      "habits", "todos",
+    ])
+  })
+
+  it("adds a daily quote only when the block requests that optional component", () => {
+    const ordinary = resolveGrid(null, 0, undefined, 20)
+    expect(ordinary.some((item) => item.id === "quote")).toBe(false)
+
+    const withQuote = resolveGrid(null, 0, undefined, 20, [], 1, false, [
+      { id: "quote", x: 0, y: 0, w: 7, h: 8 },
+    ])
+    expect(withQuote.find((item) => item.id === "quote")).toMatchObject({ w: 7, h: 8 })
+  })
+})
+
 describe("grid helpers", () => {
   it("overlaps / clampItem / gridRows", () => {
     expect(overlaps({ id: "text", x: 0, y: 0, w: 2, h: 2 }, { id: "stats", x: 1, y: 1, w: 2, h: 2 })).toBe(true)
@@ -126,6 +155,22 @@ describe("compactGrid (重力压实)", () => {
   it("slides left after falling up", () => {
     const out = compactGrid([{ id: "stats", x: 6, y: 0, w: 6, h: 1 }])
     expect(out[0].x).toBe(0)
+  })
+})
+
+describe("compactGridVertically (移动时保留列)", () => {
+  it("keeps the timeline column stable while Stats moves below it", () => {
+    const out = compactGridVertically([
+      { id: "stats", x: 6, y: 10, w: 6, h: 4 },
+      { id: "toolbar", x: 0, y: 4, w: 6, h: 3 },
+      { id: "dialog", x: 0, y: 7, w: 6, h: 4 },
+      { id: "timeline", x: 6, y: 0, w: 6, h: 10 },
+    ], "stats")
+
+    expect(out.find((item) => item.id === "timeline")).toMatchObject({ x: 6, y: 0 })
+    expect(out.find((item) => item.id === "stats")).toMatchObject({ x: 6, y: 10 })
+    expect(out.find((item) => item.id === "toolbar")).toMatchObject({ x: 0, y: 0 })
+    expect(out.find((item) => item.id === "dialog")).toMatchObject({ x: 0, y: 3 })
   })
 })
 

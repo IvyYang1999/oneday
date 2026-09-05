@@ -1,5 +1,6 @@
 /** HTTP runner for the dialog: model API 直调（D7 不变——插件仍是唯一写回方）. */
 import { ApiConfig, buildChatRequest, parseChatResponse } from "./api-client"
+import { t } from "../i18n"
 
 export type ApiRunResult =
   | { ok: true; text: string }
@@ -21,17 +22,17 @@ export async function runEntryAgentApi(
   history: Array<{ role: "user" | "assistant"; content: string }> = []
 ): Promise<ApiRunResult> {
   if (!cfg.apiKey.trim()) {
-    return { ok: false, reason: "请先在 Oneday 设置里填 API Key" }
+    return { ok: false, reason: t("missingApiKey") }
   }
   if (!cfg.baseUrl.trim() || !cfg.model.trim()) {
-    return { ok: false, reason: "请先在 Oneday 设置里填 Base URL 和模型名" }
+    return { ok: false, reason: t("missingApiEndpoint") }
   }
   const req = buildChatRequest(cfg, systemPrompt, userText, history)
   let res
   try {
     res = await http(req)
   } catch (error) {
-    return { ok: false, reason: `网络请求失败：${error instanceof Error ? error.message : String(error)}` }
+    return { ok: false, reason: t("networkFailed", { reason: error instanceof Error ? error.message : String(error) }) }
   }
   return parseChatResponse(cfg.provider, res.status, res.json)
 }

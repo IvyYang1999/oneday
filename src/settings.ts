@@ -2,15 +2,22 @@
  * Plugin settings: type -> color mapping (荧光笔色号, D2) + 对话模型配置
  * （2026-08-16 拍板：设置页填 API key 直调模型）+ layout knobs.
  */
-import { App, PluginSettingTab, Setting } from "obsidian"
+import { App, PluginSettingTab, Setting, setIcon } from "obsidian"
 import type OnedayPlugin from "./main"
 import { ApiProvider } from "./agent/api-client"
 import { DEFAULT_TYPE_COLORS } from "./core/type-colors"
+import { t as tr } from "./i18n"
+import type { HabitDefinition } from "./core/habits"
+import type { WeeklyTodoDefinition } from "./core/todos"
+import { renderCategorySettings, renderHabitSettings } from "./settings-editors"
+import { DEFAULT_DAILY_QUOTE_APPEARANCE, type DailyQuoteAppearance, type DailyQuoteDefinition } from "./core/daily-quotes"
+import { renderDailyQuoteSettings } from "./daily-quote-settings"
 
 export type DialogBackend = "api" | "claude-cli"
 
 export interface OnedaySettings {
-  typeColors: Record<string, string>
+  spanTypeColors: Record<string, string>
+  markerTypeColors: Record<string, string>
   hourHeight: number
   width: number
   /** 默认时间轴起止小时（块内 range: 头可覆盖） */
@@ -22,29 +29,46 @@ export interface OnedaySettings {
   baseUrl: string
   model: string
   /** 删除/改名的类型色号存档：新建块不显示，旧块里的色块/色板仍用原色（yyt 2026-08-17） */
-  retiredTypeColors: Record<string, string>
+  spanRetiredTypeColors: Record<string, string>
+  markerRetiredTypeColors: Record<string, string>
   /** 布局记忆（「设为默认布局」）：新建块按此摆放 */
   templateLayout?: string
   templateWidth?: number
   templateHasText?: boolean
   /** 新用户时间轴拖拽引导是否已经展示过（全局一次） */
   timelineOnboardingSeen: boolean
+  /** Global recurring habit rules projected into matching daily blocks. */
+  habits: HabitDefinition[]
+  /** Weekly cumulative Todo goals shown every day until the weekly quota is reached. */
+  weeklyTodos: WeeklyTodoDefinition[]
+  /** Global sentence library shared by every Daily Quote component. */
+  dailyQuotes: DailyQuoteDefinition[]
+  /** Appearance copied into a new Daily Quote component. */
+  dailyQuoteDefaults: DailyQuoteAppearance
 }
 
 export const DEFAULT_SETTINGS: OnedaySettings = {
-  typeColors: DEFAULT_TYPE_COLORS,
+  spanTypeColors: DEFAULT_TYPE_COLORS,
+  markerTypeColors: {},
   hourHeight: 48,
   width: 200,
   rangeStartHour: 7,
   rangeEndHour: 23,
-  retiredTypeColors: {},
+  spanRetiredTypeColors: {},
+  markerRetiredTypeColors: {},
   dialogBackend: "api",
   provider: "openai-compatible",
   apiKey: "",
   baseUrl: "https://open.bigmodel.cn/api/paas/v4",
   model: "glm-4.5-air",
   timelineOnboardingSeen: false,
+  habits: [],
+  weeklyTodos: [],
+  dailyQuotes: [],
+  dailyQuoteDefaults: { ...DEFAULT_DAILY_QUOTE_APPEARANCE },
 }
+
+const newId = (prefix: string): string => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 
 export class OnedaySettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: OnedayPlugin) {
@@ -54,78 +78,100 @@ export class OnedaySettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this
     containerEl.empty()
-    containerEl.createEl("h2", { text: "Oneday 时间轴" })
+    containerEl.addClass("oneday-focused-settings")
+    containerEl.addClass("oneday-settings-tab")
+    containerEl.createEl("h2", { text: tr("settingsTitle") })
 
-    containerEl.createEl("h3", { text: "荧光笔色号（全局）" })
-    const paletteDesc = containerEl.createEl("p", {
-      text: "这里是全局默认荧光笔，对新建块生效。删除/改名的类型会从新建块消失，但旧块里已使用的同名色块和色板仍按原色保留。每个 block 默认显示全部荧光笔，可在块内右键色板临时隐藏。",
-      cls: "setting-item-description",
-    })
-    paletteDesc.style.marginTop = "0"
-
-    const paletteEl = containerEl.createDiv()
-    const renderPalette = (): void => {
-      paletteEl.empty()
-      for (const [type, color] of Object.entries(this.plugin.settings.typeColors)) {
-        const row = new Setting(paletteEl)
-        row.settingEl.addClass("oneday-palette-setting")
-        row
-          .addColorPicker((cp) =>
-            cp.setValue(color).onChange(async (v) => {
-              this.plugin.settings.typeColors[type] = v
-              await this.plugin.saveSettings({ rerender: true })
-            })
-          )
-          .addText((t) => {
-            t.setValue(type).setPlaceholder("类型名")
-            // 改名失焦/回车才提交——逐键改名会产生中间态把 key 搞乱（yyt 2026-08-17 踩坑）
-            const commit = async (): Promise<void> => {
-              const name = t.inputEl.value.trim()
-              if (name === type) return
-              if (!/^\S+$/.test(name) || name in this.plugin.settings.typeColors) {
-                t.inputEl.value = type // 非法/重名：回退显示
-                return
-              }
-              const entries = Object.entries(this.plugin.settings.typeColors).map(([k, c]): [string, string] =>
-                k === type ? [name, c] : [k, c]
-              )
-              this.plugin.settings.typeColors = Object.fromEntries(entries)
-              this.plugin.settings.retiredTypeColors[type] ??= color // 旧名进退休板，旧块保色
-              await this.plugin.saveSettings({ rerender: true })
-              renderPalette()
-            }
-            t.inputEl.addEventListener("blur", () => void commit())
-            t.inputEl.addEventListener("keydown", (e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                t.inputEl.blur()
-              }
-            })
-          })
-          .addExtraButton((b) =>
-            b.setIcon("trash").setTooltip("删除").onClick(async () => {
-              this.plugin.settings.retiredTypeColors[type] ??= this.plugin.settings.typeColors[type] // 退休板保色
-              delete this.plugin.settings.typeColors[type]
-              await this.plugin.saveSettings({ rerender: true })
-              renderPalette()
-            })
-          )
-      }
-      new Setting(paletteEl).addButton((b) =>
-        b.setButtonText("添加荧光笔").onClick(async () => {
-          let n = 1
-          while (`type${n}` in this.plugin.settings.typeColors) n++
-          this.plugin.settings.typeColors[`type${n}`] = "#bdbdbd"
-          await this.plugin.saveSettings({ rerender: true })
-          renderPalette()
-        })
-      )
+    for (const [scope, heading, description] of [
+      ["span", tr("spanCategoriesHeading"), tr("spanCategoriesDescription")],
+      ["marker", tr("markerCategoriesHeading"), tr("markerCategoriesDescription")],
+    ] as const) {
+      const categorySection = containerEl.createDiv({ cls: "oneday-settings-section" })
+      categorySection.dataset.settingsSection = `${scope}-categories`
+      categorySection.createEl("h3", { text: heading })
+      categorySection.createEl("p", { text: description, cls: "setting-item-description" })
+      renderCategorySettings(categorySection.createDiv({ cls: "oneday-settings-section-editor" }), this.plugin, scope)
     }
-    renderPalette()
 
-    new Setting(containerEl)
-      .setName("默认时间范围（起–止，小时）")
-      .setDesc("如 7–23；想全天就 0–24。单个块可用 range: 头覆盖。")
+    const habitSection = containerEl.createDiv({ cls: "oneday-settings-section" })
+    habitSection.dataset.settingsSection = "habits"
+    habitSection.createEl("h3", { text: tr("habitsHeading") })
+    habitSection.createEl("p", { text: tr("habitsDescription"), cls: "setting-item-description" })
+    renderHabitSettings(habitSection.createDiv({ cls: "oneday-settings-section-editor" }), this.plugin)
+
+    const quoteSection = containerEl.createDiv({ cls: "oneday-settings-section" })
+    quoteSection.dataset.settingsSection = "daily-quotes"
+    quoteSection.createEl("h3", { text: tr("dailyQuoteSettings") })
+    quoteSection.createEl("p", { text: tr("dailyQuoteSettingsDescription"), cls: "setting-item-description" })
+    renderDailyQuoteSettings(
+      quoteSection.createDiv({ cls: "oneday-settings-section-editor" }),
+      this.plugin,
+      {
+        appearance: this.plugin.settings.dailyQuoteDefaults,
+        scope: "defaults",
+        onApply: async (appearance) => {
+          this.plugin.settings.dailyQuoteDefaults = appearance
+          await this.plugin.saveSettings({ rerender: true })
+        },
+      }
+    )
+
+    const weeklyTodoSection = containerEl.createDiv({ cls: "oneday-settings-section" })
+    weeklyTodoSection.dataset.settingsSection = "todo-rules"
+    weeklyTodoSection.createEl("h3", { text: tr("todoRulesHeading") })
+    weeklyTodoSection.createEl("p", { text: tr("todoRulesDescription"), cls: "setting-item-description" })
+    const weeklyTodosEl = weeklyTodoSection.createDiv({ cls: "oneday-rules-settings oneday-settings-section-editor" })
+    const renderWeeklyTodos = (): void => {
+      weeklyTodosEl.empty()
+      const categories = Object.keys(this.plugin.settings.spanTypeColors)
+      for (const todo of [...this.plugin.settings.weeklyTodos].sort((a, b) => a.order - b.order)) {
+        const row = new Setting(weeklyTodosEl).setClass("oneday-rule-setting")
+        row.addText((control) => control.setValue(todo.title).setPlaceholder(tr("todoTitle")).onChange(async (value) => {
+          todo.title = value.trim(); await this.plugin.saveSettings({ rerender: true })
+        }))
+        row.addDropdown((control) => {
+          control.addOption("", tr("noCategory")); categories.forEach((category) => control.addOption(category, category))
+          control.setValue(todo.type ?? "").onChange(async (value) => {
+            todo.type = value || undefined; await this.plugin.saveSettings({ rerender: true })
+          })
+        })
+        row.addText((control) => {
+          control.inputEl.type = "number"; control.inputEl.min = "5"; control.inputEl.step = "5"
+          control.setValue(String(todo.targetMinutes)).setPlaceholder(tr("targetMinutes")).onChange(async (value) => {
+            todo.targetMinutes = Math.max(5, Number(value) || 5); await this.plugin.saveSettings({ rerender: true })
+          })
+        })
+        row.addExtraButton((button) => button.setIcon("trash").setTooltip(tr("delete")).onClick(async () => {
+          this.plugin.settings.weeklyTodos = this.plugin.settings.weeklyTodos.filter((item) => item.id !== todo.id)
+          await this.plugin.saveSettings({ rerender: true }); renderWeeklyTodos()
+        }))
+      }
+      const add = weeklyTodosEl.createEl("button", {
+        cls: "oneday-settings-add-rule",
+        attr: { type: "button", "aria-label": tr("addWeeklyTodo") },
+      })
+      setIcon(add, "plus")
+      add.createEl("span", { text: tr("addWeeklyTodo") })
+      add.addEventListener("click", async () => {
+        this.plugin.settings.weeklyTodos.push({
+          id: newId("weekly"), title: tr("addWeeklyTodo"), group: "", targetMinutes: 120,
+          order: this.plugin.settings.weeklyTodos.length,
+        })
+        await this.plugin.saveSettings({ rerender: true })
+        renderWeeklyTodos()
+      })
+    }
+    renderWeeklyTodos()
+
+    const timelineSection = containerEl.createDiv({ cls: "oneday-settings-section" })
+    timelineSection.dataset.settingsSection = "timeline"
+    timelineSection.createEl("h3", { text: tr("timelineSettingsHeading") })
+    timelineSection.createEl("p", { text: tr("timelineSettingsDescription"), cls: "setting-item-description" })
+    const timelineSettingsEl = timelineSection.createDiv({ cls: "oneday-settings-section-editor" })
+
+    new Setting(timelineSettingsEl)
+      .setName(tr("defaultRange"))
+      .setDesc(tr("defaultRangeDescription"))
       .addText((t) =>
         t.setValue(String(this.plugin.settings.rangeStartHour)).onChange(async (v) => {
           const n = Number(v)
@@ -145,8 +191,8 @@ export class OnedaySettingTab extends PluginSettingTab {
         })
       )
 
-    new Setting(containerEl)
-      .setName("每小时高度（px）")
+    new Setting(timelineSettingsEl)
+      .setName(tr("hourHeight"))
       .addText((t) =>
         t.setValue(String(this.plugin.settings.hourHeight)).onChange(async (v) => {
           const n = Number(v)
@@ -157,15 +203,15 @@ export class OnedaySettingTab extends PluginSettingTab {
         })
       )
 
-    containerEl.createEl("h3", { text: "自然语言记录（对话框）" })
+    containerEl.createEl("h3", { text: tr("naturalLanguageHeading") })
 
     new Setting(containerEl)
-      .setName("后端")
-      .setDesc("api = 直调模型 API（推荐）；claude-cli = 调本机 Claude Code CLI")
+      .setName(tr("backend"))
+      .setDesc(tr("backendDescription"))
       .addDropdown((d) =>
         d
-          .addOption("api", "模型 API 直调")
-          .addOption("claude-cli", "本机 claude CLI")
+          .addOption("api", tr("apiDirect"))
+          .addOption("claude-cli", tr("localClaudeCli"))
           .setValue(this.plugin.settings.dialogBackend)
           .onChange(async (v) => {
             this.plugin.settings.dialogBackend = v as DialogBackend
@@ -174,11 +220,11 @@ export class OnedaySettingTab extends PluginSettingTab {
       )
 
     new Setting(containerEl)
-      .setName("API 协议")
-      .setDesc("openai-compatible 覆盖 GLM / DeepSeek / OpenAI 等大多数服务")
+      .setName(tr("apiProtocol"))
+      .setDesc(tr("apiProtocolDescription"))
       .addDropdown((d) =>
         d
-          .addOption("openai-compatible", "OpenAI 兼容")
+          .addOption("openai-compatible", tr("openaiCompatible"))
           .addOption("anthropic", "Anthropic")
           .setValue(this.plugin.settings.provider)
           .onChange(async (v) => {
@@ -189,7 +235,7 @@ export class OnedaySettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("API Key")
-      .setDesc("明文存在 Obsidian data.json，仅本机使用")
+      .setDesc(tr("apiKeyDescription"))
       .addText((t) => {
         t.inputEl.type = "password"
         t.setPlaceholder("sk-…")
@@ -202,7 +248,7 @@ export class OnedaySettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Base URL")
-      .setDesc("如 GLM：https://open.bigmodel.cn/api/paas/v4；DeepSeek：https://api.deepseek.com/v1")
+      .setDesc(tr("baseUrlDescription"))
       .addText((t) =>
         t.setValue(this.plugin.settings.baseUrl).onChange(async (v) => {
           this.plugin.settings.baseUrl = v.trim()
@@ -211,8 +257,8 @@ export class OnedaySettingTab extends PluginSettingTab {
       )
 
     new Setting(containerEl)
-      .setName("模型")
-      .setDesc("如 glm-4.5-air / deepseek-chat / gpt-4o-mini / claude-haiku-4-5")
+      .setName(tr("model"))
+      .setDesc(tr("modelDescription"))
       .addText((t) =>
         t.setValue(this.plugin.settings.model).onChange(async (v) => {
           this.plugin.settings.model = v.trim()

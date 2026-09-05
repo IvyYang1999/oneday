@@ -4,6 +4,11 @@
  * the code block in the note via MarkdownPostProcessorContext.
  */
 import { parseTimeline } from "../core/parser"
+import { formatEntryLine } from "../core/format"
+import { MIN_TIMELINE_SPAN_MINUTES } from "../core/duration"
+import { formatTodoHeaderValue } from "../core/todos"
+import { parseRecoverableLayoutHeader } from "../core/grid-layout"
+import type { TodoItem } from "../core/types"
 
 /** Insert sourceLine into source. Returns the new block source. */
 export function insertEntryLine(source: string, sourceLine: string, newStartMin: number): string {
@@ -38,12 +43,44 @@ export function insertEntryLine(source: string, sourceLine: string, newStartMin:
   return [...body, ...trailing].join("\n")
 }
 
+/** Insert a categorized point marker in stable timestamp/source order. */
+export function insertMarkerLine(source: string, sourceLine: string, timeMin: number): string {
+  const lines = source.split("\n")
+  const doc = parseTimeline(source)
+  const boundary = lines.findIndex((line) => line.trim() === "===")
+  const end = boundary >= 0 ? boundary : lines.length
+  let insertAt = -1
+  for (const marker of doc.annotations) {
+    if (marker.timeMin <= timeMin && marker.line < end) insertAt = Math.max(insertAt, marker.line)
+  }
+  if (insertAt >= 0) {
+    lines.splice(insertAt + 1, 0, sourceLine)
+  } else {
+    const firstMarker = doc.annotations.find((marker) => marker.line < end)?.line
+    lines.splice(firstMarker ?? end, 0, sourceLine)
+  }
+  return lines.join("\n")
+}
+
 /** Replace the 0-based line inside the block source. */
 export function replaceEntryLine(source: string, line: number, newLine: string): string {
   const lines = source.split("\n")
   if (line < 0 || line >= lines.length) throw new Error(`行号越界：${line}`)
   lines[line] = newLine
   return lines.join("\n")
+}
+
+/** Atomically replace one categorized point with the canonical five-minute span. */
+export function convertMarkerToEntry(source: string, line: number): string {
+  const marker = parseTimeline(source).annotations.find((item) => item.line === line && item.type)
+  if (!marker?.type) return source
+  return replaceEntryLine(source, line, formatEntryLine({
+    plan: Boolean(marker.plan),
+    startMin: marker.timeMin,
+    endMin: marker.timeMin + MIN_TIMELINE_SPAN_MINUTES,
+    type: marker.type,
+    note: marker.text || undefined,
+  }))
 }
 
 /** Delete the 0-based line from the block source. */
@@ -54,30 +91,93 @@ export function deleteEntryLine(source: string, line: number): string {
   return lines.join("\n")
 }
 
-/** Add a type to the block's `hide:` header (per-day highlighter hiding). */
-export function addHiddenType(source: string, type: string): string {
+export function insertTodo(source: string, todo: Omit<TodoItem, "line">): string {
   const lines = source.split("\n")
-  const idx = lines.findIndex((l) => /^hide\s*:/.test(l.trim()))
+  const todos = parseTimeline(source).todos
+  const separator = lines.findIndex((line) => line.trim() === "---")
+  const at = todos.length > 0 ? todos[todos.length - 1].line + 1 : (separator >= 0 ? separator : 0)
+  lines.splice(at, 0, `todo: ${formatTodoHeaderValue(todo)}`)
+  return lines.join("\n")
+}
+
+export function updateTodo(source: string, id: string, patch: Partial<Omit<TodoItem, "id" | "line">>): string {
+  const current = parseTimeline(source).todos.find((todo) => todo.id === id)
+  if (!current) return source
+  const lines = source.split("\n")
+  lines[current.line] = `todo: ${formatTodoHeaderValue({ ...current, ...patch })}`
+  return lines.join("\n")
+}
+
+export function deleteTodo(source: string, id: string): string {
+  const current = parseTimeline(source).todos.find((todo) => todo.id === id)
+  if (!current) return source
+  const lines = source.split("\n")
+  lines.splice(current.line, 1)
+  const marker = new RegExp(`\\s*\\[todo:${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\s*$`, "i")
+  return lines.map((line) => line.replace(marker, "")).join("\n")
+}
+
+export function moveTodo(source: string, id: string, targetIndex: number): string {
+  const doc = parseTimeline(source)
+  const currentIndex = doc.todos.findIndex((todo) => todo.id === id)
+  if (currentIndex < 0) return source
+  const ordered = [...doc.todos]
+  const [moved] = ordered.splice(currentIndex, 1)
+  ordered.splice(Math.max(0, Math.min(targetIndex, ordered.length)), 0, moved)
+  const lines = source.split("\n")
+  const todoLines = doc.todos.map((todo) => todo.line).sort((a, b) => a - b)
+  const values = ordered.map((todo) => `todo: ${formatTodoHeaderValue(todo)}`)
+  todoLines.forEach((line, index) => { lines[line] = values[index] })
+  return lines.join("\n")
+}
+
+export function setEntryTodoBinding(source: string, line: number, todoId: string | null): string {
+  const entry = parseTimeline(source).entries.find((candidate) => candidate.line === line)
+  if (!entry) return source
+  return replaceEntryLine(source, line, formatEntryLine({ ...entry, todoId: todoId ?? undefined }))
+}
+
+export function addHabitSkip(source: string, id: string): string {
+  const doc = parseTimeline(source)
+  if (doc.habitSkips.includes(id)) return source
+  return setHeaderValue(source, "habit-skip", [...doc.habitSkips, id].join(" "))
+}
+
+export function removeHabitSkip(source: string, id: string): string {
+  const remaining = parseTimeline(source).habitSkips.filter((value) => value !== id)
+  return remaining.length > 0
+    ? setHeaderValue(source, "habit-skip", remaining.join(" "))
+    : removeHeaderValue(source, "habit-skip")
+}
+
+/** Add a type to the block's `hide:` header (per-day highlighter hiding). */
+export function addHiddenType(source: string, type: string, tool: "span" | "marker" = "span"): string {
+  const header = tool === "marker" ? "hide-marker" : "hide"
+  const lines = source.split("\n")
+  const re = new RegExp(`^${header}\\s*:`)
+  const idx = lines.findIndex((l) => re.test(l.trim()))
   if (idx >= 0) {
     const existing = lines[idx].split(":")[1].split(/[\s,，]+/).filter(Boolean)
     if (existing.includes(type)) return source
-    lines[idx] = `hide: ${[...existing, type].join(" ")}`
+    lines[idx] = `${header}: ${[...existing, type].join(" ")}`
     return lines.join("\n")
   }
   // No hide header yet: insert at the top (header order doesn't matter to the parser).
-  return `hide: ${type}\n${source}`
+  return `${header}: ${type}\n${source}`
 }
 
 /** Remove a type from the block's `hide:` header (re-show a hidden highlighter). */
-export function removeHiddenType(source: string, type: string): string {
+export function removeHiddenType(source: string, type: string, tool: "span" | "marker" = "span"): string {
+  const header = tool === "marker" ? "hide-marker" : "hide"
   const lines = source.split("\n")
-  const idx = lines.findIndex((l) => /^hide\s*:/.test(l.trim()))
+  const re = new RegExp(`^${header}\\s*:`)
+  const idx = lines.findIndex((l) => re.test(l.trim()))
   if (idx < 0) return source
   const remaining = lines[idx].split(":")[1].split(/[\s,，]+/).filter((t) => t && t !== type)
   if (remaining.length === 0) {
     lines.splice(idx, 1) // drop the header entirely when nothing is hidden anymore
   } else {
-    lines[idx] = `hide: ${remaining.join(" ")}`
+    lines[idx] = `${header}: ${remaining.join(" ")}`
   }
   return lines.join("\n")
 }
@@ -86,7 +186,19 @@ export function removeHiddenType(source: string, type: string): string {
 export function setHeaderValue(source: string, key: string, value: string): string {
   const lines = source.split("\n")
   const re = new RegExp(`^${key}\\s*:`)
-  const idx = lines.findIndex((l) => re.test(l.trim()))
+  let idx = lines.findIndex((l) => re.test(l.trim()))
+  if (idx < 0 && key.toLowerCase() === "layout") {
+    const candidates = lines.flatMap((line, index) => {
+      const match = /^([A-Za-z][\w-]*)\s*:\s*(.*)$/.exec(line.trim())
+      return match && match[1].toLowerCase() !== "layout"
+        && parseRecoverableLayoutHeader(match[1], match[2].trim())
+        ? [index]
+        : []
+    })
+    // One unambiguous typo may be canonicalized in place. Multiple candidates
+    // stay visible for manual resolution instead of guessing which one owns the layout.
+    if (candidates.length === 1) idx = candidates[0]
+  }
   if (idx >= 0) {
     lines[idx] = `${key}: ${value}`
     return lines.join("\n")
@@ -165,6 +277,21 @@ export function extractBlockSourceFromContent(
       return body
     }, [])
     ?.join("\n") ?? null
+}
+
+/**
+ * Remove one complete fenced timeline block from whole-note content.
+ * Validation deliberately reuses extractBlockSourceFromContent so a stale
+ * section can never delete an unrelated fence or surrounding prose/callout.
+ */
+export function removeTimelineBlockFromContent(
+  content: string,
+  section: { lineStart: number; lineEnd: number }
+): string | null {
+  if (extractBlockSourceFromContent(content, section) === null) return null
+  const lines = content.split("\n")
+  lines.splice(section.lineStart, section.lineEnd - section.lineStart + 1)
+  return lines.join("\n")
 }
 
 /** Set/replace the Nth free-text section (`===` 分隔，可多个). Empty text keeps a placeholder. */

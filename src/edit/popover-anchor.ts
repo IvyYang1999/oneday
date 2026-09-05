@@ -6,7 +6,8 @@
 export function trackAnchor(
   pop: HTMLElement,
   anchor: Element,
-  place: (anchorRect: DOMRect) => void
+  place: (anchorRect: DOMRect) => void,
+  onAnchorDetached?: () => void
 ): () => void {
   const domWindow = pop.ownerDocument.defaultView
   if (!domWindow) return () => {}
@@ -15,9 +16,14 @@ export function trackAnchor(
     domWindow.removeEventListener("resize", onScroll)
   }
   const update = (): void => {
-    if (!anchor.isConnected || !pop.isConnected) {
+    if (!pop.isConnected) {
       cleanup()
-      pop.remove()
+      return
+    }
+    if (!anchor.isConnected) {
+      cleanup()
+      if (onAnchorDetached) onAnchorDetached()
+      else pop.remove()
       return
     }
     place(anchor.getBoundingClientRect())

@@ -10,6 +10,7 @@ export interface CascadeMenuController {
 }
 
 let cascadeSequence = 0
+const activeCascadeByMenu = new WeakMap<HTMLElement, () => void>()
 
 /**
  * Attach a real cascading submenu to an existing menu item. The submenu is a
@@ -31,9 +32,11 @@ export function attachCascadeMenu(
   trigger.setAttribute("aria-expanded", "false")
 
   const close = (restoreFocus = false): void => {
-    if (!submenu) return
-    submenu.remove()
-    submenu = null
+    if (submenu) {
+      submenu.remove()
+      submenu = null
+    }
+    if (activeCascadeByMenu.get(primaryMenu) === close) activeCascadeByMenu.delete(primaryMenu)
     trigger.setAttribute("aria-expanded", "false")
     trigger.removeAttribute("aria-controls")
     if (restoreFocus) trigger.focus()
@@ -44,6 +47,9 @@ export function attachCascadeMenu(
       if (focusFirst) submenu.querySelector<HTMLElement>('[role="menuitemradio"]:not([aria-disabled="true"])')?.focus()
       return
     }
+    const activeClose = activeCascadeByMenu.get(primaryMenu)
+    if (activeClose && activeClose !== close) activeClose()
+    activeCascadeByMenu.set(primaryMenu, close)
     const menu = dom.createElement("div")
     menu.id = `oneday-cascade-menu-${++cascadeSequence}`
     menu.className = "menu oneday-cascade-menu"
@@ -131,20 +137,27 @@ export function attachCascadeMenu(
   trigger.addEventListener("click", onClick, true)
   trigger.addEventListener("keydown", onKeyDown)
 
-  const siblingListeners: Array<[HTMLElement, () => void]> = []
-  for (const sibling of Array.from(primaryMenu.querySelectorAll<HTMLElement>(":scope > .menu-item"))) {
-    if (sibling === trigger) continue
-    const listener = (): void => close(false)
-    sibling.addEventListener("mouseenter", listener)
-    siblingListeners.push([sibling, listener])
+  // Obsidian may wrap menu items in a scrolling container, so `:scope >
+  // .menu-item` is not a stable boundary. Delegate pointer movement from the
+  // primary menu and let the shared coordinator replace the active cascade.
+  const onPointerOver = (event: PointerEvent): void => {
+    const target = event.target
+    if (!(target instanceof dom.defaultView!.Node)) return
+    if (submenu?.contains(target)) return
+    if (trigger.contains(target)) {
+      open(false)
+      return
+    }
+    if (target instanceof dom.defaultView!.Element && target.closest(".menu-item")) close(false)
   }
+  primaryMenu.addEventListener("pointerover", onPointerOver, true)
 
   const destroy = (): void => {
     close(false)
     trigger.removeEventListener("mouseenter", onMouseEnter)
     trigger.removeEventListener("click", onClick, true)
     trigger.removeEventListener("keydown", onKeyDown)
-    for (const [sibling, listener] of siblingListeners) sibling.removeEventListener("mouseenter", listener)
+    primaryMenu.removeEventListener("pointerover", onPointerOver, true)
   }
 
   return { open, close, destroy }

@@ -7,10 +7,15 @@ import {
 import { GRID_COLS, GridItem } from "../core/grid-layout"
 import { applyGridToBody } from "./grid-interact"
 
-export interface BlockResizeDeps {
+export interface BlockResizeDeps<Interaction = void> {
   initialSize?: BlockSize
   initialCanvasWidth?: number
-  onCommit: (size: BlockSize, canvasWidth: number) => void
+  /** Capture viewport ownership before the first live geometry change. */
+  onStart?: () => Interaction
+  /** Keep the captured visual anchor fixed while previewing the new size. */
+  onPreview?: (interaction: Interaction) => void
+  onCommit: (size: BlockSize, canvasWidth: number, interaction: Interaction | undefined) => void
+  onCancel?: (interaction: Interaction) => void
 }
 
 type ResizeDirection = "e" | "s" | "se"
@@ -32,7 +37,11 @@ function applyViewportSize(container: HTMLElement, size: BlockSize | undefined):
 }
 
 /** Resize the outer Oneday viewport without changing the internal grid geometry. */
-export function attachBlockResize(container: HTMLElement, body: HTMLElement, deps: BlockResizeDeps): void {
+export function attachBlockResize<Interaction = void>(
+  container: HTMLElement,
+  body: HTMLElement,
+  deps: BlockResizeDeps<Interaction>
+): void {
   const dom = container.ownerDocument
   const initialCanvasWidth = deps.initialCanvasWidth
   if (initialCanvasWidth !== undefined) {
@@ -52,6 +61,7 @@ export function attachBlockResize(container: HTMLElement, body: HTMLElement, dep
       event.preventDefault()
       event.stopPropagation()
 
+      const interaction = deps.onStart?.()
       const startRect = container.getBoundingClientRect()
       const columns = Number(body.dataset.gridCols) || GRID_COLS
       const oldBaseWidth = body.dataset.gridBaseWidth
@@ -77,6 +87,7 @@ export function attachBlockResize(container: HTMLElement, body: HTMLElement, dep
         latest = { width, height }
         moved = moved || width !== Math.round(startRect.width) || height !== Math.round(startRect.height)
         applyViewportSize(container, latest)
+        if (interaction !== undefined) deps.onPreview?.(interaction)
       }
 
       const cleanup = (): void => {
@@ -97,12 +108,17 @@ export function attachBlockResize(container: HTMLElement, body: HTMLElement, dep
           restoreCanvas()
           return
         }
-        deps.onCommit(latest, Math.round(baseCanvasWidth))
+        if (interaction !== undefined) deps.onPreview?.(interaction)
+        deps.onCommit(latest, Math.round(baseCanvasWidth), interaction)
       }
       const onCancel = (): void => {
         cleanup()
         applyViewportSize(container, originalSize)
         restoreCanvas()
+        if (interaction !== undefined) {
+          deps.onPreview?.(interaction)
+          deps.onCancel?.(interaction)
+        }
       }
 
       dom.addEventListener("pointermove", onMove)

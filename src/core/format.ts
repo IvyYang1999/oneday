@@ -6,6 +6,14 @@ export interface EntryParts {
   endMin: number
   type: string
   note?: string
+  todoId?: string
+}
+
+export interface MarkerParts {
+  plan?: boolean
+  timeMin: number
+  type: string
+  text?: string
 }
 
 /** "09:15" / values >=24h wrap to plain 24h (D10: source stays ordinary clock time). */
@@ -17,7 +25,14 @@ export function formatClockPlain(minutes: number): string {
 /** plan 09:15-12:15 math 李林线代 */
 export function formatEntryLine(p: EntryParts): string {
   const head = `${formatClockPlain(p.startMin)}-${formatClockPlain(p.endMin)} ${p.type}`
-  return `${p.plan ? "plan " : ""}${head}${p.note ? " " + p.note : ""}`
+  const note = `${p.note ? " " + p.note : ""}${p.todoId ? ` [todo:${p.todoId}]` : ""}`
+  return `${p.plan ? "plan " : ""}${head}${note}`
+}
+
+/** `@10:00 [起床] 正式起床` — categorized point-in-time marker. */
+export function formatMarkerLine(p: MarkerParts): string {
+  const note = p.text?.trim() ? ` ${p.text.trim()}` : ""
+  return `${p.plan ? "plan " : ""}@${formatClockPlain(p.timeMin)} [${p.type}]${note}`
 }
 
 /** "2026-08-18" -> "周二"（无效输入返回空串） */

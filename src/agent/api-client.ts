@@ -5,6 +5,7 @@
  * Pure request builders/parsers; HTTP 层由调用方注入（Obsidian 用 requestUrl
  * 绕 CORS，测试用 stub）。
  */
+import { currentLocale, t } from "../i18n"
 
 export type ApiProvider = "openai-compatible" | "anthropic"
 
@@ -75,12 +76,13 @@ export type ParsedResponse = { ok: true; text: string } | { ok: false; reason: s
 /** Parse the HTTP JSON body of either provider into plain text. */
 export function parseChatResponse(provider: ApiProvider, status: number, body: unknown): ParsedResponse {
   if (body === null || typeof body !== "object") {
-    return { ok: false, reason: `响应不是 JSON（HTTP ${status}）` }
+    return { ok: false, reason: t("responseNotJson", { status }) }
   }
   const obj = body as Record<string, unknown>
   if (status < 200 || status >= 300) {
     const err = (obj.error as Record<string, unknown> | undefined)?.message
-    return { ok: false, reason: `HTTP ${status}${typeof err === "string" ? `：${err}` : ""}` }
+    const detail = typeof err === "string" ? `${currentLocale() === "zh" ? "：" : ": "}${err}` : ""
+    return { ok: false, reason: t("httpError", { status, detail }) }
   }
   if (provider === "anthropic") {
     const content = obj.content
@@ -90,12 +92,12 @@ export function parseChatResponse(provider: ApiProvider, status: number, body: u
         | undefined
       if (textPart && typeof textPart.text === "string") return { ok: true, text: textPart.text }
     }
-    return { ok: false, reason: "响应里没有文本内容" }
+    return { ok: false, reason: t("responseMissingText") }
   }
   const choices = obj.choices
   if (Array.isArray(choices) && choices.length > 0) {
     const msg = (choices[0] as Record<string, unknown>).message as Record<string, unknown> | undefined
     if (msg && typeof msg.content === "string") return { ok: true, text: msg.content }
   }
-  return { ok: false, reason: "响应里没有文本内容" }
+  return { ok: false, reason: t("responseMissingText") }
 }
