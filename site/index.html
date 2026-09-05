@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Oneday 荧光笔时间轴 · Obsidian 插件</title>
+<meta name="description" content="在 Obsidian 笔记里，用荧光笔把一天涂在时间轴上。拖一下就是一段时间，也能一句话让 AI 帮你画。全部存成 Markdown。">
+<meta property="og:title" content="Oneday 荧光笔时间轴 · Obsidian 插件">
+<meta property="og:description" content="一天的时间去哪了，在笔记里涂出来。拖一下就是一段时间；说一句「刚跑步半小时」也行。">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="./logo.svg">
+<style>
+/* Palette comes from the product: the six default highlighter inks, the hatch of the
+   plan layer, and the violet Obsidian uses for the active brush. Nothing else is coloured. */
+:root{
+  --bg:#fff; --bg-2:#f7f6f3; --ink:#1c1c1a; --ink-2:#55554f; --muted:#8c8c86; --line:#e9e9e5; --line-2:#d3d3cd;
+  --at:#7c6cf2; --at-soft:rgba(124,108,242,.10);
+  --c-mint:#7fd4c1; --c-green:#9bd17b; --c-yellow:#f6c667; --c-grey:#d9d9d9; --c-pink:#f5a3b7; --c-lav:#c8b6e2;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC",system-ui,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --shadow:0 1px 2px rgba(20,20,10,.05),0 10px 30px rgba(20,20,10,.06);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg-2);border-radius:5px;padding:1px 6px}
+.wrap{max-width:960px;margin:0 auto;padding:0 24px}
+h2{font-size:clamp(26px,3.2vw,32px);line-height:1.3;letter-spacing:-.02em;font-weight:600;margin:0 0 12px;text-wrap:balance}
+.lead{font-size:17px;color:var(--ink-2);max-width:600px;margin:0;text-wrap:balance}
+.link{color:var(--ink-2);border-bottom:1px solid var(--line-2);transition:color .15s,border-color .15s}
+.link:hover{color:var(--at);border-color:var(--at)}
+.btn{display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 24px;border-radius:12px;font-weight:600;font-size:16px;background:var(--at);color:#fff;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(124,108,242,.32)}
+:focus-visible{outline:2px solid var(--at);outline-offset:3px}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.86);backdrop-filter:blur(14px) saturate(140%);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:58px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:15px}
+.brand .mark{width:28px;height:28px;display:block}
+.nav nav{display:flex;gap:4px}
+.nav nav a{padding:6px 12px;border-radius:8px;font-size:14.5px;color:var(--ink-2)}
+.nav nav a:hover{background:var(--bg-2);color:var(--ink)}
+
+/* ── screen 1: hero + live block ── */
+.hero{padding-top:48px;text-align:center}
+.glyph{width:clamp(64px,7vw,84px);height:auto;margin:0 auto 12px;display:block}
+.h1{font-size:clamp(34px,5.4vw,56px);line-height:1.18;font-weight:600;letter-spacing:-.03em;margin:0 0 20px;text-wrap:balance}
+.h1 mark{color:inherit;padding:0 .06em;background:linear-gradient(transparent 55%,var(--c-mint) 55%,var(--c-mint) 94%,transparent 94%)}
+.h1 mark.y{background:linear-gradient(transparent 55%,var(--c-yellow) 55%,var(--c-yellow) 94%,transparent 94%)}
+.hero .lead{margin:0 auto;font-size:clamp(17px,2vw,19px);max-width:640px}
+.cta{display:flex;align-items:center;gap:22px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+.cta .link{font-size:15px}
+
+.demo{margin:32px auto 0;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow);overflow:hidden;text-align:left;position:relative;overflow-anchor:none}
+.demo .bar{height:38px;display:flex;align-items:center;gap:6px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--bg-2)}
+.demo .bar i{width:10px;height:10px;border-radius:50%;background:#dededa}
+.demo .bar span{margin-left:10px;font-size:12.5px;color:var(--muted)}
+.bar .tools{margin-left:auto;display:flex;gap:2px}
+.bar .tools button{font-size:12.5px;color:var(--muted);padding:4px 8px;border-radius:6px}
+.bar .tools button:hover{background:var(--line);color:var(--ink)}
+.bar .tools button.on{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-2)}
+.demo .body{display:grid;grid-template-columns:1fr 316px;min-height:560px}
+@media (max-width:760px){.demo .body{grid-template-columns:1fr}}
+
+/* left: the note itself */
+.note{padding:28px 32px;font-size:15.5px;line-height:1.85;color:var(--ink-2);border-right:1px solid var(--line);min-width:0}
+@media (max-width:760px){.note{border-right:0;border-bottom:1px solid var(--line);padding:22px 20px}}
+.note h4{margin:0 0 10px;font-size:21px;letter-spacing:-.02em;font-weight:600;color:var(--ink)}
+.note p{margin:0 0 8px}
+.note ol{margin:0 0 14px;padding-left:1.4em}
+.note li{margin:0}
+.note h5{margin:18px 0 6px;font-size:15px;color:var(--ink)}
+.note ul{margin:0;padding-left:1.2em}
+.note .hint{margin-top:22px;font-size:13px;color:var(--muted)}
+.src{display:none;margin:0;font-family:var(--mono);font-size:13px;line-height:1.8;color:var(--ink-2);white-space:pre;overflow-x:auto}
+.src .k{color:var(--muted)}
+.src .plan{color:var(--muted)}
+.src .new{background:var(--at-soft);color:var(--ink);border-radius:3px;margin:0 -4px;padding:0 4px}
+.src .at{color:var(--at)}
+.note.source .prose{display:none}.note.source .src{display:block}
+
+/* right: the oneday block */
+.block{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;background:#fff}
+.tb{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.seg{display:inline-flex;background:var(--bg-2);border-radius:8px;padding:2px}
+.seg button{height:26px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--ink-2)}
+.seg button.on{background:var(--at);color:#fff}
+.pen{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 8px;border-radius:8px;background:var(--bg-2);font-size:13px;color:var(--ink-2);border:1.5px solid transparent;transition:border-color .12s}
+.pen i{width:10px;height:10px;border-radius:50%;background:var(--c);display:block}
+.pen.on{border-color:var(--at);color:var(--ink);background:#fff}
+.seg[data-plan="1"] button.on{background:var(--ink-2)}
+.tl{position:relative;user-select:none;-webkit-user-select:none}
+.tl svg{display:block;touch-action:none}
+.tl .hourlabel{font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.tl .hl{stroke:var(--line);stroke-width:1}
+.tl .frame{fill:none;stroke:var(--line-2);stroke-width:1}
+.tl .blk{cursor:crosshair}
+.tl rect.ent{stroke:#fff;stroke-width:1;cursor:pointer;transition:opacity .15s}
+.tl g.sel rect.ent{stroke:var(--at);stroke-width:2}
+.tl text.dur{font-size:12px;font-weight:600;fill:rgba(28,28,26,.72);pointer-events:none;font-variant-numeric:tabular-nums}
+.tl text.nt{font-size:10.5px;fill:rgba(28,28,26,.6);pointer-events:none}
+.tl text.side{font-size:10.5px;fill:var(--ink-2);pointer-events:none}
+.tl text.ann{font-size:10.5px;fill:var(--at);pointer-events:none}
+.tl .annline{stroke:var(--at);stroke-width:1;stroke-dasharray:2 2}
+.tl rect.ghost{fill:var(--c);opacity:.55;stroke:var(--at);stroke-width:1.5;stroke-dasharray:3 2;pointer-events:none}
+.tl text.ghostlbl{font-size:11px;fill:var(--at);font-weight:600;pointer-events:none;font-variant-numeric:tabular-nums}
+.status{font-size:12px;color:var(--muted);min-height:18px;font-variant-numeric:tabular-nums}
+.status b{color:var(--at);font-weight:600}
+.stats{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.stats .nm{color:var(--ink)}
+.stats .bar{height:8px;border-radius:4px;background:var(--bg-2);overflow:hidden}
+.stats .bar i{display:block;height:100%;border-radius:4px;background:var(--c)}
+.stats .hr{color:var(--muted);text-align:right}
+.qc{display:flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:4px 4px 4px 10px;background:var(--bg-2);margin-top:auto}
+.qc.focus{border-color:var(--line-2);background:#fff}
+.qc input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:13.5px;color:var(--ink);outline:0}
+.qc input::placeholder{color:var(--muted)}
+.qc button{height:28px;padding:0 12px;border-radius:7px;background:var(--at);color:#fff;font-size:13px;font-weight:500;white-space:nowrap}
+.qc button[disabled]{background:var(--line-2)}
+.pop{position:absolute;z-index:6;background:#fff;border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);padding:6px;display:none}
+.pop.on{display:block}
+.pop input{width:190px;border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;font-size:13px}
+.menu{position:absolute;z-index:6;background:#fff;border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);padding:4px;font-size:13.5px;min-width:150px;display:none}
+.menu.on{display:block}
+.menu button{display:block;width:100%;text-align:left;padding:6px 10px;border-radius:6px;color:var(--ink-2)}
+.menu button:hover{background:var(--bg-2);color:var(--ink)}
+.menu .danger:hover{color:#e5534b}
+.toast{position:absolute;left:50%;bottom:16px;transform:translate(-50%,10px);background:var(--ink);color:#fff;font-size:13px;padding:9px 14px;border-radius:9px;box-shadow:var(--shadow);opacity:0;transition:opacity .25s,transform .25s;white-space:nowrap;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ── screen 2: who ── */
+.who{padding-top:110px}
+.who .lead{margin-bottom:40px}
+.people{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+@media (max-width:760px){.people{grid-template-columns:1fr}}
+.person{border:1px solid var(--line);border-radius:18px;background:#fff;padding:22px 22px 20px;display:flex;flex-direction:column;gap:14px}
+.person .mini{display:block;width:100%;height:auto}
+.person h3{margin:0;font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.35}
+.person h3 small{display:block;font-size:12.5px;font-weight:500;color:var(--muted);letter-spacing:.02em;margin-top:2px}
+.person p{margin:0;font-size:14.5px;line-height:1.75;color:var(--ink-2);flex:1}
+.person .tally{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;border-top:1px solid var(--line);padding-top:12px}
+.person .tally span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:5px;vertical-align:0}
+.who .coda{margin:44px auto 0;max-width:640px;text-align:center;font-size:16px;color:var(--ink-2)}
+.who .coda b{font-weight:600;color:var(--ink)}
+
+/* ── screen 3: three things ── */
+.three{padding-top:110px}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:44px;margin-top:44px}
+@media (max-width:760px){.cols{grid-template-columns:1fr;gap:32px}}
+.cols h3{margin:0 0 10px;font-size:21px;font-weight:600;letter-spacing:-.02em;line-height:1.3}
+.cols h3 em{font-style:normal;color:var(--at)}
+.cols p{margin:0;font-size:16px;color:var(--ink-2)}
+.md{margin-top:48px;border-radius:14px;background:var(--bg-2);padding:22px 26px;display:grid;grid-template-columns:1.2fr 1fr;gap:28px;align-items:center}
+@media (max-width:700px){.md{grid-template-columns:1fr;gap:14px}}
+.md pre{margin:0;font-family:var(--mono);font-size:13.5px;line-height:1.75;color:var(--ink-2);white-space:pre;overflow-x:auto}
+.md pre b{color:var(--ink);font-weight:500;background:var(--c-mint);border-radius:3px;padding:0 3px}
+.md pre em{font-style:normal;color:var(--at)}
+.md pre i{font-style:normal;color:var(--muted)}
+.md p{margin:0;font-size:15.5px;color:var(--ink-2)}
+.also{margin-top:36px;font-size:15px;color:var(--muted);text-align:center}
+.also b{color:var(--ink-2);font-weight:500}
+
+/* ── screen 4: install ── */
+.install{padding-top:110px;text-align:center}
+.install .lead{margin:0 auto}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:820px;margin:36px auto 0;text-align:left}
+@media (max-width:700px){.steps{grid-template-columns:1fr}}
+.step{border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;font-size:14.5px;color:var(--ink-2);line-height:1.7}
+.step b{display:block;color:var(--ink);font-weight:600;margin-bottom:4px}
+.step code{white-space:nowrap}
+.install .spec{margin:22px auto 0;font-size:15px;color:var(--muted);max-width:640px}
+.qs{max-width:720px;margin:48px auto 0;border-top:1px solid var(--line);text-align:left}
+details{border-bottom:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;overflow:hidden;padding:18px 0;font-size:17px;font-weight:500;display:flex;justify-content:space-between;align-items:center;gap:16px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:'+';font-weight:300;color:var(--muted);font-size:22px;transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{margin:-6px 0 20px;font-size:16px;color:var(--ink-2)}
+
+/* ── more + footer ── */
+.more{padding-top:80px;padding-bottom:72px}
+.more .head{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+.more h2{font-size:20px;margin:0}
+.more .head .link{font-size:15px}
+.rail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:24px}
+@media (max-width:700px){.rail{grid-template-columns:1fr}}
+.pc{min-width:0;border:1px solid var(--line);border-radius:20px;background:#fff;display:flex;flex-direction:column;overflow:hidden;transition:transform .2s,box-shadow .2s,border-color .2s}
+.pc-body{padding:24px 22px 22px;display:flex;flex-direction:column;flex:1}
+.pc .ico{width:52px;height:52px;display:grid;place-items:center;font-size:34px;line-height:1;margin-bottom:20px}
+.pc .t{font-size:18px;font-weight:600;letter-spacing:-.02em;line-height:1.4;margin:0 0 8px}
+.pc .d{font-size:14px;line-height:1.75;color:var(--ink-2);margin:0 0 20px;flex:1}
+.pc-tags{display:flex;gap:6px;flex-wrap:wrap}
+.pc .st,.pc .platform{font-size:12px;line-height:1.5;padding:4px 10px;border-radius:999px;background:var(--bg-2);color:var(--ink-2)}
+.pc .st.live{background:var(--at-soft);color:#6654ce}
+.pc-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 22px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2)}
+@media (hover:hover){a.pc:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(28,28,26,.06);border-color:var(--line-2)}a.pc:hover .pc-foot{color:var(--at)}}
+footer{border-top:1px solid var(--line);padding:34px 0 40px;font-size:14px;color:var(--muted)}
+footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.me{display:flex;align-items:center;gap:10px;color:var(--ink)}
+.me b{font-weight:600}
+.me span{color:var(--muted);margin-left:4px}
+.links{display:flex;gap:18px;flex-wrap:wrap}
+.links a:hover{color:var(--at)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="nav"><div class="wrap">
+  <a class="brand" href="#"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M13 8v48" stroke="#1c1c1a" stroke-width="2" stroke-linecap="round"/><rect x="20" y="9" width="36" height="15" rx="4" fill="#7fd4c1"/><rect x="20" y="27" width="36" height="9" rx="3" fill="#f6c667"/><rect x="20" y="39" width="36" height="17" rx="4" fill="#f5a3b7"/></svg>Oneday</a>
+  <nav><a href="#who">适合谁</a><a href="#install">安装</a><a href="https://github.com/IvyYang1999/oneday" target="_blank" rel="noopener">GitHub</a></nav>
+</div></header>
+
+<main>
+<section class="hero wrap">
+  <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><path d="M13 8v48" stroke="#1c1c1a" stroke-width="2" stroke-linecap="round"/><rect x="20" y="9" width="36" height="15" rx="4" fill="#7fd4c1"/><rect x="20" y="27" width="36" height="9" rx="3" fill="#f6c667"/><rect x="20" y="39" width="36" height="17" rx="4" fill="#f5a3b7"/></svg>
+  <h1 class="h1">一天的时间去哪了，<br>在笔记里<mark>涂</mark>出来</h1>
+  <p class="lead">考研日记本上那根手画的时间轴，搬进 Obsidian。选一支荧光笔，在轴上拖一下就是一段时间；不想动手，说一句「刚跑步半小时」也行。一切都是笔记里的一段 Markdown。</p>
+  <div class="cta">
+    <a class="btn" href="#install">安装到 Obsidian</a>
+    <a class="link" href="#demo">先在下面涂一笔 ↓</a>
+  </div>
+
+  <div class="demo" id="demo" aria-label="插件效果演示：可以直接在时间轴上拖拽">
+    <div class="bar"><i></i><i></i><i></i><span id="fname">2026-09-05.md</span>
+      <div class="tools"><button id="srcBtn" title="看这个块的 Markdown 源码">源码</button><button id="replay" title="重放">↻ 重放</button></div>
+    </div>
+    <div class="body">
+      <div class="note" id="note">
+        <div class="prose">
+          <h4>9 月 5 日 · 周六</h4>
+          <p>今天要做的：</p>
+          <ol><li>第三章初稿写完，先不改。</li><li>把上周的读者留言回一遍。</li><li>晚上读完《写作这回事》最后两章。</li></ol>
+          <h5>记住</h5>
+          <ul><li>上午别开消息，写完再看。</li><li>饭后立刻回到桌前。</li></ul>
+          <p class="hint">→ 右边就是插件。选一支笔，在时间轴上按住拖一下；双击色块写备注，右键有更多。</p>
+        </div>
+        <pre class="src" id="src" aria-live="polite"></pre>
+      </div>
+      <div class="block" id="block">
+        <div class="tb" id="tb">
+          <div class="seg" id="seg" data-plan="0"><button class="on" data-mode="rec">记录</button><button data-mode="plan">计划</button></div>
+          <div id="pens" style="display:contents"></div>
+        </div>
+        <div class="tl" id="tl"></div>
+        <div class="status" id="status">从起点拖到终点，15 分钟一格</div>
+        <div class="stats" id="stats"></div>
+        <form class="qc" id="qc" autocomplete="off">
+          <input id="qi" placeholder="✦ 快速记录：刚跑步半小时…" aria-label="快速记录">
+          <button type="submit" id="qgo">记录</button>
+        </form>
+      </div>
+    </div>
+    <div class="pop" id="pop"><input id="popIn" placeholder="这段时间做了什么？" aria-label="备注"></div>
+    <div class="menu" id="menu"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+</section>
+
+<section class="who wrap" id="who">
+  <h2>它是为这几种人做的</h2>
+  <p class="lead">共同点只有一个：没有人替你安排时间，所以你得自己看见它。</p>
+  <div class="people" id="people"></div>
+  <p class="coda">每天花的功夫是 <b>拖几下</b>。一周之后，你会第一次看见自己的时间长什么样——然后才谈得上改。</p>
+</section>
+
+<section class="three wrap" id="feat">
+  <h2>小而完整的三件事</h2>
+  <p class="lead">不做日历、不做番茄钟，只把「纸上那根时间轴」做顺手。</p>
+  <div class="cols">
+    <div><h3>手画，即记录</h3><p>顶部是荧光笔色板，一种颜色一类事。在轴上拖一下就是一段，时长自动写在中间；重叠的事并排放，放不下的备注挪到旁边。前一晚用「计划」画的斜线块，第二天被真实色块盖过去——和纸上的铅笔与荧光笔一样。</p></div>
+    <div><h3>一句话，让 <em>AI</em> 画</h3><p>块底下有个输入框。写「刚跑步半小时」「12 点半吃的饭」，它算好起止、挑好颜色、写回笔记。也可以把随附的 skill 交给你自己的 Agent，让它替你记。</p></div>
+    <div><h3>Markdown 是本体</h3><p>时间轴是笔记里一个 <code>timeline</code> 代码块，一行一段时间。画的每一笔都写回源码，改源码时间轴也跟着变。Git 能 diff，同步不会丢，卸载插件也还能读。</p></div>
+  </div>
+  <div class="md">
+    <pre><i>```timeline</i>
+<i>date: 2026-09-05</i>
+<em>plan</em> 09:00-12:00 写作
+07:00-08:30 睡觉 赖床
+<b>09:15-11:45 写作 第三章初稿</b>
+11:45-12:30 吃饭
+<em>@13:10</em> 有点困，散步十分钟
+<i>```</i></pre>
+    <p>这就是右上角那根时间轴的全部。<code>plan</code> 是计划层，<code>@</code> 是一个时间点的批注，时长不用写，渲染时算。</p>
+  </div>
+  <p class="also">同一个块里还能放 <b>打卡</b>、<b>待办</b> 和 <b>每日一句</b>，把待办拖到时间轴上就成了计划。要不要用，随你。</p>
+</section>
+
+<section class="install wrap" id="install">
+  <h2>两分钟装好</h2>
+  <p class="lead">还没上社区目录，先用 BRAT 装。三步，不用手动复制文件。</p>
+  <div class="steps">
+    <div class="step"><b>1 · 装 BRAT</b>Obsidian 设置 → 第三方插件 → 浏览，搜 <code>BRAT</code>，安装并启用。</div>
+    <div class="step"><b>2 · 加仓库</b>BRAT 设置里点「Add Beta plugin」，填 <code>IvyYang1999/oneday</code>。</div>
+    <div class="step"><b>3 · 启用</b>回到第三方插件列表启用 Oneday。在任何笔记里输入 <code>```timeline</code>，或用命令面板「插入 Oneday 时间轴」。</div>
+  </div>
+  <p class="spec">免费 · 开源 · 桌面与手机 · Obsidian 1.8 以上 · 编辑与阅读视图都能画 · 快速记录需要你自己的模型 API Key（GLM / DeepSeek / OpenAI / Claude 都行）</p>
+  <div class="qs">
+    <details open><summary>数据存在哪里？</summary><p>就在那篇笔记里，一个 <code>timeline</code> 代码块。没有数据库、没有附属文件。随 iCloud / Git / Obsidian Sync 一起走，没装插件的地方打开也能读。</p></details>
+    <details><summary>不配 AI 能用吗？</summary><p>完全可以。画色块、备注、计划层、统计都不联网。快速记录是可选项：填了 API Key 才出现，不填就只是一个不显示的输入框。</p></details>
+    <details><summary>颜色和分类怎么定？</summary><p>设置里维护一张「分类 → 颜色」表，这就是你的荧光笔色号。笔记里只写分类名，改颜色不会动历史记录。</p></details>
+  </div>
+</section>
+
+<section class="more wrap">
+  <div class="head"><h2>同一个作者的其他 Obsidian 插件</h2><a class="link" href="https://yytyyf.com" target="_blank" rel="noopener">全部作品 →</a></div>
+  <div class="rail">
+    <a class="pc" href="https://obsidian-inline-comments.vercel.app/" target="_blank" rel="noopener">
+      <div class="pc-body"><span class="ico" aria-hidden="true">@</span><h3 class="t">划线评论</h3><p class="d">在笔记里划线留言，@ 一个 AI 会话来回复。</p><div class="pc-tags"><span class="st live">已上线</span><span class="platform">Obsidian 插件</span></div></div>
+      <div class="pc-foot"><span>看看划线评论</span><span aria-hidden="true">↗</span></div>
+    </a>
+    <a class="pc" href="https://obsidian-web-desk.vercel.app/" target="_blank" rel="noopener">
+      <div class="pc-body"><span class="ico" aria-hidden="true">🗂️</span><h3 class="t">NaviBoard · 画布收藏夹</h3><p class="d">收藏的网页摆成一张自由画布，当首页用。</p><div class="pc-tags"><span class="st live">已上线</span><span class="platform">Obsidian 插件</span></div></div>
+      <div class="pc-foot"><span>探索画布收藏夹</span><span aria-hidden="true">↗</span></div>
+    </a>
+    <article class="pc">
+      <div class="pc-body"><span class="ico" aria-hidden="true">📓</span><h3 class="t">AI 日记</h3><p class="d">今天 AI 帮你干了什么，自动写成时间轴。</p><div class="pc-tags"><span class="st">开发中</span><span class="platform">Obsidian 插件</span></div></div>
+    </article>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap">
+  <div class="me"><b>yytyyf</b><span>Oneday · MIT</span></div>
+  <div class="links">
+    <a href="https://yytyyf.com" target="_blank" rel="noopener">yytyyf.com</a>
+    <a href="https://github.com/IvyYang1999" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://x.com/ivyadams1999" target="_blank" rel="noopener">X</a>
+    <a href="https://www.xiaohongshu.com/user/profile/5a099fb94eacab47629e53bc" target="_blank" rel="noopener">小红书</a>
+    <a href="mailto:ivyyang1999@gmail.com">邮件</a>
+    <a href="https://github.com/IvyYang1999/oneday/issues" target="_blank" rel="noopener">问题反馈</a>
+  </div>
+</div></footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const NS = 'http://www.w3.org/2000/svg';
+  const TYPES = [
+    ['写作', 'var(--c-mint)', '#7fd4c1'], ['阅读', 'var(--c-green)', '#9bd17b'], ['英语', 'var(--c-yellow)', '#f6c667'],
+    ['睡觉', 'var(--c-grey)', '#d9d9d9'], ['吃饭', 'var(--c-pink)', '#f5a3b7'], ['运动', 'var(--c-lav)', '#c8b6e2'],
+  ];
+  const HEX = Object.fromEntries(TYPES.map(([n, , h]) => [n, h]));
+
+  /* ── geometry shared by the big block and the small persona thumbnails ── */
+  const R0 = 7, R1 = 23, SNAP = 15;
+  const fmt = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const hrs = (m) => { const h = m / 60; return (Number.isInteger(h) ? h : +h.toFixed(2)) + 'h'; };
+  const el = (tag, attrs, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
+
+  /* overlap → side-by-side columns (same idea as the plugin's interval clustering) */
+  function columns(list) {
+    const sorted = [...list].sort((a, b) => a.s - b.s || b.e - a.e);
+    const out = []; let cluster = [], ends = [], clusterEnd = -1;
+    const flush = () => { const n = ends.length; cluster.forEach((c) => out.push({ ...c, n })); cluster = []; ends = []; };
+    for (const x of sorted) {
+      if (cluster.length && x.s >= clusterEnd) flush();
+      let col = ends.findIndex((e) => e <= x.s); if (col < 0) { col = ends.length; ends.push(0); }
+      ends[col] = x.e; clusterEnd = Math.max(clusterEnd, x.e); cluster.push({ ...x, col });
+    }
+    flush(); return out;
+  }
+
+  function hatchDefs(svg, id) {
+    const defs = el('defs', {}, svg);
+    for (const [n, , h] of TYPES) {
+      const p = el('pattern', { id: `${id}-${n}`, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+      el('rect', { width: 6, height: 6, fill: h, opacity: .16 }, p);
+      el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: h, 'stroke-width': 1.6, opacity: .7 }, p);
+    }
+  }
+
+  /* ── the live block ── */
+  const HH = 30, LW = 30, PT = 12, PB = 12, W = 284, GAP = 2, SIDE = 0;
+  const TW = W - LW - 6;
+  const yOf = (m) => PT + (m - R0 * 60) * HH / 60;
+  const mOf = (y) => R0 * 60 + (y - PT) * 60 / HH;
+  const snap = (m) => Math.max(R0 * 60, Math.min(R1 * 60, Math.round(m / SNAP) * SNAP));
+
+  const INITIAL = () => ([
+    { s: 9 * 60, e: 12 * 60, t: '写作', plan: true },
+    { s: 14 * 60, e: 17 * 60, t: '写作', plan: true },
+    { s: 7 * 60, e: 8 * 60 + 30, t: '睡觉', note: '赖床' },
+    { s: 9 * 60 + 15, e: 11 * 60 + 45, t: '写作', note: '第三章初稿' },
+    { s: 11 * 60 + 45, e: 12 * 60 + 30, t: '吃饭' },
+    { s: 12 * 60 + 30, e: 13 * 60 + 30, t: '阅读' },
+  ]);
+  const ANN = [{ m: 13 * 60 + 10, text: '有点困，散步十分钟' }];
+
+  let entries = INITIAL(), pen = '写作', plan = false, sel = -1, lastNew = -1;
+  let ghost = null, autoplayOn = true, run = 0;
+
+  const tl = $('tl'), status = $('status'), statsEl = $('stats'), src = $('src'), pop = $('pop'), popIn = $('popIn'), menu = $('menu'), toast = $('toast');
+
+  function renderPens() {
+    const box = $('pens'); box.innerHTML = '';
+    for (const [n, c] of TYPES) {
+      const b = document.createElement('button'); b.className = 'pen' + (n === pen ? ' on' : ''); b.style.setProperty('--c', c);
+      b.innerHTML = `<i></i>${n}`; b.title = `用「${n}」画`;
+      b.addEventListener('click', () => { pen = n; renderPens(); });
+      box.appendChild(b);
+    }
+  }
+  $('seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    plan = b.dataset.mode === 'plan'; $('seg').dataset.plan = plan ? '1' : '0';
+    [...$('seg').children].forEach((x) => x.classList.toggle('on', x === b));
+    status.textContent = plan ? '计划模式：画出来的是斜线块，明天用真实色块盖过去' : '从起点拖到终点，15 分钟一格';
+  });
+
+  function render() {
+    tl.innerHTML = '';
+    const H = PT + (R1 - R0) * HH + PB;
+    const svg = el('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, tl);
+    hatchDefs(svg, 'h');
+    for (let h = R0; h <= R1; h++) {
+      const y = yOf(h * 60);
+      el('line', { x1: LW, y1: y, x2: W - 6, y2: y, class: 'hl' }, svg);
+      const t = el('text', { x: LW - 6, y: y + 4, 'text-anchor': 'end', class: 'hourlabel' }, svg); t.textContent = h;
+    }
+    el('rect', { x: LW, y: PT, width: TW, height: (R1 - R0) * HH, class: 'frame' }, svg);
+    // plan layer, full width
+    entries.forEach((x, i) => { if (!x.plan) return;
+      const g = el('g', { class: 'ent-g' + (i === sel ? ' sel' : ''), 'data-i': i }, svg);
+      el('rect', { x: LW + 1, y: yOf(x.s) + 1, width: TW - 2, height: yOf(x.e) - yOf(x.s) - 2, rx: 3, fill: `url(#h-${x.t})`, class: 'ent' }, g);
+      const lbl = el('text', { x: LW + TW / 2, y: (yOf(x.s) + yOf(x.e)) / 2 + 4, 'text-anchor': 'middle', class: 'nt' }, g); lbl.textContent = `计划 · ${x.t}`;
+    });
+    // actual layer, in columns
+    const act = columns(entries.map((x, i) => ({ ...x, i })).filter((x) => !x.plan));
+    for (const x of act) {
+      const cw = (TW - 2 - GAP * (x.n - 1)) / x.n, cx = LW + 1 + x.col * (cw + GAP);
+      const y0 = yOf(x.s) + 1, h = Math.max(4, yOf(x.e) - yOf(x.s) - 2);
+      const g = el('g', { class: 'ent-g' + (x.i === sel ? ' sel' : ''), 'data-i': x.i }, svg);
+      el('rect', { x: cx, y: y0, width: cw, height: h, rx: 3, fill: HEX[x.t], class: 'ent' }, g);
+      const d = hrs(x.e - x.s), thin = h < 30;
+      const dt = el('text', { x: cx + cw / 2, y: y0 + h / 2 + (thin || !x.note ? 4 : -2), 'text-anchor': 'middle', class: 'dur' }, g); dt.textContent = d;
+      if (x.note) {
+        if (thin || cw < 90) { const st = el('text', { x: W - 4, y: y0 + h / 2 + 4, 'text-anchor': 'end', class: 'side' }, g); st.textContent = x.note.length > 6 ? x.note.slice(0, 6) + '…' : x.note; st.setAttribute('x', LW + TW + 2); st.setAttribute('text-anchor', 'start'); }
+        else { const nt = el('text', { x: cx + cw / 2, y: y0 + h / 2 + 13, 'text-anchor': 'middle', class: 'nt' }, g); nt.textContent = x.note.length > 10 ? x.note.slice(0, 10) + '…' : x.note; }
+      }
+    }
+    for (const a of ANN) {
+      const y = yOf(a.m);
+      el('line', { x1: LW, y1: y, x2: W - 6, y2: y, class: 'annline' }, svg);
+      const t = el('text', { x: LW + 4, y: y - 3, class: 'ann' }, svg); t.textContent = `@${fmt(a.m)} ${a.text}`;
+    }
+    if (ghost) {
+      const a = Math.min(ghost.s, ghost.e), b = Math.max(ghost.s, ghost.e);
+      const r = el('rect', { x: LW + 1, y: yOf(a), width: TW - 2, height: Math.max(2, yOf(b) - yOf(a)), rx: 3, class: 'ghost' }, svg); r.style.setProperty('--c', HEX[pen]);
+      if (b > a) { const t = el('text', { x: LW + TW / 2, y: (yOf(a) + yOf(b)) / 2 + 4, 'text-anchor': 'middle', class: 'ghostlbl' }, svg); t.textContent = hrs(b - a); }
+    }
+    // the drawing surface sits on top of hour lines but under entries — we use a transparent rect first
+    const hit = el('rect', { x: LW, y: PT, width: TW, height: (R1 - R0) * HH, fill: 'transparent', class: 'blk' }, svg);
+    svg.insertBefore(hit, svg.children[1]);
+    renderStats(); renderSrc();
+  }
+
+  function renderStats() {
+    const sum = {};
+    for (const x of entries) if (!x.plan && x.t !== '睡觉') sum[x.t] = (sum[x.t] || 0) + (x.e - x.s);
+    const rows = Object.entries(sum).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...rows.map((r) => r[1]));
+    statsEl.innerHTML = rows.map(([t, m]) => `<span class="nm">${t}</span><span class="bar"><i style="--c:${HEX[t]};width:${(m / max * 100).toFixed(0)}%"></i></span><span class="hr">${hrs(m)}</span>`).join('');
+  }
+  function renderSrc() {
+    const lines = ['<span class="k">```timeline</span>', '<span class="k">date: 2026-09-05</span>', '<span class="k">range: 7-23</span>', '<span class="k">---</span>'];
+    const sorted = entries.map((x, i) => ({ ...x, i })).sort((a, b) => a.s - b.s || (a.plan ? -1 : 1));
+    for (const x of sorted) {
+      const line = `${x.plan ? '<span class="plan">plan</span> ' : ''}${fmt(x.s)}-${fmt(x.e)} ${x.t}${x.note ? ' ' + x.note : ''}`;
+      lines.push(x.i === lastNew ? `<span class="new">${line}</span>` : line);
+    }
+    for (const a of ANN) lines.push(`<span class="at">@${fmt(a.m)}</span> ${a.text}`);
+    lines.push('<span class="k">```</span>');
+    src.innerHTML = lines.join('\n');
+  }
+  $('srcBtn').addEventListener('click', () => { const on = $('note').classList.toggle('source'); $('srcBtn').classList.toggle('on', on); });
+
+  /* ── drawing ── */
+  let drawing = null;
+  const posM = (ev) => { const r = tl.querySelector('svg').getBoundingClientRect(); return mOf(ev.clientY - r.top); };
+  tl.addEventListener('pointerdown', (ev) => {
+    if (ev.button !== 0) return;
+    closeFloat(); autoplayOn = false;
+    const g = ev.target.closest('.ent-g');
+    if (g) { sel = +g.dataset.i; render(); return; }
+    if (!ev.target.classList.contains('blk')) return;
+    sel = -1; drawing = { s: snap(posM(ev)) }; ghost = { s: drawing.s, e: drawing.s };
+    tl.setPointerCapture(ev.pointerId); render();
+    status.innerHTML = `起点 <b>${fmt(drawing.s)}</b>，拖到终点`;
+  });
+  tl.addEventListener('pointermove', (ev) => {
+    if (!drawing) return;
+    const e = snap(posM(ev)); if (e === ghost.e) return;
+    ghost.e = e; render();
+    const a = Math.min(drawing.s, e), b = Math.max(drawing.s, e);
+    status.innerHTML = b > a ? `<b>${fmt(a)}–${fmt(b)}</b> · ${hrs(b - a)} · ${plan ? '计划' : ''}${pen}` : `起点 <b>${fmt(a)}</b>，拖到终点`;
+  });
+  const endDraw = () => {
+    if (!drawing) return;
+    const a = Math.min(drawing.s, ghost.e), b = Math.max(drawing.s, ghost.e);
+    drawing = null; ghost = null;
+    if (b - a >= SNAP) { entries.push({ s: a, e: b, t: pen, plan }); lastNew = entries.length - 1; sel = lastNew; showToast(`${plan ? '计划' : '记录'} ${fmt(a)}–${fmt(b)} ${pen} · 已写回笔记`); status.textContent = '双击色块写备注，右键有更多；Delete 删除'; }
+    else status.textContent = '从起点拖到终点，15 分钟一格';
+    render();
+  };
+  tl.addEventListener('pointerup', endDraw); tl.addEventListener('pointercancel', endDraw);
+
+  tl.addEventListener('dblclick', (ev) => { const g = ev.target.closest('.ent-g'); if (g) openNote(+g.dataset.i, ev); });
+  tl.addEventListener('contextmenu', (ev) => {
+    const g = ev.target.closest('.ent-g'); if (!g) return; ev.preventDefault();
+    const i = +g.dataset.i; sel = i; render();
+    const x = entries[i];
+    menu.innerHTML = '';
+    const add = (label, fn, cls) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.addEventListener('click', () => { closeFloat(); fn(); }); menu.appendChild(b); };
+    add(x.note ? '修改备注' : '添加备注', () => openNote(i, ev));
+    add(x.plan ? '转为实际记录' : '转为计划', () => { x.plan = !x.plan; lastNew = i; render(); });
+    add('删除色块', () => { entries.splice(i, 1); sel = -1; lastNew = -1; render(); }, 'danger');
+    place(menu, ev); menu.classList.add('on');
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (sel < 0 || document.activeElement === popIn || document.activeElement === $('qi')) return;
+    if (ev.key === 'Delete' || ev.key === 'Backspace') { entries.splice(sel, 1); sel = -1; lastNew = -1; render(); }
+    if (ev.key === 'Escape') { sel = -1; closeFloat(); render(); }
+  });
+  function place(node, ev) {
+    const r = $('demo').getBoundingClientRect();
+    node.style.left = Math.min(ev.clientX - r.left, r.width - 210) + 'px';
+    node.style.top = Math.min(ev.clientY - r.top + 6, r.height - 80) + 'px';
+  }
+  let noteIdx = -1;
+  function openNote(i, ev) { noteIdx = i; popIn.value = entries[i].note || ''; place(pop, ev); pop.classList.add('on'); popIn.focus(); popIn.select(); }
+  popIn.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { entries[noteIdx].note = popIn.value.trim(); lastNew = noteIdx; closeFloat(); render(); }
+    if (ev.key === 'Escape') closeFloat();
+  });
+  popIn.addEventListener('blur', () => setTimeout(closeFloat, 120));
+  function closeFloat() { pop.classList.remove('on'); menu.classList.remove('on'); }
+  document.addEventListener('pointerdown', (ev) => { if (!ev.target.closest('.menu,.pop')) menu.classList.remove('on'); });
+
+  /* ── quick capture: a tiny stand-in for the model call ── */
+  function parseNL(text) {
+    let dur = 0;
+    let m = text.match(/(\d+(?:\.\d+)?)\s*(小时|h|H)/); if (m) dur = Math.round(+m[1] * 60);
+    if (!dur && (m = text.match(/(\d+)\s*(分钟|分|min)/))) dur = +m[1];
+    if (!dur && /半小时|半个小时/.test(text)) dur = 30;
+    if (!dur && /一小时|1小时|一个小时/.test(text)) dur = 60;
+    if (!dur && /两小时|2小时|两个小时/.test(text)) dur = 120;
+    if (!dur) return null;
+    const type = /跑|健身|运动|游泳|骑|走路|散步|瑜伽/.test(text) ? '运动' : /写|稿|文章|改/.test(text) ? '写作' : /读|书|看/.test(text) ? '阅读' : /英|单词|听力/.test(text) ? '英语' : /饭|吃|餐|咖啡/.test(text) ? '吃饭' : /睡|午休|躺/.test(text) ? '睡觉' : '阅读';
+    const now = new Date(); let end = now.getHours() * 60 + now.getMinutes();
+    if (end < R0 * 60 + 60 || end > R1 * 60) end = 16 * 60 + 30;
+    const busy = entries.filter((x) => !x.plan).map((x) => x.e); if (busy.length) end = Math.max(end, Math.min(...busy) );
+    end = snap(end); const start = Math.max(R0 * 60, end - dur);
+    const note = text.replace(/^(我|刚刚|刚才|刚)+/, '').replace(/(了)?(半小时|半个小时|一小时|两小时|\d+(?:\.\d+)?\s*(小时|分钟|分|h|min))/g, '').replace(/^[，,、\s]+|[，,、。\s]+$/g, '');
+    return { s: start, e: end, t: type, note: note.length > 12 ? note.slice(0, 12) : note };
+  }
+  const qc = $('qc'), qi = $('qi'), qgo = $('qgo');
+  qi.addEventListener('focus', () => { qc.classList.add('focus'); autoplayOn = false; });
+  qi.addEventListener('blur', () => qc.classList.remove('focus'));
+  qc.addEventListener('submit', (ev) => { ev.preventDefault(); submitQC(qi.value); });
+  function submitQC(text) {
+    text = text.trim(); if (!text) return;
+    qgo.disabled = true; qgo.textContent = '生成中…';
+    setTimeout(() => {
+      qgo.disabled = false; qgo.textContent = '记录';
+      const r = parseNL(text);
+      if (!r) { showToast('它会追问：这件事花了多久？'); return; }
+      entries.push(r); lastNew = entries.length - 1; sel = lastNew; qi.value = ''; render();
+      showToast(`已记录 1 条：${fmt(r.s)}–${fmt(r.e)} ${r.t}`);
+    }, reduce ? 50 : 700);
+  }
+  let toastT; function showToast(t) { toast.textContent = t; toast.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toast.classList.remove('on'), 2200); }
+
+  /* ── autoplay: draw one block, then type one sentence ── */
+  const sleep = (ms) => new Promise((r) => setTimeout(r, reduce ? 0 : ms));
+  async function play() {
+    const my = ++run; entries = INITIAL(); sel = -1; lastNew = -1; ghost = null; qi.value = ''; autoplayOn = true; render();
+    status.textContent = '从起点拖到终点，15 分钟一格';
+    await sleep(900); if (my !== run || !autoplayOn) return;
+    pen = '写作'; renderPens();
+    const s = 14 * 60, e = 15 * 60 + 30;
+    for (let m = s; m <= e; m += SNAP) {
+      if (my !== run || !autoplayOn) return;
+      ghost = { s, e: m }; render(); status.innerHTML = m > s ? `<b>${fmt(s)}–${fmt(m)}</b> · ${hrs(m - s)} · 写作` : `起点 <b>${fmt(s)}</b>，拖到终点`;
+      await sleep(110);
+    }
+    ghost = null; entries.push({ s, e, t: '写作', note: '改第三章' }); lastNew = entries.length - 1; sel = lastNew; render();
+    showToast('记录 14:00–15:30 写作 · 已写回笔记'); status.textContent = '双击色块写备注，右键有更多；Delete 删除';
+    await sleep(1500); if (my !== run || !autoplayOn) return;
+    const text = '刚跑步半小时';
+    qc.classList.add('focus');
+    for (let i = 1; i <= text.length; i++) { if (my !== run || !autoplayOn) return; qi.value = text.slice(0, i); await sleep(90); }
+    await sleep(350); if (my !== run || !autoplayOn) return;
+    submitQC(text); qc.classList.remove('focus');
+  }
+  $('replay').addEventListener('click', play);
+
+  renderPens(); render();
+  let played = false;
+  const io = new IntersectionObserver((es) => { if (es.some((x) => x.isIntersecting) && !played) { played = true; play(); } }, { threshold: .5 });
+  io.observe($('demo'));
+
+  /* ── persona thumbnails, drawn with the same geometry ── */
+  const PEOPLE = [
+    { name: '全职自由创作者', sub: '写作者 · 独立开发 · 视频博主', text: '没有打卡、没有例会，一天是散的。把写作、剪辑、回消息各涂各的颜色，晚上一眼看出「今天到底产出了几小时」，而不是「忙了一天」。',
+      entries: [{ s: 420, e: 510, t: '睡觉' }, { s: 540, e: 705, t: '写作' }, { s: 705, e: 750, t: '吃饭' }, { s: 780, e: 900, t: '写作' }, { s: 900, e: 960, t: '阅读' }, { s: 1020, e: 1080, t: '运动' }, { s: 1080, e: 1125, t: '吃饭' }, { s: 1170, e: 1290, t: '写作' }] },
+    { name: '备考的人', sub: '考研 · 考公 · 考证', text: '前一晚用「计划」画出明天的数学、英语、专业课；当天真实色块盖上去，差在哪一目了然。块底下是每科的当日累计，不用再手算 3.25h。',
+      entries: [{ s: 540, e: 720, t: '写作', plan: true }, { s: 840, e: 1020, t: '阅读', plan: true }, { s: 420, e: 540, t: '睡觉' }, { s: 555, e: 735, t: '写作' }, { s: 735, e: 810, t: '吃饭' }, { s: 810, e: 1020, t: '阅读' }, { s: 1030, e: 1050, t: '吃饭' }, { s: 1140, e: 1200, t: '英语' }, { s: 1200, e: 1260, t: '阅读' }, { s: 1260, e: 1320, t: '写作' }],
+      names: { 写作: '数学', 阅读: '专业课', 英语: '英语' } },
+    { name: '想做 time-engineering 的人', sub: '先量，再改', text: '把时间当工程材料：不靠感觉，靠数据。每天二十秒的记录攒一周，睡眠、深度工作、碎片时间的形状就出来了。之后是让 Agent 读这些块，替你复盘。',
+      entries: [{ s: 420, e: 465, t: '睡觉' }, { s: 480, e: 510, t: '运动' }, { s: 540, e: 690, t: '写作' }, { s: 690, e: 735, t: '吃饭' }, { s: 750, e: 840, t: '阅读' }, { s: 840, e: 990, t: '写作' }, { s: 1020, e: 1050, t: '吃饭' }, { s: 1080, e: 1140, t: '英语' }, { s: 1170, e: 1260, t: '阅读' }],
+      names: { 写作: '深度工作', 阅读: '浅工作', 英语: '学习' } },
+  ];
+  function mini(p) {
+    const hh = 7, lw = 16, w = 260, pt = 6, h = pt + (R1 - R0) * hh + 6, tw = w - lw - 2;
+    const y = (m) => pt + (m - R0 * 60) * hh / 60;
+    const svg = el('svg', { viewBox: `0 0 ${w} ${h}`, class: 'mini', 'aria-hidden': 'true' });
+    hatchDefs(svg, 'm' + p.name.length);
+    for (let hr = R0; hr <= R1; hr += 2) { const yy = y(hr * 60); el('line', { x1: lw, y1: yy, x2: w, y2: yy, stroke: '#e9e9e5' }, svg); const t = el('text', { x: lw - 3, y: yy + 3, 'text-anchor': 'end', 'font-size': 7, fill: '#8c8c86' }, svg); t.textContent = hr; }
+    for (const x of p.entries) if (x.plan) el('rect', { x: lw, y: y(x.s), width: tw, height: y(x.e) - y(x.s), rx: 2, fill: `url(#m${p.name.length}-${x.t})` }, svg);
+    for (const x of p.entries) if (!x.plan) { el('rect', { x: lw, y: y(x.s) + .5, width: tw, height: y(x.e) - y(x.s) - 1, rx: 2, fill: HEX[x.t] }, svg); if (x.e - x.s >= 90) { const t = el('text', { x: lw + tw / 2, y: (y(x.s) + y(x.e)) / 2 + 3, 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 600, fill: 'rgba(28,28,26,.6)' }, svg); t.textContent = hrs(x.e - x.s); } }
+    return svg;
+  }
+  const people = $('people');
+  for (const p of PEOPLE) {
+    const card = document.createElement('article'); card.className = 'person';
+    card.appendChild(mini(p));
+    const sum = {}; for (const x of p.entries) if (!x.plan && x.t !== '睡觉') sum[x.t] = (sum[x.t] || 0) + (x.e - x.s);
+    const tally = Object.entries(sum).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, m]) => `<span style="--c:${HEX[t]}">${(p.names && p.names[t]) || t} ${hrs(m)}</span>`).join('');
+    card.insertAdjacentHTML('beforeend', `<h3>${p.name}<small>${p.sub}</small></h3><p>${p.text}</p><div class="tally">${tally}</div>`);
+    people.appendChild(card);
+  }
+})();
+</script>
+</body>
+</html>
