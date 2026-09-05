@@ -8,16 +8,17 @@
 <meta property="og:title" content="Oneday 荧光笔时间轴 · Obsidian 插件">
 <meta property="og:description" content="一天的时间去哪了，在笔记里涂出来。拖一下就是一段时间；说一句「刚跑步半小时」也行。">
 <meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
 <link rel="icon" type="image/svg+xml" href="./logo.svg">
 <style>
 /* Palette comes from the product: the six default highlighter inks, the hatch of the
    plan layer, and the violet Obsidian uses for the active brush. Nothing else is coloured. */
 :root{
-  --bg:#fff; --bg-2:#f7f6f3; --ink:#1c1c1a; --ink-2:#55554f; --muted:#8c8c86; --line:#e9e9e5; --line-2:#d3d3cd;
+  --bg:#fff; --bg-2:#f7f6f3; --ink:#1c1c1a; --ink-2:#55554f; --muted:#75756f; --line:#e9e9e5; --line-2:#d3d3cd;
   --at:#7c6cf2; --at-soft:rgba(124,108,242,.10);
   --c-mint:#7fd4c1; --c-green:#9bd17b; --c-yellow:#f6c667; --c-grey:#d9d9d9; --c-pink:#f5a3b7; --c-lav:#c8b6e2;
   --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC",system-ui,sans-serif;
-  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono","Cascadia Mono",Consolas,Menlo,monospace;
   --shadow:0 1px 2px rgba(20,20,10,.05),0 10px 30px rgba(20,20,10,.06);
 }
 *{box-sizing:border-box}
@@ -63,7 +64,7 @@ h2{font-size:clamp(26px,3.2vw,32px);line-height:1.3;letter-spacing:-.02em;font-w
 .bar .tools button:hover{background:var(--line);color:var(--ink)}
 .bar .tools button.on{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-2)}
 .demo .body{display:grid;grid-template-columns:1fr 316px;min-height:560px}
-@media (max-width:760px){.demo .body{grid-template-columns:1fr}}
+@media (max-width:760px){.demo .body{grid-template-columns:1fr}.block{order:-1}}
 
 /* left: the note itself */
 .note{padding:28px 32px;font-size:15.5px;line-height:1.85;color:var(--ink-2);border-right:1px solid var(--line);min-width:0}
@@ -75,6 +76,8 @@ h2{font-size:clamp(26px,3.2vw,32px);line-height:1.3;letter-spacing:-.02em;font-w
 .note h5{margin:18px 0 6px;font-size:15px;color:var(--ink)}
 .note ul{margin:0;padding-left:1.2em}
 .note .hint{margin-top:22px;font-size:13px;color:var(--muted)}
+.hint-touch{display:none}
+@media (pointer:coarse){.hint-desk{display:none}.hint-touch{display:inline}}
 .src{display:none;margin:0;font-family:var(--mono);font-size:13px;line-height:1.8;color:var(--ink-2);white-space:pre;overflow-x:auto}
 .src .k{color:var(--muted)}
 .src .plan{color:var(--muted)}
@@ -93,26 +96,27 @@ h2{font-size:clamp(26px,3.2vw,32px);line-height:1.3;letter-spacing:-.02em;font-w
 .pen.on{border-color:var(--at);color:var(--ink);background:#fff}
 .seg[data-plan="1"] button.on{background:var(--ink-2)}
 .tl{position:relative;user-select:none;-webkit-user-select:none}
-.tl svg{display:block;touch-action:none}
+.tl svg{display:block;touch-action:none;max-width:100%;height:auto;overflow:visible}
+@media (pointer:coarse){.tl svg{touch-action:pan-y}}
 .tl .hourlabel{font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
-.tl .hl{stroke:var(--line);stroke-width:1}
-.tl .frame{fill:none;stroke:var(--line-2);stroke-width:1}
+.tl .hl{stroke:var(--line);stroke-width:1;pointer-events:none}
+.tl .frame{fill:none;stroke:var(--line-2);stroke-width:1;pointer-events:none}
 .tl .blk{cursor:crosshair}
 .tl rect.ent{stroke:#fff;stroke-width:1;cursor:pointer;transition:opacity .15s}
 .tl g.sel rect.ent{stroke:var(--at);stroke-width:2}
 .tl text.dur{font-size:12px;font-weight:600;fill:rgba(28,28,26,.72);pointer-events:none;font-variant-numeric:tabular-nums}
-.tl text.nt{font-size:10.5px;fill:rgba(28,28,26,.6);pointer-events:none}
+.tl text.nt{font-size:10.5px;fill:rgba(28,28,26,.78);pointer-events:none}
 .tl text.side{font-size:10.5px;fill:var(--ink-2);pointer-events:none}
-.tl text.ann{font-size:10.5px;fill:var(--at);pointer-events:none}
-.tl .annline{stroke:var(--at);stroke-width:1;stroke-dasharray:2 2}
+.tl text.ann{font-size:10.5px;fill:var(--at);pointer-events:none;stroke:#fff;stroke-width:3;paint-order:stroke}
+.tl .annline{stroke:var(--at);stroke-width:1;stroke-dasharray:2 2;pointer-events:none}
 .tl rect.ghost{fill:var(--c);opacity:.55;stroke:var(--at);stroke-width:1.5;stroke-dasharray:3 2;pointer-events:none}
 .tl text.ghostlbl{font-size:11px;fill:var(--at);font-weight:600;pointer-events:none;font-variant-numeric:tabular-nums}
 .status{font-size:12px;color:var(--muted);min-height:18px;font-variant-numeric:tabular-nums}
 .status b{color:var(--at);font-weight:600}
 .stats{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .stats .nm{color:var(--ink)}
-.stats .bar{height:8px;border-radius:4px;background:var(--bg-2);overflow:hidden}
-.stats .bar i{display:block;height:100%;border-radius:4px;background:var(--c)}
+.stats .meter{height:8px;border-radius:4px;background:var(--bg-2);overflow:hidden}
+.stats .meter i{display:block;height:100%;border-radius:4px;background:var(--c)}
 .stats .hr{color:var(--muted);text-align:right}
 .qc{display:flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:4px 4px 4px 10px;background:var(--bg-2);margin-top:auto}
 .qc.focus{border-color:var(--line-2);background:#fff}
@@ -139,7 +143,7 @@ h2{font-size:clamp(26px,3.2vw,32px);line-height:1.3;letter-spacing:-.02em;font-w
 .person{border:1px solid var(--line);border-radius:18px;background:#fff;padding:22px 22px 20px;display:flex;flex-direction:column;gap:14px}
 .person .mini{display:block;width:100%;height:auto}
 .person h3{margin:0;font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.35}
-.person h3 small{display:block;font-size:12.5px;font-weight:500;color:var(--muted);letter-spacing:.02em;margin-top:2px}
+.person .sub{margin:-8px 0 0;font-size:12.5px;color:var(--muted);letter-spacing:.02em}
 .person p{margin:0;font-size:14.5px;line-height:1.75;color:var(--ink-2);flex:1}
 .person .tally{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;border-top:1px solid var(--line);padding-top:12px}
 .person .tally span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:5px;vertical-align:0}
@@ -218,7 +222,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
 <section class="hero wrap">
   <svg class="glyph" viewBox="0 0 64 64" aria-hidden="true"><path d="M13 8v48" stroke="#1c1c1a" stroke-width="2" stroke-linecap="round"/><rect x="20" y="9" width="36" height="15" rx="4" fill="#7fd4c1"/><rect x="20" y="27" width="36" height="9" rx="3" fill="#f6c667"/><rect x="20" y="39" width="36" height="17" rx="4" fill="#f5a3b7"/></svg>
   <h1 class="h1">一天的时间去哪了，<br>在笔记里<mark>涂</mark>出来</h1>
-  <p class="lead">考研日记本上那根手画的时间轴，搬进 Obsidian。选一支荧光笔，在轴上拖一下就是一段时间；不想动手，说一句「刚跑步半小时」也行。一切都是笔记里的一段 Markdown。</p>
+  <p class="lead">考研时手画在日记本上的那根时间轴，搬进 Obsidian。选一支荧光笔，在轴上拖一下就是一段时间；不想动手，说一句「刚跑步半小时」也行。一切都是笔记里的一段 Markdown。</p>
   <div class="cta">
     <a class="btn" href="#install">安装到 Obsidian</a>
     <a class="link" href="#demo">先在下面涂一笔 ↓</a>
@@ -236,7 +240,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
           <ol><li>第三章初稿写完，先不改。</li><li>把上周的读者留言回一遍。</li><li>晚上读完《写作这回事》最后两章。</li></ol>
           <h5>记住</h5>
           <ul><li>上午别开消息，写完再看。</li><li>饭后立刻回到桌前。</li></ul>
-          <p class="hint">→ 右边就是插件。选一支笔，在时间轴上按住拖一下；双击色块写备注，右键有更多。</p>
+          <p class="hint"><span class="hint-desk">→ 右边就是插件。选一支笔，在时间轴上按住拖一下，已有色块上也能起笔；点两下色块写备注，右键有更多。</span><span class="hint-touch">↑ 上面就是插件。手机上先看演示，桌面端再来涂。</span></p>
         </div>
         <pre class="src" id="src" aria-live="polite"></pre>
       </div>
@@ -264,15 +268,15 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
   <h2>它是为这几种人做的</h2>
   <p class="lead">共同点只有一个：没有人替你安排时间，所以你得自己看见它。</p>
   <div class="people" id="people"></div>
-  <p class="coda">每天花的功夫是 <b>拖几下</b>。一周之后，你会第一次看见自己的时间长什么样——然后才谈得上改。</p>
+  <p class="coda">每天花的功夫是 <b>拖几下</b>。一周之后，你的时间长什么样就摆在那了，然后才谈得上改。</p>
 </section>
 
 <section class="three wrap" id="feat">
-  <h2>小而完整的三件事</h2>
+  <h2>只做三件事</h2>
   <p class="lead">不做日历、不做番茄钟，只把「纸上那根时间轴」做顺手。</p>
   <div class="cols">
-    <div><h3>手画，即记录</h3><p>顶部是荧光笔色板，一种颜色一类事。在轴上拖一下就是一段，时长自动写在中间；重叠的事并排放，放不下的备注挪到旁边。前一晚用「计划」画的斜线块，第二天被真实色块盖过去——和纸上的铅笔与荧光笔一样。</p></div>
-    <div><h3>一句话，让 <em>AI</em> 画</h3><p>块底下有个输入框。写「刚跑步半小时」「12 点半吃的饭」，它算好起止、挑好颜色、写回笔记。也可以把随附的 skill 交给你自己的 Agent，让它替你记。</p></div>
+    <div><h3>手画，即记录</h3><p>顶部是荧光笔色板，一种颜色一类事。在轴上拖一下就是一段，时长自动写在中间。前一晚用「计划」画的斜线块，第二天被真实色块盖过去，像纸上的铅笔和荧光笔。</p></div>
+    <div><h3>一句话，让 <em>AI</em> 画</h3><p>块底下有个输入框。写「刚跑步半小时」「12 点半到 1 点吃饭」，它算好起止、挑好颜色、写回笔记；说不清时长它会追问一句。也可以把随附的 skill 交给你自己的 Agent，让它替你记。</p></div>
     <div><h3>Markdown 是本体</h3><p>时间轴是笔记里一个 <code>timeline</code> 代码块，一行一段时间。画的每一笔都写回源码，改源码时间轴也跟着变。Git 能 diff，同步不会丢，卸载插件也还能读。</p></div>
   </div>
   <div class="md">
@@ -284,7 +288,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
 11:45-12:30 吃饭
 <em>@13:10</em> 有点困，散步十分钟
 <i>```</i></pre>
-    <p>这就是右上角那根时间轴的全部。<code>plan</code> 是计划层，<code>@</code> 是一个时间点的批注，时长不用写，渲染时算。</p>
+    <p>演示块的源码就是这样几行。<code>plan</code> 是计划层，<code>@</code> 是一个时间点的批注，时长不用写，渲染时算。</p>
   </div>
   <p class="also">同一个块里还能放 <b>打卡</b>、<b>待办</b> 和 <b>每日一句</b>，把待办拖到时间轴上就成了计划。要不要用，随你。</p>
 </section>
@@ -297,10 +301,11 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
     <div class="step"><b>2 · 加仓库</b>BRAT 设置里点「Add Beta plugin」，填 <code>IvyYang1999/oneday</code>。</div>
     <div class="step"><b>3 · 启用</b>回到第三方插件列表启用 Oneday。在任何笔记里输入 <code>```timeline</code>，或用命令面板「插入 Oneday 时间轴」。</div>
   </div>
-  <p class="spec">免费 · 开源 · 桌面与手机 · Obsidian 1.8 以上 · 编辑与阅读视图都能画 · 快速记录需要你自己的模型 API Key（GLM / DeepSeek / OpenAI / Claude 都行）</p>
+  <p class="spec">v0.1.0 · 免费 · 开源 · 桌面与手机 · Obsidian 1.8.7 以上 · 编辑与阅读视图都能画 · 快速记录需要你自己的模型 API Key（GLM / DeepSeek / OpenAI / Claude 都行）</p>
   <div class="qs">
     <details open><summary>数据存在哪里？</summary><p>就在那篇笔记里，一个 <code>timeline</code> 代码块。没有数据库、没有附属文件。随 iCloud / Git / Obsidian Sync 一起走，没装插件的地方打开也能读。</p></details>
-    <details><summary>不配 AI 能用吗？</summary><p>完全可以。画色块、备注、计划层、统计都不联网。快速记录是可选项：填了 API Key 才出现，不填就只是一个不显示的输入框。</p></details>
+    <details><summary>不配 AI 能用吗？</summary><p>完全可以。画色块、备注、计划层、统计都不联网。快速记录是可选项：没填 API Key 时那一行只是一句「去设置填 Key」的提示，不想看见可以在块菜单里把这个组件隐藏。</p></details>
+    <details><summary>手机上能用吗？</summary><p>能看也能画，Obsidian 移动端一样渲染。快速记录在手机上走模型 API；本机 Claude CLI 这个后端只有桌面端有。</p></details>
     <details><summary>颜色和分类怎么定？</summary><p>设置里维护一张「分类 → 颜色」表，这就是你的荧光笔色号。笔记里只写分类名，改颜色不会动历史记录。</p></details>
   </div>
 </section>
@@ -309,8 +314,8 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
   <div class="head"><h2>同一个作者的其他 Obsidian 插件</h2><a class="link" href="https://yytyyf.com" target="_blank" rel="noopener">全部作品 →</a></div>
   <div class="rail">
     <a class="pc" href="https://obsidian-inline-comments.vercel.app/" target="_blank" rel="noopener">
-      <div class="pc-body"><span class="ico" aria-hidden="true">@</span><h3 class="t">划线评论</h3><p class="d">在笔记里划线留言，@ 一个 AI 会话来回复。</p><div class="pc-tags"><span class="st live">已上线</span><span class="platform">Obsidian 插件</span></div></div>
-      <div class="pc-foot"><span>看看划线评论</span><span aria-hidden="true">↗</span></div>
+      <div class="pc-body"><span class="ico" aria-hidden="true">@</span><h3 class="t">Agent Comments · 旁批</h3><p class="d">在笔记原文旁留言，@ 一个 Agent 来回复。</p><div class="pc-tags"><span class="st live">已上线</span><span class="platform">Obsidian 插件</span></div></div>
+      <div class="pc-foot"><span>看看旁批</span><span aria-hidden="true">↗</span></div>
     </a>
     <a class="pc" href="https://obsidian-web-desk.vercel.app/" target="_blank" rel="noopener">
       <div class="pc-body"><span class="ico" aria-hidden="true">🗂️</span><h3 class="t">NaviBoard · 画布收藏夹</h3><p class="d">收藏的网页摆成一张自由画布，当首页用。</p><div class="pc-tags"><span class="st live">已上线</span><span class="platform">Obsidian 插件</span></div></div>
@@ -375,8 +380,8 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
   }
 
   /* ── the live block ── */
-  const HH = 30, LW = 30, PT = 12, PB = 12, W = 284, GAP = 2, SIDE = 0;
-  const TW = W - LW - 6;
+  const HH = 30, LW = 30, PT = 12, PB = 12, W = 284, GAP = 2, SIDE = 64;
+  const TW = W - LW - 6 - SIDE;
   const yOf = (m) => PT + (m - R0 * 60) * HH / 60;
   const mOf = (y) => R0 * 60 + (y - PT) * 60 / HH;
   const snap = (m) => Math.max(R0 * 60, Math.min(R1 * 60, Math.round(m / SNAP) * SNAP));
@@ -391,7 +396,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
   ]);
   const ANN = [{ m: 13 * 60 + 10, text: '有点困，散步十分钟' }];
 
-  let entries = INITIAL(), pen = '写作', plan = false, sel = -1, lastNew = -1;
+  let entries = INITIAL(), pen = '写作', plan = false, sel = -1, lastNew = -1, lastDown = { i: -1, t: 0 };
   let ghost = null, autoplayOn = true, run = 0;
 
   const tl = $('tl'), status = $('status'), statsEl = $('stats'), src = $('src'), pop = $('pop'), popIn = $('popIn'), menu = $('menu'), toast = $('toast');
@@ -409,7 +414,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
     const b = e.target.closest('button'); if (!b) return;
     plan = b.dataset.mode === 'plan'; $('seg').dataset.plan = plan ? '1' : '0';
     [...$('seg').children].forEach((x) => x.classList.toggle('on', x === b));
-    status.textContent = plan ? '计划模式：画出来的是斜线块，明天用真实色块盖过去' : '从起点拖到终点，15 分钟一格';
+    status.textContent = plan ? '计划模式：画出来的是斜线块，明天用真实色块盖过去' : HINT;
   });
 
   function render() {
@@ -439,13 +444,13 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
       const d = hrs(x.e - x.s), thin = h < 30;
       const dt = el('text', { x: cx + cw / 2, y: y0 + h / 2 + (thin || !x.note ? 4 : -2), 'text-anchor': 'middle', class: 'dur' }, g); dt.textContent = d;
       if (x.note) {
-        if (thin || cw < 90) { const st = el('text', { x: W - 4, y: y0 + h / 2 + 4, 'text-anchor': 'end', class: 'side' }, g); st.textContent = x.note.length > 6 ? x.note.slice(0, 6) + '…' : x.note; st.setAttribute('x', LW + TW + 2); st.setAttribute('text-anchor', 'start'); }
+        if (thin || cw < 90) { const st = el('text', { x: LW + TW + 4, y: y0 + h / 2 + 4, class: 'side' }, g); st.textContent = x.note.length > 6 ? x.note.slice(0, 6) + '…' : x.note; }
         else { const nt = el('text', { x: cx + cw / 2, y: y0 + h / 2 + 13, 'text-anchor': 'middle', class: 'nt' }, g); nt.textContent = x.note.length > 10 ? x.note.slice(0, 10) + '…' : x.note; }
       }
     }
     for (const a of ANN) {
       const y = yOf(a.m);
-      el('line', { x1: LW, y1: y, x2: W - 6, y2: y, class: 'annline' }, svg);
+      el('line', { x1: LW, y1: y, x2: LW + TW, y2: y, class: 'annline' }, svg);
       const t = el('text', { x: LW + 4, y: y - 3, class: 'ann' }, svg); t.textContent = `@${fmt(a.m)} ${a.text}`;
     }
     if (ghost) {
@@ -464,11 +469,11 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
     for (const x of entries) if (!x.plan && x.t !== '睡觉') sum[x.t] = (sum[x.t] || 0) + (x.e - x.s);
     const rows = Object.entries(sum).sort((a, b) => b[1] - a[1]);
     const max = Math.max(1, ...rows.map((r) => r[1]));
-    statsEl.innerHTML = rows.map(([t, m]) => `<span class="nm">${t}</span><span class="bar"><i style="--c:${HEX[t]};width:${(m / max * 100).toFixed(0)}%"></i></span><span class="hr">${hrs(m)}</span>`).join('');
+    statsEl.innerHTML = rows.map(([t, m]) => `<span class="nm">${t}</span><span class="meter"><i style="--c:${HEX[t]};width:${(m / max * 100).toFixed(0)}%"></i></span><span class="hr">${hrs(m)}</span>`).join('');
   }
   function renderSrc() {
     const lines = ['<span class="k">```timeline</span>', '<span class="k">date: 2026-09-05</span>', '<span class="k">range: 7-23</span>', '<span class="k">---</span>'];
-    const sorted = entries.map((x, i) => ({ ...x, i })).sort((a, b) => a.s - b.s || (a.plan ? -1 : 1));
+    const sorted = entries.map((x, i) => ({ ...x, i })).sort((a, b) => a.s - b.s || (a.plan ? 0 : 1) - (b.plan ? 0 : 1));
     for (const x of sorted) {
       const line = `${x.plan ? '<span class="plan">plan</span> ' : ''}${fmt(x.s)}-${fmt(x.e)} ${x.t}${x.note ? ' ' + x.note : ''}`;
       lines.push(x.i === lastNew ? `<span class="new">${line}</span>` : line);
@@ -480,39 +485,48 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
   $('srcBtn').addEventListener('click', () => { const on = $('note').classList.toggle('source'); $('srcBtn').classList.toggle('on', on); });
 
   /* ── drawing ── */
+  // Select without rebuilding the SVG, so a second press still lands on the same node.
+  function setSel(i) { sel = i; tl.querySelectorAll('.ent-g').forEach((g) => g.classList.toggle('sel', +g.dataset.i === i)); }
   let drawing = null;
   const posM = (ev) => { const r = tl.querySelector('svg').getBoundingClientRect(); return mOf(ev.clientY - r.top); };
+  const HINT = matchMedia('(pointer:coarse)').matches ? '手机上先看演示，桌面端再来涂' : '从起点拖到终点，15 分钟一格；已有色块上也能起笔';
   tl.addEventListener('pointerdown', (ev) => {
     if (ev.button !== 0) return;
     closeFloat(); autoplayOn = false;
     const g = ev.target.closest('.ent-g');
-    if (g) { sel = +g.dataset.i; render(); return; }
-    if (!ev.target.classList.contains('blk')) return;
-    sel = -1; drawing = { s: snap(posM(ev)) }; ghost = { s: drawing.s, e: drawing.s };
-    tl.setPointerCapture(ev.pointerId); render();
-    status.innerHTML = `起点 <b>${fmt(drawing.s)}</b>，拖到终点`;
+    if (!g && !ev.target.classList.contains('blk')) return;
+    const idx = g ? +g.dataset.i : -1;
+    if (ev.pointerType === 'touch') { setSel(idx); return; }            // touch: look and pick, keep page scroll
+    if (idx >= 0 && idx === lastDown.i && ev.timeStamp - lastDown.t < 350) { ev.preventDefault(); lastDown = { i: -1, t: 0 }; openNote(idx, ev); return; }   // preventDefault keeps the compat mousedown from stealing focus back from the popover
+    lastDown = { i: idx, t: ev.timeStamp };
+    drawing = { s: snap(posM(ev)), hit: idx, moved: false }; ghost = null;
+    tl.setPointerCapture(ev.pointerId);
   });
   tl.addEventListener('pointermove', (ev) => {
     if (!drawing) return;
-    const e = snap(posM(ev)); if (e === ghost.e) return;
-    ghost.e = e; render();
+    const e = snap(posM(ev));
+    if (!drawing.moved && e === drawing.s) return;
+    drawing.moved = true;
+    if (ghost && e === ghost.e) return;
+    ghost = { s: drawing.s, e }; render();
     const a = Math.min(drawing.s, e), b = Math.max(drawing.s, e);
     status.innerHTML = b > a ? `<b>${fmt(a)}–${fmt(b)}</b> · ${hrs(b - a)} · ${plan ? '计划' : ''}${pen}` : `起点 <b>${fmt(a)}</b>，拖到终点`;
   });
   const endDraw = () => {
     if (!drawing) return;
-    const a = Math.min(drawing.s, ghost.e), b = Math.max(drawing.s, ghost.e);
-    drawing = null; ghost = null;
-    if (b - a >= SNAP) { entries.push({ s: a, e: b, t: pen, plan }); lastNew = entries.length - 1; sel = lastNew; showToast(`${plan ? '计划' : '记录'} ${fmt(a)}–${fmt(b)} ${pen} · 已写回笔记`); status.textContent = '双击色块写备注，右键有更多；Delete 删除'; }
-    else status.textContent = '从起点拖到终点，15 分钟一格';
+    const d = drawing; drawing = null;
+    if (!d.moved) { ghost = null; setSel(d.hit); status.textContent = d.hit >= 0 ? '再点一下写备注，右键有更多；Delete 删除' : HINT; return; }
+    const a = Math.min(d.s, ghost.e), b = Math.max(d.s, ghost.e);
+    ghost = null;
+    if (b - a >= SNAP) { entries.push({ s: a, e: b, t: pen, plan }); lastNew = entries.length - 1; sel = lastNew; showToast(`${plan ? '计划' : '记录'} ${fmt(a)}–${fmt(b)} ${pen} · 已写回笔记`); status.textContent = '点两下色块写备注，右键有更多；Delete 删除'; }
+    else status.textContent = HINT;
     render();
   };
   tl.addEventListener('pointerup', endDraw); tl.addEventListener('pointercancel', endDraw);
 
-  tl.addEventListener('dblclick', (ev) => { const g = ev.target.closest('.ent-g'); if (g) openNote(+g.dataset.i, ev); });
   tl.addEventListener('contextmenu', (ev) => {
     const g = ev.target.closest('.ent-g'); if (!g) return; ev.preventDefault();
-    const i = +g.dataset.i; sel = i; render();
+    const i = +g.dataset.i; setSel(i);
     const x = entries[i];
     menu.innerHTML = '';
     const add = (label, fn, cls) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.addEventListener('click', () => { closeFloat(); fn(); }); menu.appendChild(b); };
@@ -537,25 +551,37 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
     if (ev.key === 'Enter') { entries[noteIdx].note = popIn.value.trim(); lastNew = noteIdx; closeFloat(); render(); }
     if (ev.key === 'Escape') closeFloat();
   });
-  popIn.addEventListener('blur', () => setTimeout(closeFloat, 120));
+  popIn.addEventListener('blur', () => setTimeout(() => pop.classList.remove('on'), 120));
   function closeFloat() { pop.classList.remove('on'); menu.classList.remove('on'); }
-  document.addEventListener('pointerdown', (ev) => { if (!ev.target.closest('.menu,.pop')) menu.classList.remove('on'); });
+  document.addEventListener('pointerdown', (ev) => { if (!ev.target.closest('.menu,.pop')) menu.classList.remove('on'); if (sel >= 0 && !ev.target.closest('#tl,.menu,.pop')) setSel(-1); });
 
   /* ── quick capture: a tiny stand-in for the model call ── */
+  const DEMO_NOW = 16 * 60 + 30;   // the demo's "now": keeps the story on the left consistent for every visitor
   function parseNL(text) {
-    let dur = 0;
-    let m = text.match(/(\d+(?:\.\d+)?)\s*(小时|h|H)/); if (m) dur = Math.round(+m[1] * 60);
-    if (!dur && (m = text.match(/(\d+)\s*(分钟|分|min)/))) dur = +m[1];
-    if (!dur && /半小时|半个小时/.test(text)) dur = 30;
-    if (!dur && /一小时|1小时|一个小时/.test(text)) dur = 60;
-    if (!dur && /两小时|2小时|两个小时/.test(text)) dur = 120;
-    if (!dur) return null;
     const type = /跑|健身|运动|游泳|骑|走路|散步|瑜伽/.test(text) ? '运动' : /写|稿|文章|改/.test(text) ? '写作' : /读|书|看/.test(text) ? '阅读' : /英|单词|听力/.test(text) ? '英语' : /饭|吃|餐|咖啡/.test(text) ? '吃饭' : /睡|午休|躺/.test(text) ? '睡觉' : '阅读';
-    const now = new Date(); let end = now.getHours() * 60 + now.getMinutes();
-    if (end < R0 * 60 + 60 || end > R1 * 60) end = 16 * 60 + 30;
-    const busy = entries.filter((x) => !x.plan).map((x) => x.e); if (busy.length) end = Math.max(end, Math.min(...busy) );
-    end = snap(end); const start = Math.max(R0 * 60, end - dur);
-    const note = text.replace(/^(我|刚刚|刚才|刚)+/, '').replace(/(了)?(半小时|半个小时|一小时|两小时|\d+(?:\.\d+)?\s*(小时|分钟|分|h|min))/g, '').replace(/^[，,、\s]+|[，,、。\s]+$/g, '');
+    let start, end, m;
+    const clock = (h, mm, half) => (+h % 24) * 60 + (mm ? +mm : half ? 30 : 0);
+    // "9 点到 11 点" / "12 点半到 1 点" / "09:15-10:30"
+    if ((m = text.match(/(\d{1,2})\s*[:：点]\s*(\d{2})?\s*(半)?\s*[-–—~到至]\s*(\d{1,2})\s*[:：点]?\s*(\d{2})?\s*(半)?/))) {
+      start = clock(m[1], m[2], m[3]); end = clock(m[4], m[5], m[6]);
+      if (end <= start) end += 12 * 60;                 // "12 点半到 1 点" → 13:00
+      if (start < R0 * 60) { start += 12 * 60; end += 12 * 60; }
+      if (end > R1 * 60) return null;
+    } else {
+      let dur = 0;
+      if ((m = text.match(/(\d+(?:\.\d+)?)\s*(小时|h|H)/))) dur = Math.round(+m[1] * 60);
+      if (!dur && (m = text.match(/(\d+)\s*(分钟|分|min)/))) dur = +m[1];
+      if (!dur && /半小时|半个小时/.test(text)) dur = 30;
+      if (!dur && /一小时|一个小时/.test(text)) dur = 60;
+      if (!dur && /两小时|两个小时/.test(text)) dur = 120;
+      if (!dur) return null;
+      end = snap(DEMO_NOW); start = Math.max(R0 * 60, end - dur);
+    }
+    let note = text.replace(/^(我|刚刚|刚才|刚|今天)+/, '')
+      .replace(/(\d{1,2})\s*[:：点]\s*(\d{2})?\s*(半)?\s*[-–—~到至]\s*(\d{1,2})\s*[:：点]?\s*(\d{2})?\s*(半)?/g, '')
+      .replace(/(了)?(半小时|半个小时|一小时|一个小时|两小时|两个小时|\d+(?:\.\d+)?\s*(小时|分钟|分|h|min))/g, '')
+      .replace(/^[，,、的了\s]+|[，,、。的了\s]+$/g, '');
+    if (note.length < 2) note = '';
     return { s: start, e: end, t: type, note: note.length > 12 ? note.slice(0, 12) : note };
   }
   const qc = $('qc'), qi = $('qi'), qgo = $('qgo');
@@ -564,11 +590,13 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
   qc.addEventListener('submit', (ev) => { ev.preventDefault(); submitQC(qi.value); });
   function submitQC(text) {
     text = text.trim(); if (!text) return;
+    const my = run;
     qgo.disabled = true; qgo.textContent = '生成中…';
     setTimeout(() => {
       qgo.disabled = false; qgo.textContent = '记录';
+      if (my !== run) return;
       const r = parseNL(text);
-      if (!r) { showToast('它会追问：这件事花了多久？'); return; }
+      if (!r) { showToast('它会追问一句：这件事花了多久？'); return; }
       entries.push(r); lastNew = entries.length - 1; sel = lastNew; qi.value = ''; render();
       showToast(`已记录 1 条：${fmt(r.s)}–${fmt(r.e)} ${r.t}`);
     }, reduce ? 50 : 700);
@@ -577,9 +605,10 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
 
   /* ── autoplay: draw one block, then type one sentence ── */
   const sleep = (ms) => new Promise((r) => setTimeout(r, reduce ? 0 : ms));
-  async function play() {
+  async function play(force) {
+    if (!force && !autoplayOn) return;
     const my = ++run; entries = INITIAL(); sel = -1; lastNew = -1; ghost = null; qi.value = ''; autoplayOn = true; render();
-    status.textContent = '从起点拖到终点，15 分钟一格';
+    status.textContent = HINT;
     await sleep(900); if (my !== run || !autoplayOn) return;
     pen = '写作'; renderPens();
     const s = 14 * 60, e = 15 * 60 + 30;
@@ -589,7 +618,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
       await sleep(110);
     }
     ghost = null; entries.push({ s, e, t: '写作', note: '改第三章' }); lastNew = entries.length - 1; sel = lastNew; render();
-    showToast('记录 14:00–15:30 写作 · 已写回笔记'); status.textContent = '双击色块写备注，右键有更多；Delete 删除';
+    showToast('记录 14:00–15:30 写作 · 已写回笔记'); status.textContent = '点两下色块写备注，右键有更多；Delete 删除';
     await sleep(1500); if (my !== run || !autoplayOn) return;
     const text = '刚跑步半小时';
     qc.classList.add('focus');
@@ -597,11 +626,11 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
     await sleep(350); if (my !== run || !autoplayOn) return;
     submitQC(text); qc.classList.remove('focus');
   }
-  $('replay').addEventListener('click', play);
+  $('replay').addEventListener('click', () => play(true));
 
-  renderPens(); render();
+  renderPens(); render(); status.textContent = HINT;
   let played = false;
-  const io = new IntersectionObserver((es) => { if (es.some((x) => x.isIntersecting) && !played) { played = true; play(); } }, { threshold: .5 });
+  const io = new IntersectionObserver((es) => { if (es.some((x) => x.isIntersecting) && !played && autoplayOn) { played = true; play(); } }, { threshold: .15, rootMargin: '0px 0px -15% 0px' });
   io.observe($('demo'));
 
   /* ── persona thumbnails, drawn with the same geometry ── */
@@ -611,7 +640,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
     { name: '备考的人', sub: '考研 · 考公 · 考证', text: '前一晚用「计划」画出明天的数学、英语、专业课；当天真实色块盖上去，差在哪一目了然。块底下是每科的当日累计，不用再手算 3.25h。',
       entries: [{ s: 540, e: 720, t: '写作', plan: true }, { s: 840, e: 1020, t: '阅读', plan: true }, { s: 420, e: 540, t: '睡觉' }, { s: 555, e: 735, t: '写作' }, { s: 735, e: 810, t: '吃饭' }, { s: 810, e: 1020, t: '阅读' }, { s: 1030, e: 1050, t: '吃饭' }, { s: 1140, e: 1200, t: '英语' }, { s: 1200, e: 1260, t: '阅读' }, { s: 1260, e: 1320, t: '写作' }],
       names: { 写作: '数学', 阅读: '专业课', 英语: '英语' } },
-    { name: '想做 time-engineering 的人', sub: '先量，再改', text: '把时间当工程材料：不靠感觉，靠数据。每天二十秒的记录攒一周，睡眠、深度工作、碎片时间的形状就出来了。之后是让 Agent 读这些块，替你复盘。',
+    { name: '想做 time-engineering 的人', sub: '独立开发者 · 远程工作者 · 自我量化爱好者', text: '把时间当工程材料：先量，再改。不靠感觉，靠每天二十秒攒出来的数据。一周之后，睡眠、深度工作、碎片时间的形状就出来了，该砍什么一眼看得见。',
       entries: [{ s: 420, e: 465, t: '睡觉' }, { s: 480, e: 510, t: '运动' }, { s: 540, e: 690, t: '写作' }, { s: 690, e: 735, t: '吃饭' }, { s: 750, e: 840, t: '阅读' }, { s: 840, e: 990, t: '写作' }, { s: 1020, e: 1050, t: '吃饭' }, { s: 1080, e: 1140, t: '英语' }, { s: 1170, e: 1260, t: '阅读' }],
       names: { 写作: '深度工作', 阅读: '浅工作', 英语: '学习' } },
   ];
@@ -631,7 +660,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:2
     card.appendChild(mini(p));
     const sum = {}; for (const x of p.entries) if (!x.plan && x.t !== '睡觉') sum[x.t] = (sum[x.t] || 0) + (x.e - x.s);
     const tally = Object.entries(sum).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, m]) => `<span style="--c:${HEX[t]}">${(p.names && p.names[t]) || t} ${hrs(m)}</span>`).join('');
-    card.insertAdjacentHTML('beforeend', `<h3>${p.name}<small>${p.sub}</small></h3><p>${p.text}</p><div class="tally">${tally}</div>`);
+    card.insertAdjacentHTML('beforeend', `<h3>${p.name}</h3><p class="sub">${p.sub}</p><p>${p.text}</p><div class="tally">${tally}</div>`);
     people.appendChild(card);
   }
 })();
